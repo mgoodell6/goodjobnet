@@ -40,7 +40,7 @@ function Login({ onLogin }) {
           navigate('/dashboard');
         }
       } else {
-        alert(data.error || 'Invalid credentials');
+        alert((data.error || 'Invalid credentials') + (data.details ? '\n\nDetails: ' + data.details : ''));
       }
     } catch (err) {
       console.error("Login Error:", err);

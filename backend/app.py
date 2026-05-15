@@ -31,21 +31,13 @@ def get_gsheets_client():
     global _gsheets_client
     if _gsheets_client is None:
         if "GOOGLE_CREDENTIALS" in os.environ:
-            import tempfile
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp:
-                # If the env var is a string representation of the JSON
-                try:
-                    cred_data = json.loads(os.environ["GOOGLE_CREDENTIALS"])
-                    json.dump(cred_data, temp)
-                except json.JSONDecodeError:
-                    # Fallback in case it's literally just the raw file contents
-                    temp.write(os.environ["GOOGLE_CREDENTIALS"])
-                temp_path = temp.name
-            _gsheets_client = pygsheets.authorize(service_file=temp_path)
             try:
-                os.remove(temp_path)
-            except:
-                pass
+                _gsheets_client = pygsheets.authorize(service_account_env_var='GOOGLE_CREDENTIALS')
+            except Exception as e:
+                # Print to server logs for debugging
+                print("Failed to authorize using GOOGLE_CREDENTIALS env var:", str(e))
+                # Fallback to local file if needed (mostly for local development with both set)
+                _gsheets_client = pygsheets.authorize(service_file=SERVICE_ACCOUNT_FILE)
         else:
             _gsheets_client = pygsheets.authorize(service_file=SERVICE_ACCOUNT_FILE)
     return _gsheets_client
