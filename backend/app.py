@@ -183,7 +183,7 @@ def search_jobs():
                 continue
                 
             # Filter by job type
-            row_job_type = str(row.get("Company Type / Industry", row.get("Company Type", "")))
+            row_job_type = str(row.get("Available Jobs", row.get("Job Title", "")))
             if job_types and row_job_type not in job_types and "Other" not in job_types:
                 match = False
                 for jt in job_types:
