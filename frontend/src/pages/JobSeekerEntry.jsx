@@ -17,6 +17,10 @@ function JobSeekerEntry({ user }) {
 
     // Handle multiple selections for desired_job_types
     const desired_job_types = Array.from(e.target.querySelectorAll('select[name="desired_job_types"] option:checked')).map(el => el.value);
+    const otherJobType = formData.get('other_job_type');
+    if (otherJobType && otherJobType.trim() !== '') {
+      desired_job_types.push(otherJobType.trim());
+    }
     data.desired_job_types = desired_job_types;
 
     // Handle checkboxes
@@ -131,26 +135,39 @@ function JobSeekerEntry({ user }) {
             <div className="input-group full-width">
               <label>Desired Job type(s) (Hold Ctrl/Cmd to select multiple)</label>
               <select name="desired_job_types" multiple size="4">
-                <option value="">Select Type...</option>
-                <option value="A/C Repair">A/C Repair</option>
+                <option value="HVAC Repair">HVAC Repair</option>
                 <option value="Accountant">Accountant</option>
                 <option value="Airport (Baggage/customer service/ground ops)">Airport (Baggage/customer service/ground ops)</option>
                 <option value="Auto Parts">Auto Parts</option>
                 <option value="Car Wash Attendant">Car Wash Attendant</option>
+                <option value="Cashier">Cashier</option>
+                <option value="Catering">Catering</option>
                 <option value="CDL Driver">CDL Driver</option>
                 <option value="Cement Mason/finisher">Cement Mason/finisher</option>
+                <option value="Computer / IT">Computer / IT</option>
                 <option value="Computer Programmer">Computer Programmer</option>
+                <option value="Construction">Construction</option>
                 <option value="Corrections">Corrections</option>
                 <option value="Custodian">Custodian</option>
+                <option value="Customer service">Customer service</option>
+                <option value="Data Entry">Data Entry</option>
+                <option value="Day Care / Preschool">Day Care/ Preschool</option>
                 <option value="Delivery Driver">Delivery Driver</option>
                 <option value="Drywaller">Drywaller</option>
                 <option value="Educator">Educator</option>
                 <option value="Electrician">Electrician</option>
+                <option value="Engineering">Engineering</option>
+                <option value="Event Staff">Event Staff</option>
+                <option value="Fast food">Fast food</option>
+                <option value="Gas Station Attendant">Gas Station Attendant</option>
                 <option value="Grocery Store">Grocery Store</option>
                 <option value="Healthcare">Healthcare</option>
                 <option value="Hotel/Hospitality">Hotel/Hospitality</option>
-                <option value="Information Technology (IT)">Information Technology</option>
+                <option value="Housekeeper">Housekeeper</option>
+                <option value="Information Technology (IT)">Information Technology (IT)</option>
                 <option value="Landscaping">Landscaping</option>
+                <option value="Manager (Department/Project)">Manager (Department/Project)</option>
+                <option value="Manager (Store/Crew)">Manager (Store/Crew)</option>
                 <option value="Mechanic">Mechanic</option>
                 <option value="Manufacturing">Manufacturing</option>
                 <option value="Nursing">Nursing</option>
@@ -161,12 +178,17 @@ function JobSeekerEntry({ user }) {
                 <option value="Retail">Retail</option>
                 <option value="Sales">Sales</option>
                 <option value="Security">Security</option>
-                <option value="Telemarketing">Telemarketing</option>
+                <option value="Stocking">Stocking</option>
+                <option value="Telephone/Call Center/Scheduling">Telephone/Call Center/Scheduling</option>
                 <option value="Theme Park">Theme Park</option>
                 <option value="Trucking/Transportation">Trucking/Transportation</option>
                 <option value="Warehousing/Logistics">Warehousing/Logistics</option>
-                <option value="Other">Other</option>
               </select>
+            </div>
+
+            <div className="input-group full-width">
+              <label>Other Job Type (Not in list)</label>
+              <input type="text" name="other_job_type" placeholder="Enter other job type..." />
             </div>
 
             <div className="input-group full-width">

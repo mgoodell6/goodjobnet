@@ -14,7 +14,9 @@ function EmploymentCenterDashboard() {
     new_seekers_url: '#',
     expired_recently: '...',
     total_hot_jobs: '...',
-    total_job_seekers: '...'
+    total_job_seekers: '...',
+    job_types: {},
+    seeker_types: {}
   });
 
   useEffect(() => {
@@ -31,7 +33,9 @@ function EmploymentCenterDashboard() {
             new_seekers_url: data.new_seekers_url,
             expired_recently: data.expired_recently,
             total_hot_jobs: data.total_hot_jobs,
-            total_job_seekers: data.total_job_seekers
+            total_job_seekers: data.total_job_seekers,
+            job_types: data.job_types || {},
+            seeker_types: data.seeker_types || {}
           });
         }
       })
@@ -56,6 +60,84 @@ function EmploymentCenterDashboard() {
     setUpdatingSnapshot(false);
   };
 
+  const getSharedColorMap = () => {
+    const map = new Map();
+    map.set('Other', '#95a5a6');
+    
+    let jobTypesArr = Object.entries(stats.job_types || {}).map(([l, c]) => ({ label: l, count: c })).sort((a, b) => b.count - a.count).slice(0, 5);
+    let seekerTypesArr = Object.entries(stats.seeker_types || {}).map(([l, c]) => ({ label: l, count: c })).sort((a, b) => b.count - a.count).slice(0, 5);
+    
+    const allLabels = [...new Set([...jobTypesArr.map(t => t.label), ...seekerTypesArr.map(t => t.label)])];
+    const palette = ['#3a7bd5', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#1abc9c', '#d35400', '#2980b9', '#27ae60', '#e67e22'];
+    
+    let colorIndex = 0;
+    allLabels.forEach(label => {
+      if (label !== 'Other' && !map.has(label)) {
+        map.set(label, palette[colorIndex % palette.length]);
+        colorIndex++;
+      }
+    });
+    
+    return map;
+  };
+
+  const sharedColorMap = getSharedColorMap();
+
+  const renderPieChart = (typeCounts, total, colorMap) => {
+    if (!typeCounts || Object.keys(typeCounts).length === 0) return null;
+    
+    let typesArr = Object.entries(typeCounts).map(([label, count]) => ({ label, count }));
+    typesArr.sort((a, b) => b.count - a.count);
+    
+    let topTypes = typesArr.slice(0, 5);
+    let otherCount = typesArr.slice(5).reduce((acc, curr) => acc + curr.count, 0);
+    
+    const existingOtherIdx = topTypes.findIndex(t => t.label === "Other");
+    if (existingOtherIdx !== -1) {
+      otherCount += topTypes[existingOtherIdx].count;
+      topTypes.splice(existingOtherIdx, 1);
+    }
+    
+    if (otherCount > 0) {
+      topTypes.push({ label: "Other", count: otherCount });
+    }
+    
+    let gradientStops = [];
+    let currentPercent = 0;
+    
+    const validTotal = Math.max(1, typesArr.reduce((sum, item) => sum + item.count, 0));
+    
+    const legendItems = topTypes.map((t, idx) => {
+      const percentage = Math.round((t.count / validTotal) * 100);
+      const nextPercent = currentPercent + percentage;
+      const color = colorMap.get(t.label) || '#333';
+      gradientStops.push(`${color} ${currentPercent}% ${nextPercent}%`);
+      currentPercent = nextPercent;
+      
+      return (
+        <span key={t.label} style={{ color: color }}>■ {t.label} ({percentage}%)</span>
+      );
+    });
+    
+    if (gradientStops.length > 0) {
+      const lastStop = gradientStops[gradientStops.length - 1];
+      gradientStops[gradientStops.length - 1] = lastStop.replace(/\d+%$/, '100%');
+    }
+    
+    const background = gradientStops.length > 0 
+      ? `conic-gradient(${gradientStops.join(', ')})`
+      : 'conic-gradient(#bdc3c7 0% 100%)';
+      
+    return (
+      <>
+        <div style={{ width: '150px', height: '150px', borderRadius: '50%', background: background, margin: '0 auto 1rem' }}></div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+          {legendItems}
+        </div>
+      </>
+    );
+  };
+
   return (
     <div className="app-container" style={{ flexDirection: 'column' }}>
       <div className="glass-panel main-form" style={{ maxWidth: '1000px' }}>
@@ -69,15 +151,8 @@ function EmploymentCenterDashboard() {
           <div className="stat-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
             <h3 style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>Hot Jobs by Industry</h3>
             <p style={{ fontWeight: 'bold', color: 'var(--text-color)', marginBottom: '1rem' }}>Total Hot Jobs: {stats.total_hot_jobs}</p>
-            {/* Pseudo-chart representation */}
-            <div style={{ width: '150px', height: '150px', borderRadius: '50%', background: 'conic-gradient(#3a7bd5 0% 40%, #2ecc71 40% 70%, #e74c3c 70% 90%, #f39c12 90% 100%)', margin: '0 auto 1rem' }}></div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-              <span style={{ color: '#3a7bd5' }}>■ Technology (40%)</span>
-              <span style={{ color: '#2ecc71' }}>■ Healthcare (30%)</span>
-              <span style={{ color: '#e74c3c' }}>■ Retail (20%)</span>
-              <span style={{ color: '#f39c12' }}>■ Other (10%)</span>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+            {renderPieChart(stats.job_types, stats.total_hot_jobs, sharedColorMap)}
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginTop: '1rem' }}>
               <Link to="/hot-job-search" className="btn secondary-btn mt-2" style={{ width: 'auto', display: 'inline-block' }}>Query Hot Jobs</Link>
               <button onClick={handleUpdateSnapshot} disabled={updatingSnapshot} className="btn primary-btn mt-2" style={{ width: 'auto', display: 'inline-block', background: '#2ecc71' }}>
                 {updatingSnapshot ? 'Updating...' : 'Update Snapshot'}
@@ -88,14 +163,11 @@ function EmploymentCenterDashboard() {
           <div className="stat-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
             <h3 style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>Job Seekers by Desired Type</h3>
             <p style={{ fontWeight: 'bold', color: 'var(--text-color)', marginBottom: '1rem' }}>Total Job Seekers: {stats.total_job_seekers}</p>
-            {/* Pseudo-chart representation */}
-            <div style={{ width: '150px', height: '150px', borderRadius: '50%', background: 'conic-gradient(#8e44ad 0% 50%, #3498db 50% 85%, #1abc9c 85% 100%)', margin: '0 auto 1rem' }}></div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-              <span style={{ color: '#8e44ad' }}>■ Technology (50%)</span>
-              <span style={{ color: '#3498db' }}>■ Finance (35%)</span>
-              <span style={{ color: '#1abc9c' }}>■ Services (15%)</span>
+            {renderPieChart(stats.seeker_types, stats.total_job_seekers, sharedColorMap)}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
+              <Link to="/job-seeker-matches-report" className="btn primary-btn" style={{ width: 'auto', background: '#8e44ad' }}>View Job Seeker Matches Report</Link>
+              <a href="https://docs.google.com/spreadsheets/d/1BCkpZ2S_Covnh-cc5mg8auKWeKOfqubT/edit" target="_blank" rel="noopener noreferrer" className="btn secondary-btn" style={{ width: 'auto' }}>Go to Job Seekers Sheet</a>
             </div>
-            <a href="https://docs.google.com/spreadsheets/d/1BCkpZ2S_Covnh-cc5mg8auKWeKOfqubT/edit" target="_blank" rel="noopener noreferrer" className="btn secondary-btn mt-2" style={{ width: 'auto' }}>Go to Job Seekers Sheet</a>
           </div>
         </div>
 

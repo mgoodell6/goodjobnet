@@ -9,6 +9,7 @@ import EmploymentCenterDashboard from './pages/EmploymentCenterDashboard';
 import InformationAndHelp from './pages/InformationAndHelp';
 import HotJobsReview from './pages/HotJobsReview';
 import JobSeekerDashboard from './pages/JobSeekerDashboard';
+import JobSeekerMatchesReport from './pages/JobSeekerMatchesReport';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -56,6 +57,7 @@ function App() {
             <Route path="/hot-jobs-review" element={<HotJobsReview user={user} />} />
             <Route path="/hot-jobs-5review" element={<HotJobsReview user={user} />} />
             <Route path="/hot-jobs-46review" element={<HotJobsReview user={user} />} />
+            <Route path="/job-seeker-matches-report" element={<JobSeekerMatchesReport />} />
           </>
         ) : (
           <Route path="*" element={<Login onLogin={handleLogin} />} />

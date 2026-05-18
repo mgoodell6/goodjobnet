@@ -258,6 +258,22 @@ def dashboard_stats():
         reaching_2_years_count = 0
         expired_recently_count = 0
         
+        STANDARD_TYPES = [
+            "HVAC Repair", "Accountant", "Airport", "Auto Parts", "Car Wash", 
+            "Cashier", "Catering", "CDL Driver", "Cement Mason", "Computer / IT", 
+            "Programmer", "Construction", "Corrections", "Custodian", "Customer service", 
+            "Data Entry", "Day Care", "Delivery Driver", "Drywaller", "Educator", 
+            "Electrician", "Engineering", "Event Staff", "Fast food", "Gas Station", 
+            "Grocery Store", "Healthcare", "Hospitality", "Housekeeper", 
+            "Information Technology", "Landscaping", "Manager", "Mechanic", 
+            "Manufacturing", "Nursing", "Painter", "Pest Control", "Plumbing", 
+            "Restaurant", "Retail", "Sales", "Security", "Stocking", 
+            "Telephone", "Theme Park", "Transportation", "Warehousing", "Logistics"
+        ]
+        
+        job_type_counts = {}
+        total_hot_jobs_matched = 0
+        
         for row in all_records:
             date_str = str(row.get("Date last verified", row.get("Date Entered", ""))).strip()
             if not date_str:
@@ -274,7 +290,10 @@ def dashboard_stats():
             age_days = (now - date_obj).days
             
             is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
+            is_hot = False
             if is_hiring_val in ["TRUE", "YES", "1", "Y"]:
+                if 0 <= age_days <= 21:
+                    is_hot = True
                 if 16 <= age_days < 21:
                     expiring_in_5_days_count += 1
                 if 22 <= age_days <= 36:
@@ -283,18 +302,53 @@ def dashboard_stats():
             if 640 <= age_days < 730:
                 reaching_2_years_count += 1
                 
+            if is_hot:
+                total_hot_jobs_matched += 1
+                job_title = str(row.get("Available Jobs", row.get("Job Title", ""))).lower()
+                matched_type = "Other"
+                for st in STANDARD_TYPES:
+                    if st.lower() in job_title:
+                        matched_type = st
+                        break
+                job_type_counts[matched_type] = job_type_counts.get(matched_type, 0) + 1
+                
         # 2. Get stats from New Job Opportunities sheet
         sh_jobs = gc.open_by_key(SPREADSHEET_ID_JOBS)
         new_jobs_count = len(sh_jobs.sheet1.get_all_records())
         new_jobs_url = sh_jobs.url
         
         # 3. Get stats from New Job Seekers queue
+        seeker_type_counts = {}
+        total_seekers_matched = 0
+        
         try:
-            sh_seekers = gc.open(SPREADSHEET_NAME_SEEKERS)
-            wks_seekers = sh_seekers.worksheet_by_title(WORKSHEET_NAME_SEEKERS)
-            new_seekers_count = len(wks_seekers.get_all_records())
-            new_seekers_url = sh_seekers.url
-        except Exception:
+            import pandas as pd
+            import warnings
+            warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
+            url = "https://docs.google.com/spreadsheets/d/1BCkpZ2S_Covnh-cc5mg8auKWeKOfqubT/export?format=xlsx"
+            df_seekers = pd.read_excel(url)
+            df_seekers = df_seekers.fillna("")
+            seekers_records = df_seekers.to_dict('records')
+            
+            total_seekers_matched = len(seekers_records)
+            
+            for row in seekers_records:
+                seeker_types = str(row.get("Type of Job Needed", "")).lower()
+                matched_type = "Other"
+                for st in STANDARD_TYPES:
+                    if st.lower() in seeker_types:
+                        matched_type = st
+                        break
+                seeker_type_counts[matched_type] = seeker_type_counts.get(matched_type, 0) + 1
+        except Exception as e:
+            print(f"Error fetching seeker types: {e}")
+            
+        try:
+            sh_new_seekers = gc.open_by_key("1dY7BsSBTt1lyfGYWvCQKdCicpm4Rgcd4fMyEcNlaSr4")
+            new_seekers_count = len(sh_new_seekers.sheet1.get_all_records())
+            new_seekers_url = sh_new_seekers.url
+        except Exception as e:
+            print(f"Error fetching new seekers: {e}")
             new_seekers_count = 0
             new_seekers_url = ""
         # 4. Get stats from Hot Job Snapshot
@@ -314,8 +368,10 @@ def dashboard_stats():
             "new_jobs_url": new_jobs_url,
             "new_seekers_count": new_seekers_count,
             "new_seekers_url": new_seekers_url,
-            "total_hot_jobs": total_hot_jobs,
-            "total_job_seekers": new_seekers_count
+            "total_hot_jobs": total_hot_jobs_matched,
+            "total_job_seekers": total_seekers_matched,
+            "job_types": job_type_counts,
+            "seeker_types": seeker_type_counts
         })
     except Exception as e:
         print(traceback.format_exc())
@@ -657,6 +713,150 @@ def update_snapshot():
         
         return jsonify({"success": True, "message": f"Snapshot updated successfully with {len(snapshot_data)-1} jobs!"})
         
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+
+
+@app.route('/api/job-seeker-matches-report', methods=['GET'])
+def job_seeker_matches_report():
+    try:
+        import pgeocode
+        import math
+        dist_calc = pgeocode.GeoDistance('US')
+        
+        gc = get_gsheets_client()
+        # 1. Get all seekers from the Unemployed List spreadsheet
+        try:
+            import pandas as pd
+            import warnings
+            warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
+            url = "https://docs.google.com/spreadsheets/d/1BCkpZ2S_Covnh-cc5mg8auKWeKOfqubT/export?format=xlsx"
+            df_seekers = pd.read_excel(url)
+            df_seekers = df_seekers.fillna("")
+            seekers_records = df_seekers.to_dict('records')
+        except Exception as e:
+            print(f"Error fetching seekers: {e}")
+            seekers_records = []
+            
+        # 2. Get all jobs
+        try:
+            sh_master = gc.open_by_key("1NxDQTta3xvch5jn_j-DpWvGg0zRfJhpGnLv9rFQxw6I")
+        except Exception:
+            sh_master = gc.open_by_key(SPREADSHEET_ID_JOBS)
+        wks_jobs = sh_master.sheet1
+        jobs_records = wks_jobs.get_all_records()
+        
+        # 3. Filter Hot Jobs (Verified in last 3 weeks and Currently Hiring = TRUE)
+        now = datetime.datetime.now()
+        three_weeks_ago = now - datetime.timedelta(days=21)
+        hot_jobs = []
+        
+        for row in jobs_records:
+            is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
+            if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
+                continue
+                
+            date_str = str(row.get("Date last verified", row.get("Date Entered", ""))).strip()
+            if not date_str:
+                continue
+                
+            try:
+                if "-" in date_str:
+                    date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%Y-%m-%d")
+                else:
+                    date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%m/%d/%Y")
+                    
+                if date_obj >= three_weeks_ago:
+                    hot_jobs.append(row)
+            except:
+                continue
+                
+        # 4. Generate report
+        report = []
+        for seeker in seekers_records:
+            name = seeker.get(" Name", seeker.get("Name", "Unknown"))
+            street = seeker.get("Street", "")
+            city = seeker.get("City", "")
+            zip_val = seeker.get("Zip", seeker.get("Zipcode", ""))
+            
+            if str(zip_val).endswith('.0'):
+                zip_val = str(zip_val)[:-2]
+            zipcode = str(zip_val).strip()
+                
+            address = f"{street} {city} {zipcode}".strip()
+            skills = str(seeker.get("Skills/Education", ""))
+            desired_types_raw = str(seeker.get("Type of Job Needed", seeker.get("Desired Types", "")))
+            
+            if not desired_types_raw or desired_types_raw == "nan":
+                report.append({
+                    "name": name,
+                    "address": address,
+                    "skills": skills,
+                    "desired_types": "",
+                    "hot_jobs_count": "More information needed (Missing Job Types)"
+                })
+                continue
+                
+            if not address or not zipcode or zipcode == "nan":
+                report.append({
+                    "name": name,
+                    "address": address,
+                    "skills": skills,
+                    "desired_types": desired_types_raw,
+                    "hot_jobs_count": "More information needed (Missing Address/Zipcode)"
+                })
+                continue
+                
+            # Split by comma, filter empty, and normalize common typos and spacing variations
+            desired_types_list = []
+            for t in desired_types_raw.split(","):
+                t = t.strip().lower()
+                if not t:
+                    continue
+                t = t.replace("warehouseing", "warehousing").replace(" / ", "/")
+                desired_types_list.append(t)
+            
+            # Find matching hot jobs within 20 miles
+            matched_jobs_count = 0
+            for job in hot_jobs:
+                job_type = str(job.get("Available Jobs", job.get("Job Title", ""))).lower()
+                job_type = job_type.replace(" / ", "/")
+                
+                # Check type match
+                match = False
+                for dt in desired_types_list:
+                    if dt in job_type:
+                        match = True
+                        break
+                
+                if not match:
+                    continue
+                    
+                # Check distance
+                job_zip = str(job.get("Zipcode") or job.get("Zip Code") or job.get("Zip") or job.get("company_zip") or job.get("Zip code", "")).strip()
+                if job_zip:
+                    try:
+                        # Extract 5 digit zip just in case
+                        job_zip_5 = job_zip[:5]
+                        seeker_zip_5 = zipcode[:5]
+                        dist_km = dist_calc.query_postal_code(seeker_zip_5, job_zip_5)
+                        if not math.isnan(dist_km):
+                            dist_miles = dist_km * 0.621371
+                            if dist_miles <= 20:
+                                matched_jobs_count += 1
+                    except Exception:
+                        pass
+                        
+            report.append({
+                "name": name,
+                "address": address,
+                "skills": skills,
+                "desired_types": desired_types_raw,
+                "hot_jobs_count": matched_jobs_count
+            })
+            
+        return jsonify({"success": True, "report": report})
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
