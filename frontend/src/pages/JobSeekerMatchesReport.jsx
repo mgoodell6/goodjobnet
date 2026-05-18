@@ -31,7 +31,12 @@ function JobSeekerMatchesReport() {
       <div className="glass-panel main-form" style={{ maxWidth: '1000px' }}>
         <header>
           <h1>Job Seeker Matches Report</h1>
-          <p className="subtitle">Hot Jobs within 20 miles matching desired job types</p>
+          <p className="subtitle">Overview of Unemployed List and available Hot Jobs within a 20-mile radius</p>
+          <div style={{ marginTop: '1rem' }}>
+            <a href="https://docs.google.com/spreadsheets/d/1nI1GA-ajJmZncYzYPSsTY10LXKgyd43dBIYLFsUec2w/edit" target="_blank" rel="noopener noreferrer" className="btn secondary-btn" style={{ display: 'inline-block', width: 'auto' }}>
+              View Exported Google Sheet
+            </a>
+          </div>
         </header>
 
         {loading ? (

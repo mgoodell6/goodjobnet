@@ -856,6 +856,26 @@ def job_seeker_matches_report():
                 "hot_jobs_count": matched_jobs_count
             })
             
+        # 5. Export to Google Sheets
+        try:
+            sh_report = gc.open_by_key("1nI1GA-ajJmZncYzYPSsTY10LXKgyd43dBIYLFsUec2w")
+            wks_report = sh_report.sheet1
+            
+            sheet_data = [["Name", "Address", "Skills / Education", "Desired Job Types", "Hot Jobs within 20 miles"]]
+            for r in report:
+                sheet_data.append([
+                    r["name"], 
+                    r["address"], 
+                    r["skills"], 
+                    r["desired_types"], 
+                    str(r["hot_jobs_count"])
+                ])
+                
+            wks_report.clear()
+            wks_report.update_values('A1', sheet_data)
+        except Exception as e:
+            print(f"Error exporting report to Google Sheets: {e}")
+            
         return jsonify({"success": True, "report": report})
     except Exception as e:
         print(traceback.format_exc())
