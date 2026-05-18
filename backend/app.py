@@ -119,9 +119,10 @@ def submit_seeker():
         data.get("stake", ""),
         data.get("phone", ""),
         data.get("email", ""),
-        data.get("general_notes", ""),
+        data.get("skills_education", ""),
         data.get("job_needed", ""),
         ", ".join(data.get("desired_job_types", [])),
+        data.get("general_notes", ""),
         "Yes" if data.get("resume_assistance") else "No",
         "Yes" if data.get("interview_coaching") else "No",
         "Yes" if data.get("job_search_assistance") else "No",
@@ -146,7 +147,7 @@ def submit_seeker():
             wks = sh.sheet1
             wks.title = WORKSHEET_NAME_SEEKERS
             # Set headers if new
-            wks.update_row(1, ["Name", "Street", "City", "Zipcode", "Ward", "Stake", "Phone", "Email", "General Notes", "Job Needed", "Desired Types", "Resume Asst", "Interview Coach", "Job Search Asst", "Date"])
+            wks.update_row(1, ["Name", "Street", "City", "Zipcode", "Ward", "Stake", "Phone", "Email", "Skills/Education", "Job Needed", "Desired Types", "General Notes", "Resume Asst", "Interview Coach", "Job Search Asst", "Date Entered", "Entered by - Name", "Ward", "Stake", "Phone", "email"])
             
         wks.append_table(values=[row_data])
         return jsonify({"success": True, "message": "Job Seeker successfully added to Google Sheets!"})
@@ -203,7 +204,6 @@ def search_jobs():
                 "company": row.get("Name") or row.get("Company Name") or "Unknown",
                 "role": row.get("Available Jobs") or row.get("Job Title") or "Various",
                 "location": location,
-                "distance": "Calculated via API", # Would require Geocoding API for actual distance
                 "career_website": row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
             }
             

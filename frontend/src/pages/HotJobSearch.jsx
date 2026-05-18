@@ -42,7 +42,7 @@ function HotJobSearch() {
     <div className="app-container" style={{ flexDirection: 'column' }}>
       <div className="glass-panel main-form" style={{ maxWidth: '1000px' }}>
         <header>
-          <h1>Hot Job Search</h1>
+          <h1>Job Search</h1>
           <p className="subtitle">Find potential jobs based on radius and job type</p>
         </header>
 
@@ -122,7 +122,6 @@ function HotJobSearch() {
                       <th>Company</th>
                       <th>Role</th>
                       <th>Location</th>
-                      <th>Distance</th>
                       <th>Career Website</th>
                     </tr>
                   </thead>
@@ -132,7 +131,6 @@ function HotJobSearch() {
                         <td>{job.company}</td>
                         <td>{job.role}</td>
                         <td>{job.location}</td>
-                        <td>{job.distance}</td>
                         <td>
                           {job.career_website ? (
                             <a href={job.career_website} target="_blank" rel="noopener noreferrer">View Posting</a>
@@ -154,7 +152,6 @@ function HotJobSearch() {
                       <th>Company</th>
                       <th>Role</th>
                       <th>Location</th>
-                      <th>Distance</th>
                       <th>Career Website</th>
                     </tr>
                   </thead>

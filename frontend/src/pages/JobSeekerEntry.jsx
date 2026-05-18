@@ -105,6 +105,11 @@ function JobSeekerEntry({ user }) {
             </div>
 
             <div className="input-group full-width">
+              <label>Skills/Education</label>
+              <textarea name="skills_education" rows="3" placeholder="Enter skills and education..."></textarea>
+            </div>
+
+            <div className="input-group full-width">
               <label>Desired Company Type for employer</label>
               <select name="job_needed">
                 <option value="">Select Type...</option>
