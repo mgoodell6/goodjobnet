@@ -1124,21 +1124,20 @@ function HotJobsReview({ user }) {
                 <select
                   value={callMethod}
                   onChange={e => setCallMethod(e.target.value)}
-                  style={{ background: 'transparent', color: 'var(--text-main)', border: 'none', fontSize: '0.85rem', cursor: 'pointer', outline: 'none' }}
+                  style={{
+                    background: '#1a1a1a',
+                    color: '#ffffff',
+                    border: '1px solid var(--glass-border)',
+                    borderRadius: '4px',
+                    padding: '0.2rem 0.5rem',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
                 >
-                  <option value="dialer" style={{ background: '#2c3e50' }}>Device Dialer</option>
-                  <option value="clipboard" style={{ background: '#2c3e50' }}>Clipboard & Read Slowly</option>
+                  <option value="dialer" style={{ background: '#1a1a1a', color: '#ffffff' }}>Device Dialer</option>
+                  <option value="clipboard" style={{ background: '#1a1a1a', color: '#ffffff' }}>Clipboard & Read Slowly</option>
                 </select>
-                <button
-                  type="button"
-                  className="btn secondary-btn"
-                  onClick={handleCallCompany}
-                  style={{ width: 'auto', padding: '0.3rem 0.8rem', fontSize: '0.85rem', gap: '0.3rem', display: 'inline-flex', alignItems: 'center', borderColor: '#27ae60', color: '#27ae60' }}
-                  title="Press 'C' to call company"
-                >
-                  <FaPhone />
-                  Call
-                </button>
               </div>
             </div>
 
