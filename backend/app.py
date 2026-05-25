@@ -14,7 +14,7 @@ import urllib.request
 from werkzeug.security import generate_password_hash, check_password_hash
 
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist'))
-app = Flask(__name__, static_folder=frontend_dir, static_url_path='/')
+app = Flask(__name__, static_folder=frontend_dir, static_url_path='/static_dist')
 CORS(app)
 
 # Configuration
