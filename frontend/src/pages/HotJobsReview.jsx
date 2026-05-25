@@ -29,6 +29,13 @@ function HotJobsReview({ user }) {
   const [jobTypeQuery, setJobTypeQuery] = useState('');
   const [selectedJobTypes, setSelectedJobTypes] = useState([]);
   const [reviewTitle, setReviewTitle] = useState('Hot Jobs Review');
+  const [callMethod, setCallMethod] = useState(() => {
+    return localStorage.getItem('goodjobnet_call_method') || 'dialer';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('goodjobnet_call_method', callMethod);
+  }, [callMethod]);
 
   // Accessibility and Voice Assistant States
   const [voiceActive, setVoiceActive] = useState(false);
@@ -104,7 +111,7 @@ function HotJobsReview({ user }) {
   };
 
   // Text-To-Speech (TTS) voice synthesis with Speech Recognition coordination
-  const speak = (text, onEndCallback = null) => {
+  const speak = (text, onEndCallback = null, rate = 0.95) => {
     if ('speechSynthesis' in window) {
       console.log(`[Voice Assistant] TTS Speaking: "${text}"`);
 
@@ -125,7 +132,7 @@ function HotJobsReview({ user }) {
       window.speechSynthesis.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.95; // slightly slower for readability
+      utterance.rate = rate; // use custom rate if provided
       activeUtteranceRef.current = utterance;
 
       const handleSpeechEnd = () => {
@@ -162,13 +169,46 @@ function HotJobsReview({ user }) {
   };
 
   // Telephone call handler using system handler
+  const copyToClipboard = (text) => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(err => {
+        console.error("Could not copy text: ", err);
+      });
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      try {
+        document.execCommand("copy");
+      } catch (err) {
+        console.error("Fallback copy failed", err);
+      }
+      document.body.removeChild(textarea);
+    }
+  };
+
+  // Telephone call handler with options
   const handleCallCompany = () => {
     const job = jobsRef.current[currentIndexRef.current];
     if (job && job.contact_phone && job.contact_phone.trim()) {
-      speak(`Opening call to ${job.company_name} at ${job.contact_phone}.`);
-      setTimeout(() => {
-        window.location.href = `tel:${job.contact_phone.trim()}`;
-      }, 1500);
+      const phoneNumber = job.contact_phone.trim();
+      
+      if (callMethod === 'clipboard') {
+        copyToClipboard(phoneNumber);
+        speak(`Phone number copied to clipboard. Dialing:`, () => {
+          const cleanDigits = phoneNumber.replace(/\D/g, '');
+          const spokenDigits = cleanDigits.split('').join(', ');
+          speak(spokenDigits, null, 0.6);
+        });
+      } else {
+        speak(`Opening call to ${job.company_name} at ${phoneNumber}.`);
+        setTimeout(() => {
+          window.location.href = `tel:${phoneNumber}`;
+        }, 1500);
+      }
     } else {
       playChirp('error');
       speak("There is no phone number listed for this job.");
@@ -1078,6 +1118,28 @@ function HotJobsReview({ user }) {
                 <FaMicrophone />
                 {voiceActive ? 'Voice Assistant ON' : 'Turn On Voice Assistant'}
               </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.3rem 0.6rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>Call Mode:</span>
+                <select
+                  value={callMethod}
+                  onChange={e => setCallMethod(e.target.value)}
+                  style={{ background: 'transparent', color: 'var(--text-main)', border: 'none', fontSize: '0.85rem', cursor: 'pointer', outline: 'none' }}
+                >
+                  <option value="dialer" style={{ background: '#2c3e50' }}>Device Dialer</option>
+                  <option value="clipboard" style={{ background: '#2c3e50' }}>Clipboard & Read Slowly</option>
+                </select>
+                <button
+                  type="button"
+                  className="btn secondary-btn"
+                  onClick={handleCallCompany}
+                  style={{ width: 'auto', padding: '0.3rem 0.8rem', fontSize: '0.85rem', gap: '0.3rem', display: 'inline-flex', alignItems: 'center', borderColor: '#27ae60', color: '#27ae60' }}
+                  title="Press 'C' to call company"
+                >
+                  <FaPhone />
+                  Call
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', minWidth: '220px' }}>
