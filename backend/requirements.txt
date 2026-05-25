@@ -3,8 +3,3 @@ flask-cors
 pygsheets
 werkzeug
 gunicorn
-pgeocode
-geopy
-pandas
-openpyxl
-

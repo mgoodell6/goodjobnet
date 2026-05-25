@@ -15,6 +15,14 @@ function JobEntry({ user }) {
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData.entries());
 
+    let careerWebsite = data.career_website ? data.career_website.trim() : '';
+    if (careerWebsite) {
+      if (!/^https?:\/\//i.test(careerWebsite)) {
+        careerWebsite = 'https://' + careerWebsite;
+      }
+      data.career_website = careerWebsite;
+    }
+
     const selectedJobs = formData.getAll('available_jobs_select');
     const manualJobs = data.available_jobs_manual;
 
@@ -75,21 +83,25 @@ function JobEntry({ user }) {
 
             <div className="input-group">
               <label>Company Type</label>
-              <select name="company_type">
-                <option value="">Select Type...</option>
-                <option value="Construction">Construction</option>
-                <option value="Driving">Driving</option>
-                <option value="Education">Education</option>
-                <option value="Government related">Government related</option>
-                <option value="Healthcare">Healthcare</option>
-                <option value="Hospitality">Hospitality</option>
-                <option value="Janitorial">Janitorial</option>
-                <option value="Non-Profit">Non-Profit</option>
-                <option value="Restaurant">Restaurant</option>
-                <option value="Retail">Retail</option>
-                <option value="Technology">Technology</option>
-                <option value="Theme Park">Theme Park</option>
-              </select>
+              <input type="text" name="company_type" list="company-types" placeholder="Enter or select type..." />
+              <datalist id="company-types">
+                <option value="Call Center" />
+                <option value="Construction" />
+                <option value="Driving" />
+                <option value="Education" />
+                <option value="Fast Food" />
+                <option value="Government related" />
+                <option value="Healthcare" />
+                <option value="Hospitality" />
+                <option value="Janitorial" />
+                <option value="Non-Profit" />
+                <option value="Restaurant" />
+                <option value="Retail" />
+                <option value="Services" />
+                <option value="Technology" />
+                <option value="Theme Park" />
+                <option value="Vocation careers (HVAC, plumbing, electrical, etc)" />
+              </datalist>
             </div>
 
             <div className="input-group full-width">
@@ -125,7 +137,7 @@ function JobEntry({ user }) {
 
             <div className="input-group">
               <label>Career Website URL</label>
-              <input type="url" name="career_website" />
+              <input type="text" name="career_website" />
             </div>
 
             <div className="input-group">

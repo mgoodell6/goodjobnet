@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 
 function EmploymentCenterDashboard() {
   const navigate = useNavigate();
-  const [updatingSnapshot, setUpdatingSnapshot] = useState(false);
+
   const [stats, setStats] = useState({
     expiring_soon: '...',
     two_years_soon: '...',
@@ -16,8 +16,22 @@ function EmploymentCenterDashboard() {
     total_hot_jobs: '...',
     total_job_seekers: '...',
     job_types: {},
-    seeker_types: {}
+    seeker_types: {},
+    unverified_no_career_count: '...'
   });
+
+  const [pendingUsers, setPendingUsers] = useState([]);
+
+  const fetchPendingUsers = () => {
+    fetch('/api/pending-users')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setPendingUsers(data.users);
+        }
+      })
+      .catch(err => console.error('Error fetching pending users:', err));
+  };
 
   useEffect(() => {
     fetch('/api/dashboard-stats')
@@ -35,41 +49,72 @@ function EmploymentCenterDashboard() {
             total_hot_jobs: data.total_hot_jobs,
             total_job_seekers: data.total_job_seekers,
             job_types: data.job_types || {},
-            seeker_types: data.seeker_types || {}
+            seeker_types: data.seeker_types || {},
+            unverified_no_career_count: data.unverified_no_career_count
           });
         }
       })
       .catch(err => {
         console.error('Error fetching stats:', err);
       });
+
+    fetchPendingUsers();
   }, []);
 
-  const handleUpdateSnapshot = async () => {
-    setUpdatingSnapshot(true);
+  const handleApproveUser = async (username) => {
+    if (!window.confirm(`Are you sure you want to approve user: ${username}?`)) return;
     try {
-      const response = await fetch('/api/update-snapshot', { method: 'POST' });
-      const result = await response.json();
-      if (result.success) {
-        alert(result.message || 'Snapshot successfully updated!');
+      const response = await fetch('/api/approve-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert(data.message);
+        fetchPendingUsers();
       } else {
-        alert('Failed to update snapshot: ' + (result.error || 'Unknown error'));
+        alert('Approval failed: ' + data.error);
       }
     } catch (err) {
-      alert('Error connecting to server.');
+      console.error(err);
+      alert('Network error while approving user');
     }
-    setUpdatingSnapshot(false);
   };
+
+  const handleRejectUser = async (username) => {
+    if (!window.confirm(`Are you sure you want to REJECT and REMOVE user: ${username}?`)) return;
+    try {
+      const response = await fetch('/api/reject-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert(data.message);
+        fetchPendingUsers();
+      } else {
+        alert('Rejection failed: ' + data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error while rejecting user');
+    }
+  };
+
+
 
   const getSharedColorMap = () => {
     const map = new Map();
     map.set('Other', '#95a5a6');
-    
+
     let jobTypesArr = Object.entries(stats.job_types || {}).map(([l, c]) => ({ label: l, count: c })).sort((a, b) => b.count - a.count).slice(0, 5);
     let seekerTypesArr = Object.entries(stats.seeker_types || {}).map(([l, c]) => ({ label: l, count: c })).sort((a, b) => b.count - a.count).slice(0, 5);
-    
+
     const allLabels = [...new Set([...jobTypesArr.map(t => t.label), ...seekerTypesArr.map(t => t.label)])];
     const palette = ['#3a7bd5', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#1abc9c', '#d35400', '#2980b9', '#27ae60', '#e67e22'];
-    
+
     let colorIndex = 0;
     allLabels.forEach(label => {
       if (label !== 'Other' && !map.has(label)) {
@@ -77,7 +122,7 @@ function EmploymentCenterDashboard() {
         colorIndex++;
       }
     });
-    
+
     return map;
   };
 
@@ -85,49 +130,49 @@ function EmploymentCenterDashboard() {
 
   const renderPieChart = (typeCounts, total, colorMap) => {
     if (!typeCounts || Object.keys(typeCounts).length === 0) return null;
-    
+
     let typesArr = Object.entries(typeCounts).map(([label, count]) => ({ label, count }));
     typesArr.sort((a, b) => b.count - a.count);
-    
+
     let topTypes = typesArr.slice(0, 5);
     let otherCount = typesArr.slice(5).reduce((acc, curr) => acc + curr.count, 0);
-    
+
     const existingOtherIdx = topTypes.findIndex(t => t.label === "Other");
     if (existingOtherIdx !== -1) {
       otherCount += topTypes[existingOtherIdx].count;
       topTypes.splice(existingOtherIdx, 1);
     }
-    
+
     if (otherCount > 0) {
       topTypes.push({ label: "Other", count: otherCount });
     }
-    
+
     let gradientStops = [];
     let currentPercent = 0;
-    
+
     const validTotal = Math.max(1, typesArr.reduce((sum, item) => sum + item.count, 0));
-    
+
     const legendItems = topTypes.map((t, idx) => {
       const percentage = Math.round((t.count / validTotal) * 100);
       const nextPercent = currentPercent + percentage;
       const color = colorMap.get(t.label) || '#333';
       gradientStops.push(`${color} ${currentPercent}% ${nextPercent}%`);
       currentPercent = nextPercent;
-      
+
       return (
         <span key={t.label} style={{ color: color }}>■ {t.label} ({percentage}%)</span>
       );
     });
-    
+
     if (gradientStops.length > 0) {
       const lastStop = gradientStops[gradientStops.length - 1];
       gradientStops[gradientStops.length - 1] = lastStop.replace(/\d+%$/, '100%');
     }
-    
-    const background = gradientStops.length > 0 
+
+    const background = gradientStops.length > 0
       ? `conic-gradient(${gradientStops.join(', ')})`
       : 'conic-gradient(#bdc3c7 0% 100%)';
-      
+
     return (
       <>
         <div style={{ width: '150px', height: '150px', borderRadius: '50%', background: background, margin: '0 auto 1rem' }}></div>
@@ -152,12 +197,7 @@ function EmploymentCenterDashboard() {
             <h3 style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>Hot Jobs by Industry</h3>
             <p style={{ fontWeight: 'bold', color: 'var(--text-color)', marginBottom: '1rem' }}>Total Hot Jobs: {stats.total_hot_jobs}</p>
             {renderPieChart(stats.job_types, stats.total_hot_jobs, sharedColorMap)}
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginTop: '1rem' }}>
-              <Link to="/hot-job-search" className="btn secondary-btn mt-2" style={{ width: 'auto', display: 'inline-block' }}>Query Hot Jobs</Link>
-              <button onClick={handleUpdateSnapshot} disabled={updatingSnapshot} className="btn primary-btn mt-2" style={{ width: 'auto', display: 'inline-block', background: '#2ecc71' }}>
-                {updatingSnapshot ? 'Updating...' : 'Update Snapshot'}
-              </button>
-            </div>
+
           </div>
 
           <div className="stat-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
@@ -166,10 +206,50 @@ function EmploymentCenterDashboard() {
             {renderPieChart(stats.seeker_types, stats.total_job_seekers, sharedColorMap)}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
               <Link to="/job-seeker-matches-report" className="btn primary-btn" style={{ width: 'auto', background: '#8e44ad' }}>View Job Seeker Matches Report</Link>
-              <a href="https://docs.google.com/spreadsheets/d/1BCkpZ2S_Covnh-cc5mg8auKWeKOfqubT/edit" target="_blank" rel="noopener noreferrer" className="btn secondary-btn" style={{ width: 'auto' }}>Go to Job Seekers Sheet</a>
             </div>
           </div>
         </div>
+
+        {/* User Approval Requests Section */}
+        {pendingUsers && pendingUsers.length > 0 && (
+          <div className="alerts-section mb-2" style={{ background: 'rgba(58, 123, 213, 0.05)', border: '1px solid rgba(58, 123, 213, 0.2)', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem' }}>
+            <h3 style={{ color: '#3a7bd5', marginBottom: '1rem' }}>Pending Account Requests ({pendingUsers.length})</h3>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Calling</th>
+                    <th>Ward / Stake</th>
+                    <th>Email / Phone</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingUsers.map((u, idx) => (
+                    <tr key={idx}>
+                      <td>{u.name}</td>
+                      <td>{u.username}</td>
+                      <td>{u.calling}</td>
+                      <td>{u.ward} / {u.stake}</td>
+                      <td>
+                        {u.email || 'N/A'}<br/>
+                        {u.phone || 'N/A'}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button onClick={() => handleApproveUser(u.username)} className="btn primary-btn" style={{ background: '#2ecc71', padding: '0.25rem 0.5rem', fontSize: '0.8rem', width: 'auto', margin: 0 }}>Approve</button>
+                          <button onClick={() => handleRejectUser(u.username)} className="btn primary-btn" style={{ background: '#e74c3c', padding: '0.25rem 0.5rem', fontSize: '0.8rem', width: 'auto', margin: 0 }}>Reject</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Middle Section: Alerts */}
         <div className="alerts-section mb-2" style={{ background: 'rgba(231, 76, 60, 0.05)', border: '1px solid rgba(231, 76, 60, 0.2)', padding: '1.5rem', borderRadius: '12px' }}>
@@ -183,6 +263,10 @@ function EmploymentCenterDashboard() {
               <span>Hot Jobs that expired 4 - 6 weeks ago:</span>
               <strong>{stats.expired_recently}</strong>
             </li>
+            <li style={{ padding: '0.5rem 0', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Hot Jobs unverified &gt; 3 weeks (Phone Verification Required):</span>
+              <strong>{stats.unverified_no_career_count}</strong>
+            </li>
             <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between' }}>
               <span>JobBank rows reaching 2 years in next 3 months:</span>
               <strong>{stats.two_years_soon}</strong>
@@ -191,7 +275,7 @@ function EmploymentCenterDashboard() {
               <span>New unreviewed Job Opportunities:</span>
               <strong>{stats.new_jobs_count}</strong>
             </li>
-            <li style={{ padding: '0.5rem 0', display: 'flex', justifyContent: 'space-between' }}>
+            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between' }}>
               <span>New unreviewed Job Seekers:</span>
               <strong>{stats.new_seekers_count}</strong>
             </li>
@@ -199,7 +283,7 @@ function EmploymentCenterDashboard() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
             <div style={{ display: 'flex', gap: '1rem' }}>
-              <Link to="/hot-jobs-review" className="btn primary-btn" style={{ background: '#e74c3c' }}>
+              <Link to="/hot-jobs-review" className="btn primary-btn" style={{ background: '#e74c3c', flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                   <FaBriefcase /> Review Hot Jobs
                 </div>
@@ -228,9 +312,13 @@ function EmploymentCenterDashboard() {
             <FaBriefcase />
             <h3>Job Entry Form</h3>
           </Link>
-          <Link to="/job-seeker-entry" className="nav-card">
+          <Link to="/hot-job-search" className="nav-card">
+            <FaSearch />
+            <h3>Search for nearby jobs</h3>
+          </Link>
+          <Link to="/job-seeker-search" className="nav-card">
             <FaUserTie />
-            <h3>Job Seeker Form</h3>
+            <h3>Search for nearby job seekers</h3>
           </Link>
         </div>
 

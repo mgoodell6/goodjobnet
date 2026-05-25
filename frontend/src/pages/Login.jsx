@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
 function Login({ onLogin }) {
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
@@ -70,20 +73,8 @@ function Login({ onLogin }) {
 
       const responseData = await response.json();
       if (responseData.success) {
-        const userRole = responseData.role || (data.calling === 'Employment Center missionary/volunteer' ? 'admin' : 'user');
-        onLogin({
-          name: data.name || data.username,
-          role: userRole,
-          ward: data.ward || "",
-          stake: data.stake || "",
-          email: data.email || "",
-          phone: data.phone || ""
-        });
-        if (userRole === 'admin') {
-          navigate('/admin-dashboard');
-        } else {
-          navigate('/dashboard');
-        }
+        alert("Account request submitted successfully!\n\nAn administrator must manually approve your account before you can log in. Please check back later.");
+        setIsCreatingAccount(false);
       } else {
         alert(responseData.error || 'Registration failed');
       }
@@ -106,11 +97,6 @@ function Login({ onLogin }) {
           <p><strong>Note:</strong> Log-in accounts are intended for use by church members in leadership roles.</p>
         </div>
 
-        <div className="nav-grid mb-2">
-          <button type="button" onClick={() => navigate('/job-seeker-dashboard')} className="nav-card" style={{ border: '2px solid #3a7bd5', margin: '0 auto', maxWidth: '300px' }}>
-            <h3 style={{ color: '#3a7bd5' }}>I am looking for a job</h3>
-          </button>
-        </div>
 
         {!isCreatingAccount ? (
           <form onSubmit={handleLogin}>
@@ -121,7 +107,33 @@ function Login({ onLogin }) {
               </div>
               <div className="input-group full-width">
                 <label>Password</label>
-                <input type="password" required value={password} onChange={e => setPassword(e.target.value)} />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    style={{ width: '100%', paddingRight: '2.5rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'var(--text-light)',
+                      padding: '4px'
+                    }}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
+                  </button>
+                </div>
               </div>
             </div>
             <div className="actions mt-2 mb-1">
@@ -172,7 +184,33 @@ function Login({ onLogin }) {
               </div>
               <div className="input-group full-width">
                 <label>Password (Min 8 chars)</label>
-                <input type="password" name="password" minLength="8" required />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type={showRegisterPassword ? 'text' : 'password'}
+                    name="password"
+                    minLength="8"
+                    required
+                    style={{ width: '100%', paddingRight: '2.5rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'var(--text-light)',
+                      padding: '4px'
+                    }}
+                    aria-label={showRegisterPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showRegisterPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
+                  </button>
+                </div>
               </div>
             </div>
             <div className="actions mt-2 mb-1">

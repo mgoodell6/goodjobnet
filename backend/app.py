@@ -5,6 +5,12 @@ import datetime
 import os
 import traceback
 import json
+import time
+import sqlite3
+import math
+import csv
+import io
+import urllib.request
 from werkzeug.security import generate_password_hash, check_password_hash
 
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist'))
@@ -25,6 +31,148 @@ SPREADSHEET_NAME_SEEKERS = 'GoodJobNet_JobSeekers' # Name of new sheet to create
 WORKSHEET_NAME_SEEKERS = 'Sheet1'
 
 _gsheets_client = None
+
+# Global In-Memory Cache
+_cache = {}
+CACHE_TTL = 300 # 5 minutes
+
+def get_cached_data(key, fetch_fn, ttl=CACHE_TTL):
+    now = time.time()
+    if key in _cache and (now - _cache[key]['timestamp']) < ttl:
+        return _cache[key]['data']
+    try:
+        data = fetch_fn()
+        _cache[key] = {
+            'timestamp': now,
+            'data': data
+        }
+        return data
+    except Exception as e:
+        print(f"Error fetching data for cache key {key}: {e}")
+        if key in _cache:
+            print(f"Returning stale cache for key: {key}")
+            return _cache[key]['data']
+        raise e
+
+def invalidate_cache(key=None):
+    global _cache
+    if key:
+        if key in _cache:
+            del _cache[key]
+            print(f"Invalidated cache key: {key}")
+    else:
+        _cache.clear()
+        print("Invalidated entire cache")
+
+# ZIP Code Distance Helpers
+def get_zip_coordinates(zip_code):
+    db_path = os.path.join(os.path.dirname(__file__), "zips.db")
+    zip_str = str(zip_code).strip()[:5]
+    if not zip_str.isdigit():
+        return None
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT lat, lon FROM zips WHERE zip = ?", (zip_str,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return row[0], row[1]
+    except Exception as e:
+        print(f"Error querying ZIP {zip_str}: {e}")
+    return None
+
+def calculate_distance(lat1, lon1, lat2, lon2):
+    R = 3958.8  # Earth radius in miles
+    try:
+        lat1, lon1, lat2, lon2 = map(math.radians, [float(lat1), float(lon1), float(lat2), float(lon2)])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        return R * c
+    except (ValueError, TypeError, ZeroDivisionError):
+        return float('inf')
+
+# Cached Sheets Helpers
+def get_seekers_records():
+    def fetch_seekers():
+        records = []
+        # 1. Try opening via pygsheets and service account (preferred)
+        try:
+            gc = get_gsheets_client()
+            sh = gc.open_by_key("1Ye9hgTVuqUtV8CQhFwLzZzCBz4E26otvJbjiVYRySJ0")
+            wks = sh.sheet1
+            raw_records = wks.get_all_records()
+            for row in raw_records:
+                cleaned_row = {}
+                for k, v in row.items():
+                    if k is None or k == "":
+                        continue
+                    val = str(v).strip() if v is not None else ""
+                    if val.lower() == 'nan':
+                        val = ""
+                    cleaned_row[k] = val
+                records.append(cleaned_row)
+            print(f"Successfully fetched {len(records)} seekers via pygsheets")
+            return records
+        except Exception as e:
+            print(f"Failed to fetch seekers via pygsheets: {e}")
+            
+        # 2. Try fetching via public CSV export as fallback
+        try:
+            url = "https://docs.google.com/spreadsheets/d/1Ye9hgTVuqUtV8CQhFwLzZzCBz4E26otvJbjiVYRySJ0/export?format=csv"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                csv_data = response.read().decode('utf-8')
+            reader = csv.DictReader(io.StringIO(csv_data))
+            for row in reader:
+                cleaned_row = {}
+                for k, v in row.items():
+                    if k is None or k == "":
+                        continue
+                    val = str(v).strip() if v is not None else ""
+                    if val.lower() == 'nan':
+                        val = ""
+                    cleaned_row[k] = val
+                records.append(cleaned_row)
+            print(f"Successfully fetched {len(records)} seekers via fallback CSV URL")
+            return records
+        except Exception as e2:
+            print(f"Failed to fetch seekers via fallback CSV URL: {e2}")
+            raise e2
+            
+    return get_cached_data('seekers_records', fetch_seekers)
+
+def get_master_jobs_records():
+    def fetch_master_jobs():
+        gc = get_gsheets_client()
+        try:
+            sh = gc.open_by_key("1NxDQTta3xvch5jn_j-DpWvGg0zRfJhpGnLv9rFQxw6I")
+        except Exception:
+            sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
+        return sh.sheet1.get_all_records()
+    return get_cached_data('master_jobs_records', fetch_master_jobs)
+
+def get_new_jobs_records():
+    def fetch_new_jobs():
+        gc = get_gsheets_client()
+        sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
+        return {
+            'records': sh.sheet1.get_all_records(),
+            'url': sh.url
+        }
+    return get_cached_data('new_jobs_records', fetch_new_jobs)
+
+def get_new_seekers_records():
+    def fetch_new_seekers():
+        gc = get_gsheets_client()
+        sh = gc.open_by_key("1dY7BsSBTt1lyfGYWvCQKdCicpm4Rgcd4fMyEcNlaSr4")
+        return {
+            'count': len(sh.sheet1.get_all_records()),
+            'url': sh.url
+        }
+    return get_cached_data('new_seekers_records', fetch_new_seekers)
 
 # Authentication helper
 def get_gsheets_client():
@@ -95,6 +243,8 @@ def submit_job():
         sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
         wks = sh.worksheet_by_title(WORKSHEET_NAME_JOBS)
         wks.append_table(values=[row_data])
+        invalidate_cache('new_jobs_records')
+        invalidate_cache('master_jobs_records')
         return jsonify({"success": True, "message": "Job successfully added to Google Sheets!"})
     except Exception as e:
         print(traceback.format_exc())
@@ -150,6 +300,7 @@ def submit_seeker():
             wks.update_row(1, ["Name", "Street", "City", "Zipcode", "Ward", "Stake", "Phone", "Email", "Skills/Education", "Job Needed", "Desired Types", "General Notes", "Resume Asst", "Interview Coach", "Job Search Asst", "Date Entered", "Entered by - Name", "Ward", "Stake", "Phone", "email"])
             
         wks.append_table(values=[row_data])
+        invalidate_cache('new_seekers_records')
         return jsonify({"success": True, "message": "Job Seeker successfully added to Google Sheets!"})
     except Exception as e:
         print(traceback.format_exc())
@@ -159,18 +310,23 @@ def submit_seeker():
 def search_jobs():
     data = request.json
     job_types = data.get("job_types", [])
+    address = data.get("address", "")
+    radius = data.get("radius", 20)
     
     try:
-        gc = get_gsheets_client()
-        try:
-            # Try to open the Master JobBank file
-            sh = gc.open_by_key("1NxDQTta3xvch5jn_j-DpWvGg0zRfJhpGnLv9rFQxw6I")
-        except Exception:
-            # Fallback to the job entry sheet if the master is not shared or accessible
-            sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
+        radius = float(radius)
+    except (ValueError, TypeError):
+        radius = 20.0
+        
+    origin_zip = None
+    if address and address.strip():
+        import re
+        zip_match = re.search(r'\b\d{5}\b', address)
+        if zip_match:
+            origin_zip = zip_match.group(0)
             
-        wks = sh.sheet1
-        all_records = wks.get_all_records()
+    try:
+        all_records = get_master_jobs_records()
         
         recent = []
         older = []
@@ -194,6 +350,33 @@ def search_jobs():
                 if not match:
                     continue
             
+            # Check distance if address and zip code are provided
+            dist_miles = float('inf')
+            if origin_zip:
+                import re
+                job_zip_val = str(row.get("Zipcode") or row.get("Zip Code") or row.get("Zip") or row.get("company_zip") or row.get("Zip code") or "").strip()
+                # strip .0 if float conversion happened in spreadsheet
+                if job_zip_val.endswith('.0'):
+                    job_zip_val = job_zip_val[:-2]
+                job_zip_match = re.search(r'\b\d{5}\b', job_zip_val)
+                if not job_zip_match:
+                    continue  # Skip jobs without a valid ZIP if location search is requested
+                job_zip_5 = job_zip_match.group(0)
+                
+                if job_zip_5 == origin_zip:
+                    dist_miles = 0.0
+                else:
+                    try:
+                        coords1 = get_zip_coordinates(origin_zip)
+                        coords2 = get_zip_coordinates(job_zip_5)
+                        if coords1 and coords2:
+                            dist_miles = calculate_distance(coords1[0], coords1[1], coords2[0], coords2[1])
+                    except Exception:
+                        pass
+                
+                if dist_miles > radius:
+                    continue
+            
             # Use appropriate column names, falling back to what exists in the fallback sheet
             address_val = row.get('Address', row.get('company_street', ''))
             city_val = row.get('City', '')
@@ -204,6 +387,7 @@ def search_jobs():
                 "company": row.get("Name") or row.get("Company Name") or "Unknown",
                 "role": row.get("Available Jobs") or row.get("Job Title") or "Various",
                 "location": location,
+                "distance": f"{round(dist_miles, 1)} miles" if dist_miles != float('inf') else ("" if not origin_zip else "N/A"),
                 "career_website": row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
             }
             
@@ -228,6 +412,16 @@ def search_jobs():
             else:
                 older.append(job_entry)
                 
+        # Sort results by distance if distance filter is active
+        if origin_zip:
+            def sort_key(x):
+                try:
+                    return float(x["distance"].split(" ")[0])
+                except:
+                    return float('inf')
+            recent.sort(key=sort_key)
+            older.sort(key=sort_key)
+                
         return jsonify({
             "success": True, 
             "results": {
@@ -242,21 +436,14 @@ def search_jobs():
 @app.route('/api/dashboard-stats', methods=['GET'])
 def dashboard_stats():
     try:
-        gc = get_gsheets_client()
-        
         # 1. Get stats from Master JobBank
-        try:
-            sh_master = gc.open_by_key("1NxDQTta3xvch5jn_j-DpWvGg0zRfJhpGnLv9rFQxw6I")
-        except Exception:
-            sh_master = gc.open_by_key("1YIGS6DRmnEH3be9TG59nFVhGee2DVcc4MaaXFhKgSic")
-            
-        wks_master = sh_master.sheet1
-        all_records = wks_master.get_all_records()
+        all_records = get_master_jobs_records()
         
         now = datetime.datetime.now()
         expiring_in_5_days_count = 0
         reaching_2_years_count = 0
         expired_recently_count = 0
+        unverified_no_career_count = 0
         
         STANDARD_TYPES = [
             "HVAC Repair", "Accountant", "Airport", "Auto Parts", "Car Wash", 
@@ -275,33 +462,36 @@ def dashboard_stats():
         total_hot_jobs_matched = 0
         
         for row in all_records:
-            date_str = str(row.get("Date last verified", row.get("Date Entered", ""))).strip()
-            if not date_str:
-                continue
-                
-            try:
-                if "-" in date_str:
-                    date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%Y-%m-%d")
-                else:
-                    date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%m/%d/%Y")
-            except:
-                continue
-                
-            age_days = (now - date_obj).days
-            
             is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
-            is_hot = False
-            if is_hiring_val in ["TRUE", "YES", "1", "Y"]:
-                if 0 <= age_days <= 21:
-                    is_hot = True
-                if 16 <= age_days < 21:
+            if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
+                continue
+
+            date_str = str(row.get("Date last verified", row.get("Date Entered", ""))).strip()
+            age_days = 9999
+            has_date = False
+            if date_str:
+                try:
+                    if "-" in date_str:
+                        date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%Y-%m-%d")
+                    else:
+                        date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%m/%d/%Y")
+                    age_days = (now - date_obj).days
+                    has_date = True
+                except:
+                    pass
+
+            if has_date:
+                career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
+                has_career_page = bool(str(career_page).strip())
+                if 16 <= age_days <= 21 and has_career_page:
                     expiring_in_5_days_count += 1
-                if 22 <= age_days <= 36:
+                if 22 <= age_days <= 36 and has_career_page:
                     expired_recently_count += 1
                     
             if 640 <= age_days < 730:
                 reaching_2_years_count += 1
                 
+            is_hot = (0 <= age_days <= 21)
             if is_hot:
                 total_hot_jobs_matched += 1
                 job_title = str(row.get("Available Jobs", row.get("Job Title", ""))).lower()
@@ -312,24 +502,22 @@ def dashboard_stats():
                         break
                 job_type_counts[matched_type] = job_type_counts.get(matched_type, 0) + 1
                 
+            if age_days > 21:
+                career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
+                if not str(career_page).strip():
+                    unverified_no_career_count += 1
+                
         # 2. Get stats from New Job Opportunities sheet
-        sh_jobs = gc.open_by_key(SPREADSHEET_ID_JOBS)
-        new_jobs_count = len(sh_jobs.sheet1.get_all_records())
-        new_jobs_url = sh_jobs.url
+        new_jobs_info = get_new_jobs_records()
+        new_jobs_count = len(new_jobs_info['records'])
+        new_jobs_url = new_jobs_info['url']
         
         # 3. Get stats from New Job Seekers queue
         seeker_type_counts = {}
         total_seekers_matched = 0
         
         try:
-            import pandas as pd
-            import warnings
-            warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
-            url = "https://docs.google.com/spreadsheets/d/1BCkpZ2S_Covnh-cc5mg8auKWeKOfqubT/export?format=xlsx"
-            df_seekers = pd.read_excel(url)
-            df_seekers = df_seekers.fillna("")
-            seekers_records = df_seekers.to_dict('records')
-            
+            seekers_records = get_seekers_records()
             total_seekers_matched = len(seekers_records)
             
             for row in seekers_records:
@@ -344,20 +532,15 @@ def dashboard_stats():
             print(f"Error fetching seeker types: {e}")
             
         try:
-            sh_new_seekers = gc.open_by_key("1dY7BsSBTt1lyfGYWvCQKdCicpm4Rgcd4fMyEcNlaSr4")
-            new_seekers_count = len(sh_new_seekers.sheet1.get_all_records())
-            new_seekers_url = sh_new_seekers.url
+            new_seekers_info = get_new_seekers_records()
+            new_seekers_count = new_seekers_info['count']
+            new_seekers_url = new_seekers_info['url']
         except Exception as e:
             print(f"Error fetching new seekers: {e}")
             new_seekers_count = 0
             new_seekers_url = ""
-        # 4. Get stats from Hot Job Snapshot
-        try:
-            sh_hot_jobs = gc.open_by_key("1T42pCZhRcZcAtlTSSOac5GzR4eI0OcBS47IAbA8h3Hg")
-            wks_hot_jobs = sh_hot_jobs.sheet1
-            total_hot_jobs = len(wks_hot_jobs.get_all_records())
-        except Exception:
-            total_hot_jobs = 0
+            
+        total_hot_jobs = total_hot_jobs_matched
             
         return jsonify({
             "success": True, 
@@ -368,10 +551,11 @@ def dashboard_stats():
             "new_jobs_url": new_jobs_url,
             "new_seekers_count": new_seekers_count,
             "new_seekers_url": new_seekers_url,
-            "total_hot_jobs": total_hot_jobs_matched,
+            "total_hot_jobs": total_hot_jobs,
             "total_job_seekers": total_seekers_matched,
             "job_types": job_type_counts,
-            "seeker_types": seeker_type_counts
+            "seeker_types": seeker_type_counts,
+            "unverified_no_career_count": unverified_no_career_count
         })
     except Exception as e:
         print(traceback.format_exc())
@@ -383,48 +567,55 @@ def hot_jobs_review():
     job_type = request.args.get("type", "").lower()
 
     try:
-        gc = get_gsheets_client()
-        try:
-            sh = gc.open_by_key("1NxDQTta3xvch5jn_j-DpWvGg0zRfJhpGnLv9rFQxw6I")
-        except Exception:
-            sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
-            
-        wks = sh.sheet1
-        all_records = wks.get_all_records()
+        all_records = get_master_jobs_records()
         
         now = datetime.datetime.now()
         jobs_to_review = []
         
         for idx, row in enumerate(all_records):
-            age_days = 0
             date_str = str(row.get("Date last verified", row.get("Date Entered", ""))).strip()
+            age_days = 0
+            has_valid_date = False
             
-            if category == "type":
-                row_type = str(row.get("Available Jobs", row.get("Job Title", ""))).lower()
-                if not job_type or job_type not in row_type:
-                    continue
-            else:
-                if not date_str:
-                    continue
-                    
+            if date_str:
                 try:
                     if "-" in date_str:
                         date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%Y-%m-%d")
                     else:
                         date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%m/%d/%Y")
+                    age_days = (now - date_obj).days
+                    has_valid_date = True
                 except:
+                    pass
+            
+            if category == "type":
+                row_type = str(row.get("Available Jobs", row.get("Job Title", ""))).lower()
+                job_types_list = [t.strip().lower() for t in job_type.split(",") if t.strip()]
+                if not job_types_list or not any(t in row_type for t in job_types_list):
                     continue
-                    
-                age_days = (now - date_obj).days
-                is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
+            else:
+                if not has_valid_date:
+                    if category == "unverified_no_career":
+                        age_days = 9999
+                    else:
+                        continue
                 
+                is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
                 if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
                     continue
                     
-                if category == "5days" and not (16 <= age_days <= 21):
-                    continue
-                elif category == "46weeks" and not (22 <= age_days <= 36):
-                    continue
+                career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
+                has_career_page = bool(str(career_page).strip())
+                
+                if category == "5days":
+                    if not (16 <= age_days <= 21) or not has_career_page:
+                        continue
+                elif category == "46weeks":
+                    if not (22 <= age_days <= 36) or not has_career_page:
+                        continue
+                elif category == "unverified_no_career":
+                    if age_days <= 21 or has_career_page:
+                        continue
 
             job = {
                 "row_index": idx + 2,
@@ -524,6 +715,7 @@ def update_hot_job():
         if submitter_col != -1 and submitter_name:
             wks.update_value((row_index, submitter_col), submitter_name)
             
+        invalidate_cache('master_jobs_records')
         return jsonify({"success": True, "message": "Job successfully updated!"})
     except Exception as e:
         print(traceback.format_exc())
@@ -551,6 +743,11 @@ def login():
         for idx, row in enumerate(records):
             if row.get("Username") == username:
                 if check_password_hash(row.get("PasswordHash", ""), password):
+                    # Check if account is approved
+                    approved_val = str(row.get("Approved", "TRUE")).strip().upper()
+                    if approved_val not in ["TRUE", "YES", "1", "Y"]:
+                        return jsonify({"success": False, "error": "Your account is pending approval. Please check back later or contact an administrator."}), 401
+
                     # Update Date Last Logged In
                     try:
                         headers = wks.get_row(1)
@@ -592,22 +789,142 @@ def register():
             sh = gc.create("GoodJobNet_Users")
             wks = sh.sheet1
             wks.title = "Users"
-            wks.update_row(1, ["Name", "Ward", "Stake", "Calling", "Email", "Phone", "Username", "Role", "Date Registered", "Date Last Logged In", "PasswordHash"])
+            wks.update_row(1, ["Name", "Ward", "Stake", "Calling", "Email", "Phone", "Username", "Role", "Date Registered", "Date Last Logged In", "Approved", "PasswordHash"])
             
         wks = sh.worksheet_by_title("Users")
+        
+        # Check if username already exists
+        try:
+            records = wks.get_all_records()
+            for r in records:
+                if str(r.get("Username", "")).strip().lower() == str(data.get("username", "")).strip().lower():
+                    return jsonify({"success": False, "error": "Username already exists. Please choose a unique username."}), 400
+        except Exception as ex:
+            print("Failed to check duplicate username:", str(ex))
+            
         calling = data.get("calling", "")
         role = "admin" if calling == "Employment Center missionary/volunteer" else "user"
         
-        row_data = [
-            data.get("name", ""), data.get("ward", ""), data.get("stake", ""), 
-            calling, data.get("email", ""), data.get("phone", ""), 
-            data.get("username", ""), role, datetime.datetime.now().strftime("%Y-%m-%d"),
-            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), # Date Last Logged In
-            generate_password_hash(data.get("password", ""))
-        ]
+        # Get headers and add "Approved" column if not present
+        headers = wks.get_row(1)
+        if "Approved" not in headers:
+            if "PasswordHash" in headers:
+                pwd_idx = headers.index("PasswordHash")
+                headers.insert(pwd_idx, "Approved")
+            else:
+                headers.append("Approved")
+            wks.update_row(1, headers)
+            
+        # Dynamically build row_data based on headers to ensure robustness
+        row_dict = {
+            "Name": data.get("name", ""),
+            "Ward": data.get("ward", ""),
+            "Stake": data.get("stake", ""),
+            "Calling": calling,
+            "Email": data.get("email", ""),
+            "Phone": data.get("phone", ""),
+            "Username": data.get("username", ""),
+            "Role": role,
+            "Date Registered": datetime.datetime.now().strftime("%Y-%m-%d"),
+            "Date Last Logged In": "",
+            "Approved": "FALSE",
+            "PasswordHash": generate_password_hash(data.get("password", ""))
+        }
+        row_data = [row_dict.get(h, "") for h in headers]
         wks.append_table(values=[row_data])
         return jsonify({"success": True, "role": role})
     except Exception as e:
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+
+@app.route('/api/pending-users', methods=['GET'])
+def pending_users():
+    try:
+        gc = get_gsheets_client()
+        try:
+            sh = gc.open("GoodJobNet_Users")
+            wks = sh.worksheet_by_title("Users")
+        except (pygsheets.SpreadsheetNotFound, pygsheets.WorksheetNotFound):
+            return jsonify({"success": True, "users": []})
+            
+        records = wks.get_all_records()
+        pending = []
+        for row in records:
+            approved_val = str(row.get("Approved", "TRUE")).strip().upper()
+            if approved_val not in ["TRUE", "YES", "1", "Y"]:
+                pending.append({
+                    "name": row.get("Name", ""),
+                    "username": row.get("Username", ""),
+                    "email": row.get("Email", ""),
+                    "phone": row.get("Phone", ""),
+                    "calling": row.get("Calling", ""),
+                    "ward": row.get("Ward", ""),
+                    "stake": row.get("Stake", ""),
+                    "role": row.get("Role", "user"),
+                    "date_registered": row.get("Date Registered", "")
+                })
+        return jsonify({"success": True, "users": pending})
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+
+@app.route('/api/approve-user', methods=['POST'])
+def approve_user():
+    data = request.json
+    username_to_approve = data.get("username", "")
+    if not username_to_approve:
+        return jsonify({"success": False, "error": "Username is required"}), 400
+        
+    try:
+        gc = get_gsheets_client()
+        sh = gc.open("GoodJobNet_Users")
+        wks = sh.worksheet_by_title("Users")
+        
+        headers = wks.get_row(1)
+        if "Approved" not in headers:
+            return jsonify({"success": False, "error": "Approved column not found in Google Sheet"}), 500
+            
+        approved_col_idx = headers.index("Approved") + 1
+        username_col_idx = headers.index("Username") + 1 if "Username" in headers else -1
+        
+        if username_col_idx == -1:
+            return jsonify({"success": False, "error": "Username column not found in Google Sheet"}), 500
+            
+        # Get all records to find the row index
+        records = wks.get_all_records()
+        for idx, row in enumerate(records):
+            if row.get("Username") == username_to_approve:
+                row_idx = idx + 2 # 1-indexed, plus 1 for header row
+                wks.update_value((row_idx, approved_col_idx), "TRUE")
+                return jsonify({"success": True, "message": f"User {username_to_approve} approved successfully!"})
+                
+        return jsonify({"success": False, "error": f"User {username_to_approve} not found"}), 404
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+
+@app.route('/api/reject-user', methods=['POST'])
+def reject_user():
+    data = request.json
+    username_to_reject = data.get("username", "")
+    if not username_to_reject:
+        return jsonify({"success": False, "error": "Username is required"}), 400
+        
+    try:
+        gc = get_gsheets_client()
+        sh = gc.open("GoodJobNet_Users")
+        wks = sh.worksheet_by_title("Users")
+        
+        # Get all records to find the row index
+        records = wks.get_all_records()
+        for idx, row in enumerate(records):
+            if row.get("Username") == username_to_reject:
+                row_idx = idx + 2 # 1-indexed, plus 1 for header row
+                wks.delete_rows(row_idx, number=1)
+                return jsonify({"success": True, "message": f"User {username_to_reject} rejected and removed!"})
+                
+        return jsonify({"success": False, "error": f"User {username_to_reject} not found"}), 404
+    except Exception as e:
+        print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
 
 @app.route('/api/update-snapshot', methods=['POST'])
@@ -711,6 +1028,7 @@ def update_snapshot():
         wks_snapshot.clear()
         wks_snapshot.update_values('A1', snapshot_data)
         
+        invalidate_cache('master_jobs_records')
         return jsonify({"success": True, "message": f"Snapshot updated successfully with {len(snapshot_data)-1} jobs!"})
         
     except Exception as e:
@@ -721,31 +1039,16 @@ def update_snapshot():
 @app.route('/api/job-seeker-matches-report', methods=['GET'])
 def job_seeker_matches_report():
     try:
-        import pgeocode
-        import math
-        dist_calc = pgeocode.GeoDistance('US')
-        
         gc = get_gsheets_client()
         # 1. Get all seekers from the Unemployed List spreadsheet
         try:
-            import pandas as pd
-            import warnings
-            warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
-            url = "https://docs.google.com/spreadsheets/d/1BCkpZ2S_Covnh-cc5mg8auKWeKOfqubT/export?format=xlsx"
-            df_seekers = pd.read_excel(url)
-            df_seekers = df_seekers.fillna("")
-            seekers_records = df_seekers.to_dict('records')
+            seekers_records = get_seekers_records()
         except Exception as e:
             print(f"Error fetching seekers: {e}")
             seekers_records = []
             
         # 2. Get all jobs
-        try:
-            sh_master = gc.open_by_key("1NxDQTta3xvch5jn_j-DpWvGg0zRfJhpGnLv9rFQxw6I")
-        except Exception:
-            sh_master = gc.open_by_key(SPREADSHEET_ID_JOBS)
-        wks_jobs = sh_master.sheet1
-        jobs_records = wks_jobs.get_all_records()
+        jobs_records = get_master_jobs_records()
         
         # 3. Filter Hot Jobs (Verified in last 3 weeks and Currently Hiring = TRUE)
         now = datetime.datetime.now()
@@ -840,11 +1143,19 @@ def job_seeker_matches_report():
                         # Extract 5 digit zip just in case
                         job_zip_5 = job_zip[:5]
                         seeker_zip_5 = zipcode[:5]
-                        dist_km = dist_calc.query_postal_code(seeker_zip_5, job_zip_5)
-                        if not math.isnan(dist_km):
-                            dist_miles = dist_km * 0.621371
-                            if dist_miles <= 20:
-                                matched_jobs_count += 1
+                        
+                        if job_zip_5 == seeker_zip_5:
+                            dist_miles = 0.0
+                        else:
+                            coords1 = get_zip_coordinates(seeker_zip_5)
+                            coords2 = get_zip_coordinates(job_zip_5)
+                            if coords1 and coords2:
+                                dist_miles = calculate_distance(coords1[0], coords1[1], coords2[0], coords2[1])
+                            else:
+                                dist_miles = float('inf')
+                                
+                        if dist_miles <= 20:
+                            matched_jobs_count += 1
                     except Exception:
                         pass
                         
@@ -877,6 +1188,115 @@ def job_seeker_matches_report():
             print(f"Error exporting report to Google Sheets: {e}")
             
         return jsonify({"success": True, "report": report})
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+
+
+@app.route('/api/search-seekers', methods=['POST'])
+def search_seekers():
+    data = request.json
+    if not data:
+        return jsonify({"success": False, "error": "No data provided"}), 400
+        
+    job_types = data.get("job_types", [])
+    address = data.get("address", "")
+    radius = data.get("radius", 20)
+    
+    try:
+        radius = float(radius)
+    except (ValueError, TypeError):
+        radius = 20.0
+        
+    if not address or not address.strip():
+        return jsonify({"success": False, "error": "Address is required"}), 400
+        
+    # Extract 5-digit zip code from address
+    import re
+    zip_match = re.search(r'\b\d{5}\b', address)
+    if not zip_match:
+        return jsonify({"success": False, "error": "No valid 5-digit US zip code found in the address. Please include a zip code (e.g. 32801)."}), 400
+    origin_zip = zip_match.group(0)
+    
+    try:
+        # Load seekers from Unemployed List spreadsheet
+        seekers_records = get_seekers_records()
+        
+        results = []
+        has_other = any(jt.lower() == "other" for jt in job_types)
+        
+        # Normalize helper
+        def normalize(t):
+            return t.strip().lower().replace(" / ", "/").replace("warehouseing", "warehousing")
+            
+        normalized_req_types = [normalize(jt) for jt in job_types if jt.strip()]
+        
+        for seeker in seekers_records:
+            name = seeker.get(" Name", seeker.get("Name", "Unknown")).strip()
+            street = str(seeker.get("Street", "")).strip()
+            city = str(seeker.get("City", "")).strip()
+            zip_val = str(seeker.get("Zip", seeker.get("Zipcode", ""))).strip()
+            
+            if zip_val.endswith('.0'):
+                zip_val = zip_val[:-2]
+            seeker_zip = zip_val.strip()
+            
+            # Format seeker address
+            addr_parts = [p for p in [street, city, seeker_zip] if p]
+            seeker_address = ", ".join(addr_parts)
+            
+            # Get and parse desired job types
+            seeker_job_types = str(seeker.get("Type of Job Needed", seeker.get("Desired Types", ""))).strip()
+            
+            # Filter by job type (if job_types provided and doesn't contain "Other")
+            if normalized_req_types and not has_other:
+                seeker_types_list = [normalize(t) for t in seeker_job_types.split(",") if t.strip()]
+                match = False
+                for req_type in normalized_req_types:
+                    for st in seeker_types_list:
+                        if req_type in st or st in req_type:
+                            match = True
+                            break
+                    if match:
+                        break
+                if not match:
+                    continue
+                    
+            # Calculate distance
+            seeker_zip_5 = seeker_zip[:5]
+            origin_zip_5 = origin_zip[:5]
+            
+            if not seeker_zip_5:
+                continue
+                
+            dist_miles = float('inf')
+            if seeker_zip_5 == origin_zip_5:
+                dist_miles = 0.0
+            else:
+                try:
+                    coords1 = get_zip_coordinates(origin_zip_5)
+                    coords2 = get_zip_coordinates(seeker_zip_5)
+                    if coords1 and coords2:
+                        dist_miles = calculate_distance(coords1[0], coords1[1], coords2[0], coords2[1])
+                except Exception:
+                    pass
+                    
+            if dist_miles <= radius:
+                results.append({
+                    "name": name,
+                    "address": seeker_address,
+                    "job_types": seeker_job_types,
+                    "distance": round(dist_miles, 1) if dist_miles != float('inf') else "N/A"
+                })
+                
+        # Sort results by distance
+        results.sort(key=lambda x: x["distance"] if isinstance(x["distance"], (int, float)) else float('inf'))
+        
+        return jsonify({
+            "success": True,
+            "results": results
+        })
+        
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500

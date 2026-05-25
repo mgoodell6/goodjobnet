@@ -26,11 +26,14 @@ function JobSeekerDashboard() {
         </div>
 
         <div className="form-footer">
-          <p className="footer-text">No one should go through a job search alone. We offer a team of experts, support groups, webinars, workshops, and other resources.</p>
+          <p className="footer-text">No one should go through a job search alone. We offer a team of employment coaches, resume assistance, interview preparation, and networking opportunities.</p>
           <div className="footer-quote-container">
             <p className="footer-quote">"We can accomplish so much more together than we can alone."</p>
             <p className="footer-author">- President Russell M. Nelson</p>
           </div>
+          <p style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem', color: '#7f8c8d' }}>
+            Orlando Employment Center  - contact us at - <a href="mailto:Orlandoemploymentoffice@gmail.com" style={{ color: '#3498db', textDecoration: 'underline' }}>Orlandoemploymentoffice@gmail.com</a>
+          </p>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-function HotJobSearch({ user }) {
+function JobSeekerSearch() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const navigate = useNavigate();
@@ -24,7 +24,7 @@ function HotJobSearch({ user }) {
     };
 
     try {
-      const response = await fetch('/api/search-jobs', {
+      const response = await fetch('/api/search-seekers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -48,8 +48,8 @@ function HotJobSearch({ user }) {
     <div className="app-container" style={{ flexDirection: 'column' }}>
       <div className="glass-panel main-form" style={{ maxWidth: '1000px' }}>
         <header>
-          <h1>Job Search</h1>
-          <p className="subtitle">Find potential jobs based on radius and job type</p>
+          <h1>Job Seeker Search</h1>
+          <p className="subtitle">Find unemployed individuals interested in a job type within a certain radius of an address</p>
         </header>
 
         <form onSubmit={handleSearch}>
@@ -109,8 +109,8 @@ function HotJobSearch({ user }) {
             </div>
 
             <div className="input-group">
-              <label>Find a job near this location (Street, City, Zipcode)</label>
-              <textarea name="address" rows="4" placeholder="Enter full address..."></textarea>
+              <label>Find individuals near this location (Street, City, Zipcode)</label>
+              <textarea name="address" rows="4" placeholder="Enter full address including zip code... (e.g. 32801)" required></textarea>
             </div>
 
             <div className="input-group">
@@ -119,23 +119,17 @@ function HotJobSearch({ user }) {
             </div>
 
             <div className="input-group">
-              <label>List jobs within radius of (miles)</label>
-              <input type="number" name="radius" defaultValue="20" min="1" />
+              <label>List individuals within radius of (miles)</label>
+              <input type="number" name="radius" defaultValue="20" min="1" required />
             </div>
           </div>
 
           <div className="actions mt-2 text-center">
             <button type="submit" className="btn primary-btn" style={{ maxWidth: '300px' }} disabled={loading}>
-              {loading ? 'Searching...' : 'Look for potential jobs'}
+              {loading ? 'Searching...' : 'Look for potential job seekers'}
             </button>
-            <button type="button" className="btn secondary-btn" style={{ maxWidth: '300px', marginLeft: '1rem' }} onClick={() => {
-              if (user) {
-                navigate(user.role === 'admin' ? '/admin-dashboard' : '/dashboard');
-              } else {
-                navigate('/');
-              }
-            }}>
-              {user ? 'Back to Dashboard' : 'Back to Job Seeker Dashboard'}
+            <button type="button" className="btn secondary-btn" style={{ maxWidth: '300px', marginLeft: '1rem' }} onClick={() => navigate('/admin-dashboard')}>
+              Back to Dashboard
             </button>
           </div>
         </form>
@@ -143,70 +137,36 @@ function HotJobSearch({ user }) {
         {results && (
           <div className="results-section mt-2">
             <h2>Search Results</h2>
-
-            <h3 style={{ marginTop: '1.5rem', color: '#2ecc71' }}>Current Jobs (Validated in last 3 weeks)</h3>
-            {results.recent.length > 0 ? (
+            {results.length > 0 ? (
               <div className="table-container">
                 <table>
                   <thead>
                     <tr>
-                      <th>Company</th>
-                      <th>Role</th>
-                      <th>Location</th>
+                      <th>Name</th>
+                      <th>Address</th>
+                      <th>Job Types</th>
                       <th>Distance</th>
-                      <th>Career Website</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {results.recent.map((job, idx) => (
+                    {results.map((seeker, idx) => (
                       <tr key={idx}>
-                        <td>{job.company}</td>
-                        <td>{job.role}</td>
-                        <td>{job.location}</td>
-                        <td>{job.distance || 'N/A'}</td>
+                        <td style={{ fontWeight: 'bold' }}>{seeker.name}</td>
+                        <td>{seeker.address}</td>
+                        <td>{seeker.job_types}</td>
                         <td>
-                          {job.career_website ? (
-                            <a href={job.career_website} target="_blank" rel="noopener noreferrer">View Posting</a>
-                          ) : 'N/A'}
+                          {typeof seeker.distance === 'number'
+                            ? `${seeker.distance} mile${seeker.distance === 1 ? '' : 's'}`
+                            : seeker.distance}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            ) : <p>No recent jobs found.</p>}
-
-            <h3 style={{ marginTop: '2rem', color: '#f39c12' }}>Other Potential Jobs (Older than 3 weeks that were hiring previously)</h3>
-            {results.older.length > 0 ? (
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Company</th>
-                      <th>Role</th>
-                      <th>Location</th>
-                      <th>Distance</th>
-                      <th>Career Website</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.older.map((job, idx) => (
-                      <tr key={idx}>
-                        <td>{job.company}</td>
-                        <td>{job.role}</td>
-                        <td>{job.location}</td>
-                        <td>{job.distance || 'N/A'}</td>
-                        <td>
-                          {job.career_website ? (
-                            <a href={job.career_website} target="_blank" rel="noopener noreferrer">View Posting</a>
-                          ) : 'N/A'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : <p>No older potential jobs found.</p>}
+            ) : (
+              <p className="text-center" style={{ marginTop: '1.5rem' }}>No job seekers found matching the criteria within the specified radius.</p>
+            )}
           </div>
         )}
       </div>
@@ -214,4 +174,4 @@ function HotJobSearch({ user }) {
   );
 }
 
-export default HotJobSearch;
+export default JobSeekerSearch;
