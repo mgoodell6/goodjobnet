@@ -1078,28 +1078,6 @@ function HotJobsReview({ user }) {
                 <FaMicrophone />
                 {voiceActive ? 'Voice Assistant ON' : 'Turn On Voice Assistant'}
               </button>
-
-              <button
-                type="button"
-                className="btn secondary-btn"
-                onClick={() => speakJobDetails(currentJob)}
-                style={{ width: 'auto', padding: '0.6rem 1.2rem', gap: '0.5rem', display: 'inline-flex', alignItems: 'center' }}
-                title="Press 'Space' to read job details"
-              >
-                <FaVolumeUp />
-                Audio Reading
-              </button>
-
-              <button
-                type="button"
-                className="btn secondary-btn"
-                onClick={handleCallCompany}
-                style={{ width: 'auto', padding: '0.6rem 1.2rem', gap: '0.5rem', display: 'inline-flex', alignItems: 'center', borderColor: '#27ae60', color: '#27ae60' }}
-                title="Press 'C' to call company"
-              >
-                <FaPhone />
-                Call Company
-              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', minWidth: '220px' }}>
