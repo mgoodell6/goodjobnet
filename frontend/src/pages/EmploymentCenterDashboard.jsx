@@ -20,19 +20,6 @@ function EmploymentCenterDashboard() {
     unverified_no_career_count: '...'
   });
 
-  const [pendingUsers, setPendingUsers] = useState([]);
-
-  const fetchPendingUsers = () => {
-    fetch('/api/pending-users')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setPendingUsers(data.users);
-        }
-      })
-      .catch(err => console.error('Error fetching pending users:', err));
-  };
-
   useEffect(() => {
     fetch('/api/dashboard-stats')
       .then(res => res.json())
@@ -57,51 +44,7 @@ function EmploymentCenterDashboard() {
       .catch(err => {
         console.error('Error fetching stats:', err);
       });
-
-    fetchPendingUsers();
   }, []);
-
-  const handleApproveUser = async (username) => {
-    if (!window.confirm(`Are you sure you want to approve user: ${username}?`)) return;
-    try {
-      const response = await fetch('/api/approve-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username })
-      });
-      const data = await response.json();
-      if (data.success) {
-        alert(data.message);
-        fetchPendingUsers();
-      } else {
-        alert('Approval failed: ' + data.error);
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Network error while approving user');
-    }
-  };
-
-  const handleRejectUser = async (username) => {
-    if (!window.confirm(`Are you sure you want to REJECT and REMOVE user: ${username}?`)) return;
-    try {
-      const response = await fetch('/api/reject-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username })
-      });
-      const data = await response.json();
-      if (data.success) {
-        alert(data.message);
-        fetchPendingUsers();
-      } else {
-        alert('Rejection failed: ' + data.error);
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Network error while rejecting user');
-    }
-  };
 
 
 
@@ -209,47 +152,6 @@ function EmploymentCenterDashboard() {
             </div>
           </div>
         </div>
-
-        {/* User Approval Requests Section */}
-        {pendingUsers && pendingUsers.length > 0 && (
-          <div className="alerts-section mb-2" style={{ background: 'rgba(58, 123, 213, 0.05)', border: '1px solid rgba(58, 123, 213, 0.2)', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem' }}>
-            <h3 style={{ color: '#3a7bd5', marginBottom: '1rem' }}>Pending Account Requests ({pendingUsers.length})</h3>
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Username</th>
-                    <th>Calling</th>
-                    <th>Ward / Stake</th>
-                    <th>Email / Phone</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingUsers.map((u, idx) => (
-                    <tr key={idx}>
-                      <td>{u.name}</td>
-                      <td>{u.username}</td>
-                      <td>{u.calling}</td>
-                      <td>{u.ward} / {u.stake}</td>
-                      <td>
-                        {u.email || 'N/A'}<br/>
-                        {u.phone || 'N/A'}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => handleApproveUser(u.username)} className="btn primary-btn" style={{ background: '#2ecc71', padding: '0.25rem 0.5rem', fontSize: '0.8rem', width: 'auto', margin: 0 }}>Approve</button>
-                          <button onClick={() => handleRejectUser(u.username)} className="btn primary-btn" style={{ background: '#e74c3c', padding: '0.25rem 0.5rem', fontSize: '0.8rem', width: 'auto', margin: 0 }}>Reject</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
         {/* Middle Section: Alerts */}
         <div className="alerts-section mb-2" style={{ background: 'rgba(231, 76, 60, 0.05)', border: '1px solid rgba(231, 76, 60, 0.2)', padding: '1.5rem', borderRadius: '12px' }}>
