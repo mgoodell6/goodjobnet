@@ -29,13 +29,7 @@ function HotJobsReview({ user }) {
   const [jobTypeQuery, setJobTypeQuery] = useState('');
   const [selectedJobTypes, setSelectedJobTypes] = useState([]);
   const [reviewTitle, setReviewTitle] = useState('Hot Jobs Review');
-  const [callMethod, setCallMethod] = useState(() => {
-    return localStorage.getItem('goodjobnet_call_method') || 'dialer';
-  });
 
-  useEffect(() => {
-    localStorage.setItem('goodjobnet_call_method', callMethod);
-  }, [callMethod]);
 
   // Accessibility and Voice Assistant States
   const [voiceActive, setVoiceActive] = useState(false);
@@ -43,6 +37,8 @@ function HotJobsReview({ user }) {
   const [isListeningForJobs, setIsListeningForJobs] = useState(false);
   const [isListeningForCompanyType, setIsListeningForCompanyType] = useState(false);
   const [isListeningForNotes, setIsListeningForNotes] = useState(false);
+  const [isVoicePaused, setIsVoicePaused] = useState(false);
+  const [isListeningForHiring, setIsListeningForHiring] = useState(false);
   const [updateKey, setUpdateKey] = useState(0);
   const recognitionRef = useRef(null);
   const spokenJobsAccumulatorRef = useRef('');
@@ -63,6 +59,8 @@ function HotJobsReview({ user }) {
   const isListeningForJobsRef = useRef(isListeningForJobs);
   const isListeningForCompanyTypeRef = useRef(isListeningForCompanyType);
   const isListeningForNotesRef = useRef(isListeningForNotes);
+  const isVoicePausedRef = useRef(isVoicePaused);
+  const isListeningForHiringRef = useRef(isListeningForHiring);
   const jobsRef = useRef(jobs);
   const currentIndexRef = useRef(currentIndex);
 
@@ -71,9 +69,11 @@ function HotJobsReview({ user }) {
     isListeningForJobsRef.current = isListeningForJobs;
     isListeningForCompanyTypeRef.current = isListeningForCompanyType;
     isListeningForNotesRef.current = isListeningForNotes;
+    isVoicePausedRef.current = isVoicePaused;
+    isListeningForHiringRef.current = isListeningForHiring;
     jobsRef.current = jobs;
     currentIndexRef.current = currentIndex;
-  }, [voiceActive, isListeningForJobs, isListeningForCompanyType, isListeningForNotes, jobs, currentIndex]);
+  }, [voiceActive, isListeningForJobs, isListeningForCompanyType, isListeningForNotes, isVoicePaused, isListeningForHiring, jobs, currentIndex]);
 
   // Audio chirp feedback for voice controls
   const playChirp = (type = 'success') => {
@@ -163,52 +163,22 @@ function HotJobsReview({ user }) {
     const available = job.available_jobs ? job.available_jobs : "No specific jobs listed";
     const contactPhoneFormatted = job.contact_phone ? job.contact_phone.split('').join(' ') : "not listed";
     const companyType = (job.company_type && job.company_type.trim()) ? job.company_type : "Nothing entered";
+    const currentlyHiring = (job.currently_hiring === 'TRUE' || job.currently_hiring === 'Yes' || job.currently_hiring === true || String(job.currently_hiring).toUpperCase() === 'TRUE') ? 'Yes' : 'No';
     const notesText = `. Additional Notes: ${(job.notes && job.notes.trim()) ? job.notes : "None"}`;
-    const text = `Company: ${job.company_name || 'unknown'}. Company Type: ${companyType}. Available Jobs: ${available}. Contact Phone: ${contactPhoneFormatted}${notesText}.`;
+    const text = `Company: ${job.company_name || 'unknown'}. Company Type: ${companyType}. Currently Hiring: ${currentlyHiring}. Available Jobs: ${available}. Contact Phone: ${contactPhoneFormatted}${notesText}.`;
     speak(text);
   };
 
-  // Telephone call handler using system handler
-  const copyToClipboard = (text) => {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).catch(err => {
-        console.error("Could not copy text: ", err);
-      });
-    } else {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.style.position = "fixed";
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      try {
-        document.execCommand("copy");
-      } catch (err) {
-        console.error("Fallback copy failed", err);
-      }
-      document.body.removeChild(textarea);
-    }
-  };
-
-  // Telephone call handler with options
+  // Telephone call handler
   const handleCallCompany = () => {
     const job = jobsRef.current[currentIndexRef.current];
     if (job && job.contact_phone && job.contact_phone.trim()) {
       const phoneNumber = job.contact_phone.trim();
-      
-      if (callMethod === 'clipboard') {
-        copyToClipboard(phoneNumber);
-        speak(`Phone number copied to clipboard. Dialing:`, () => {
-          const cleanDigits = phoneNumber.replace(/\D/g, '');
-          const spokenDigits = cleanDigits.split('').join(', ');
-          speak(spokenDigits, null, 0.6);
-        });
-      } else {
-        speak(`Opening call to ${job.company_name} at ${phoneNumber}.`);
-        setTimeout(() => {
-          window.location.href = `tel:${phoneNumber}`;
-        }, 1500);
-      }
+      const cleanDigits = phoneNumber.replace(/\D/g, '');
+      const spokenDigits = cleanDigits.split('').join(', ');
+      speak(`Here is the phone number to call.`, () => {
+        speak(spokenDigits, null, 0.6);
+      });
     } else {
       playChirp('error');
       speak("There is no phone number listed for this job.");
@@ -422,6 +392,37 @@ function HotJobsReview({ user }) {
     setUpdateKey(prev => prev + 1);
     playChirp('success');
     speak(`Updated additional notes to: ${transcript}. You can say "save" to submit, or "update notes" to try again.`);
+  };
+
+  const handlePauseVoice = () => {
+    setIsVoicePaused(true);
+    isVoicePausedRef.current = true;
+    setIsListeningForJobs(false);
+    setIsListeningForCompanyType(false);
+    setIsListeningForNotes(false);
+    setIsListeningForHiring(false);
+    setSpeechStatus('Voice Assistant Paused (Say "Resume" to activate)');
+    speak("Voice assistant paused.");
+  };
+
+  const handleResumeVoice = () => {
+    setIsVoicePaused(false);
+    isVoicePausedRef.current = false;
+    setSpeechStatus('Listening for Commands...');
+    playChirp('success');
+    speak("Voice assistant resumed.");
+  };
+
+  const updateHiringStatusState = (status) => {
+    const updatedJobs = [...jobsRef.current];
+    updatedJobs[currentIndexRef.current] = {
+      ...updatedJobs[currentIndexRef.current],
+      currently_hiring: status
+    };
+    setJobs(updatedJobs);
+    setUpdateKey(prev => prev + 1);
+    playChirp('success');
+    speak(`Updated currently hiring status to: ${status}. You can say "save" to submit, or "update currently hiring status" to try again.`);
   };
 
   const fetchJobs = (category, type = '') => {
@@ -645,12 +646,16 @@ function HotJobsReview({ user }) {
           if (!active) return;
           console.log("[Voice Assistant] Speech recognition started.");
           let statusText = 'Listening for Commands...';
-          if (isListeningForJobsRef.current) {
+          if (isVoicePausedRef.current) {
+            statusText = 'Voice Assistant Paused (Say "Resume" to activate)';
+          } else if (isListeningForJobsRef.current) {
             statusText = 'Listening for Job Types (Say Done when finished)...';
           } else if (isListeningForCompanyTypeRef.current) {
             statusText = 'Listening for Company Type...';
           } else if (isListeningForNotesRef.current) {
             statusText = 'Listening for Notes...';
+          } else if (isListeningForHiringRef.current) {
+            statusText = 'Listening for Currently Hiring Status (Say Yes or No)...';
           }
           setSpeechStatus(statusText);
         };
@@ -671,6 +676,27 @@ function HotJobsReview({ user }) {
           if (!active) return;
           console.log("[Voice Assistant] Speech recognition result received.");
           if (!event.results || event.results.length === 0) return;
+
+          const transcript = event.results[event.results.length - 1][0].transcript.trim();
+          console.log("[Voice Assistant] Transcript:", transcript);
+          setLastHeard(transcript);
+
+          const transcriptLower = transcript.toLowerCase();
+
+          if (isVoicePausedRef.current) {
+            if (transcriptLower.includes("resume") || transcriptLower.includes("start listening")) {
+              handleResumeVoice();
+            }
+            return;
+          }
+
+          if (transcriptLower.includes("pause voice assistant") || transcriptLower.includes("pause voice") || transcriptLower === "pause" || transcriptLower.includes("stop listening")) {
+            handlePauseVoice();
+            if (rec) {
+              try { rec.stop(); } catch (e) { }
+            }
+            return;
+          }
 
           playChirp('listen');
 
@@ -698,6 +724,14 @@ function HotJobsReview({ user }) {
               spokenJobsAccumulatorRef.current = '';
               currentSessionTranscriptRef.current = '';
               speak("Cancelled updating job types.");
+              if (rec) {
+                try { rec.stop(); } catch (e) { }
+              }
+              return;
+            }
+
+            if (fullTranscriptLower.includes("pause")) {
+              handlePauseVoice();
               if (rec) {
                 try { rec.stop(); } catch (e) { }
               }
@@ -732,21 +766,42 @@ function HotJobsReview({ user }) {
             return;
           }
 
-          const transcript = event.results[event.results.length - 1][0].transcript.trim();
-          console.log("[Voice Assistant] Transcript:", transcript);
-          setLastHeard(transcript);
-
-          const transcriptLower = transcript.toLowerCase();
-
           if (isListeningForCompanyTypeRef.current) {
+            if (transcriptLower.includes("pause")) {
+              handlePauseVoice();
+              return;
+            }
             processSpokenCompanyType(transcript);
             setIsListeningForCompanyType(false);
             return;
           }
 
           if (isListeningForNotesRef.current) {
+            if (transcriptLower.includes("pause")) {
+              handlePauseVoice();
+              return;
+            }
             processSpokenNotes(transcript);
             setIsListeningForNotes(false);
+            return;
+          }
+
+          if (isListeningForHiringRef.current) {
+            if (transcriptLower.includes("pause")) {
+              handlePauseVoice();
+              return;
+            }
+            const cleanTranscript = transcriptLower.trim();
+            if (cleanTranscript.includes("yes") || cleanTranscript === "s") {
+              updateHiringStatusState("Yes");
+              setIsListeningForHiring(false);
+            } else if (cleanTranscript.includes("no")) {
+              updateHiringStatusState("No");
+              setIsListeningForHiring(false);
+            } else {
+              playChirp('error');
+              speak("I didn't catch that. Please say Yes or No.");
+            }
             return;
           }
 
@@ -769,13 +824,20 @@ function HotJobsReview({ user }) {
           } else if (transcriptLower.includes("update additional notes") || transcriptLower.includes("update notes") || transcriptLower.includes("change notes") || transcriptLower.includes("edit notes") || transcriptLower.includes("add notes")) {
             setIsListeningForNotes(true);
             speak("Please say the additional notes now.");
+          } else if (transcriptLower.includes("update currently hiring status") || transcriptLower.includes("update hiring status") || transcriptLower.includes("change currently hiring status") || transcriptLower.includes("change hiring status") || transcriptLower.includes("edit currently hiring status") || transcriptLower.includes("edit hiring status") || transcriptLower.includes("update hiring")) {
+            setIsListeningForHiring(true);
+            speak("Please say Yes or No for currently hiring status.");
+          } else if (transcriptLower.includes("currently hiring yes") || transcriptLower.includes("hiring status yes") || transcriptLower.includes("update currently hiring to yes") || transcriptLower.includes("set currently hiring to yes")) {
+            updateHiringStatusState("Yes");
+          } else if (transcriptLower.includes("currently hiring no") || transcriptLower.includes("hiring status no") || transcriptLower.includes("update currently hiring to no") || transcriptLower.includes("set currently hiring to no")) {
+            updateHiringStatusState("No");
           } else if (transcriptLower.includes("save") || transcriptLower.includes("submit") || transcriptLower.includes("update job")) {
             if (formRef.current) {
               speak("Saving job details.");
               formRef.current.requestSubmit();
             }
           } else if (transcriptLower.includes("help")) {
-            speak("Voice commands are: next job, previous job, read details, update company type, update job types, update notes, call company, save, or help.");
+            speak("Voice commands are: next job, previous job, read details, update company type, update job types, update hiring status, update notes, call company, pause, save, or help.");
           }
         };
 
@@ -797,12 +859,16 @@ function HotJobsReview({ user }) {
             playChirp('error');
           } else if (e.error === 'no-speech') {
             let statusText = 'Listening for Commands...';
-            if (isListeningForJobsRef.current) {
+            if (isVoicePausedRef.current) {
+              statusText = 'Voice Assistant Paused (Say "Resume" to activate)';
+            } else if (isListeningForJobsRef.current) {
               statusText = 'Listening for Job Types (Say Done when finished)...';
             } else if (isListeningForCompanyTypeRef.current) {
               statusText = 'Listening for Company Type...';
             } else if (isListeningForNotesRef.current) {
               statusText = 'Listening for Notes...';
+            } else if (isListeningForHiringRef.current) {
+              statusText = 'Listening for Currently Hiring Status (Say Yes or No)...';
             }
             setSpeechStatus(statusText);
           } else {
@@ -864,9 +930,13 @@ function HotJobsReview({ user }) {
     if (voiceActive) {
       setVoiceActive(false);
       voiceActiveRef.current = false;
+      setIsVoicePaused(false);
+      isVoicePausedRef.current = false;
       setIsListeningForJobs(false);
       setIsListeningForCompanyType(false);
       setIsListeningForNotes(false);
+      setIsListeningForHiring(false);
+      isListeningForHiringRef.current = false;
       spokenJobsAccumulatorRef.current = '';
       currentSessionTranscriptRef.current = '';
       if (recognitionRef.current) {
@@ -880,6 +950,10 @@ function HotJobsReview({ user }) {
     } else {
       setVoiceActive(true);
       voiceActiveRef.current = true;
+      setIsVoicePaused(false);
+      isVoicePausedRef.current = false;
+      setIsListeningForHiring(false);
+      isListeningForHiringRef.current = false;
       playChirp('success');
       setSpeechStatus('Initializing...');
       speak("Voice assistant activated. You can navigate, edit job types, or call the company using voice commands.", () => {
@@ -1110,35 +1184,15 @@ function HotJobsReview({ user }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
               <button
                 type="button"
-                className={`btn ${voiceActive ? 'mic-pulsing' : 'secondary-btn'}`}
+                className={`btn ${(voiceActive && !isVoicePaused) ? 'mic-pulsing' : 'secondary-btn'}`}
                 onClick={toggleVoiceActive}
                 style={{ width: 'auto', padding: '0.6rem 1.2rem', gap: '0.5rem', display: 'inline-flex', alignItems: 'center' }}
                 title="Press 'V' to toggle voice control"
               >
                 <FaMicrophone />
-                {voiceActive ? 'Voice Assistant ON' : 'Turn On Voice Assistant'}
+                {voiceActive ? (isVoicePaused ? 'Voice Assistant PAUSED' : 'Voice Assistant ON') : 'Turn On Voice Assistant'}
               </button>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.3rem 0.6rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>Call Mode:</span>
-                <select
-                  value={callMethod}
-                  onChange={e => setCallMethod(e.target.value)}
-                  style={{
-                    background: '#1a1a1a',
-                    color: '#ffffff',
-                    border: '1px solid var(--glass-border)',
-                    borderRadius: '4px',
-                    padding: '0.2rem 0.5rem',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    outline: 'none'
-                  }}
-                >
-                  <option value="dialer" style={{ background: '#1a1a1a', color: '#ffffff' }}>Device Dialer</option>
-                  <option value="clipboard" style={{ background: '#1a1a1a', color: '#ffffff' }}>Clipboard & Read Slowly</option>
-                </select>
-              </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', minWidth: '220px' }}>
@@ -1193,8 +1247,11 @@ function HotJobsReview({ user }) {
                 <span>• "Read details"</span>
                 <span>• "Update company type"</span>
                 <span>• "Update job types"</span>
+                <span>• "Update hiring status"</span>
                 <span>• "Update notes"</span>
                 <span>• "Call company"</span>
+                <span>• "Pause"</span>
+                <span>• "Resume"</span>
                 <span>• "Save"</span>
                 <span>• "Help"</span>
               </div>
@@ -1308,7 +1365,18 @@ function HotJobsReview({ user }) {
 
                 <div className="input-group">
                   <label>Currently Hiring <span className="required">*</span></label>
-                  <select name="currently_hiring" defaultValue={currentJob.currently_hiring} required>
+                  <select
+                    name="currently_hiring"
+                    defaultValue={
+                      (currentJob.currently_hiring === 'TRUE' ||
+                       currentJob.currently_hiring === 'Yes' ||
+                       currentJob.currently_hiring === true ||
+                       String(currentJob.currently_hiring).toUpperCase() === 'TRUE')
+                        ? 'Yes'
+                        : 'No'
+                    }
+                    required
+                  >
                     <option value="Yes">Yes</option>
                     <option value="No">No</option>
                   </select>
