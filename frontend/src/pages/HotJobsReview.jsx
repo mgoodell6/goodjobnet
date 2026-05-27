@@ -837,7 +837,7 @@ function HotJobsReview({ user }) {
               formRef.current.requestSubmit();
             }
           } else if (transcriptLower.includes("help")) {
-            speak("Voice commands are: next job, previous job, read details, update company type, update job types, update hiring status, update notes, call company, pause, save, or help.");
+            speak("Voice commands are: next job, previous job, read details, update company type, update job types, update currently hiring status, update notes, call company, pause, save, or help.");
           }
         };
 
@@ -1247,7 +1247,7 @@ function HotJobsReview({ user }) {
                 <span>• "Read details"</span>
                 <span>• "Update company type"</span>
                 <span>• "Update job types"</span>
-                <span>• "Update hiring status"</span>
+                <span>• "Update currently hiring status"</span>
                 <span>• "Update notes"</span>
                 <span>• "Call company"</span>
                 <span>• "Pause"</span>
