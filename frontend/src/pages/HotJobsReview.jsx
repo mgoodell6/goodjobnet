@@ -14,7 +14,7 @@ const JOB_OPTIONS = [
   "Manufacturing", "Nursing", "Painter", "Pest Control", "Plumbing",
   "Restaurant (Cook/Waiter/Host)", "Retail", "Sales", "Security", "Stocking",
   "Telephone/Call Center/Scheduling", "Theme Park", "Trucking/Transportation",
-  "Warehousing/Logistics", "Other"
+  "Warehousing/Logistics"
 ];
 
 function HotJobsReview({ user }) {
@@ -240,8 +240,7 @@ function HotJobsReview({ user }) {
       "Telephone/Call Center/Scheduling": ["telephone", "call center", "scheduling", "telemarketing", "telemarketer"],
       "Theme Park": ["theme park", "amusement park"],
       "Trucking/Transportation": ["trucking", "transportation", "truck driver", "truck"],
-      "Warehousing/Logistics": ["warehousing", "logistics", "warehouse"],
-      "Other": ["other"]
+      "Warehousing/Logistics": ["warehousing", "logistics", "warehouse"]
     };
 
     for (const [option, keywords] of Object.entries(optionKeywords)) {
