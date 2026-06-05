@@ -1155,6 +1155,10 @@ def search_seekers():
             addr_parts = [p for p in [street, city, seeker_zip] if p]
             seeker_address = ", ".join(addr_parts)
             
+            # Get phone and email
+            phone = str(seeker.get("Phone ") or seeker.get("Phone") or seeker.get("phone", "")).strip()
+            email = str(seeker.get("email") or seeker.get("Email") or seeker.get("Email Address", "")).strip()
+            
             # Get and parse desired job types
             seeker_job_types = str(seeker.get("Type of Job Needed", seeker.get("Desired Types", ""))).strip()
             
@@ -1195,6 +1199,8 @@ def search_seekers():
                 results.append({
                     "name": name,
                     "address": seeker_address,
+                    "phone": phone,
+                    "email": email,
                     "job_types": seeker_job_types,
                     "distance": round(dist_miles, 1) if dist_miles != float('inf') else "N/A"
                 })

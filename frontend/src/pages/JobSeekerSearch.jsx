@@ -144,6 +144,8 @@ function JobSeekerSearch() {
                     <tr>
                       <th>Name</th>
                       <th>Address</th>
+                      <th>Phone</th>
+                      <th>Email</th>
                       <th>Job Types</th>
                       <th>Distance</th>
                     </tr>
@@ -153,6 +155,8 @@ function JobSeekerSearch() {
                       <tr key={idx}>
                         <td style={{ fontWeight: 'bold' }}>{seeker.name}</td>
                         <td>{seeker.address}</td>
+                        <td>{seeker.phone ? <a href={`tel:${seeker.phone}`}>{seeker.phone}</a> : 'N/A'}</td>
+                        <td>{seeker.email ? <a href={`mailto:${seeker.email}`}>{seeker.email}</a> : 'N/A'}</td>
                         <td>{seeker.job_types}</td>
                         <td>
                           {typeof seeker.distance === 'number'
