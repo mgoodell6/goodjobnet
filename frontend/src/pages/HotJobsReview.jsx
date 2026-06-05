@@ -1308,18 +1308,18 @@ function HotJobsReview({ user }) {
                 </div>
 
                 <div className="input-group full-width">
-                  <label>Company Street Address <span className="required">*</span></label>
-                  <input type="text" name="company_street" defaultValue={currentJob.company_street} required />
+                  <label>Company Street Address</label>
+                  <input type="text" name="company_street" defaultValue={currentJob.company_street} />
                 </div>
 
                 <div className="input-group">
-                  <label>City <span className="required">*</span></label>
-                  <input type="text" name="company_city" defaultValue={currentJob.company_city} required />
+                  <label>City</label>
+                  <input type="text" name="company_city" defaultValue={currentJob.company_city} />
                 </div>
 
                 <div className="input-group">
-                  <label>Company State <span className="required">*</span></label>
-                  <select name="company_state" defaultValue={currentJob.company_state || 'FL'} required>
+                  <label>Company State</label>
+                  <select name="company_state" defaultValue={currentJob.company_state || 'FL'}>
                     <option value="">Select State...</option>
                     <option value="FL">Florida</option>
                     <option value="AL">Alabama</option>
@@ -1331,8 +1331,8 @@ function HotJobsReview({ user }) {
                 </div>
 
                 <div className="input-group">
-                  <label>Company Zipcode <span className="required">*</span></label>
-                  <input type="text" name="company_zip" defaultValue={currentJob.company_zip} required />
+                  <label>Company Zipcode</label>
+                  <input type="text" name="company_zip" defaultValue={currentJob.company_zip} />
                 </div>
 
                 <div className="input-group full-width">
@@ -1363,7 +1363,7 @@ function HotJobsReview({ user }) {
                 </div>
 
                 <div className="input-group">
-                  <label>Currently Hiring <span className="required">*</span></label>
+                  <label>Currently Hiring</label>
                   <select
                     name="currently_hiring"
                     defaultValue={
@@ -1374,7 +1374,6 @@ function HotJobsReview({ user }) {
                         ? 'Yes'
                         : 'No'
                     }
-                    required
                   >
                     <option value="Yes">Yes</option>
                     <option value="No">No</option>
