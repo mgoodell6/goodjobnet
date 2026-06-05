@@ -42,7 +42,9 @@ function HotJobsReview({ user }) {
   const [updateKey, setUpdateKey] = useState(0);
   const recognitionRef = useRef(null);
   const spokenJobsAccumulatorRef = useRef('');
+  const spokenNotesAccumulatorRef = useRef('');
   const currentSessionTranscriptRef = useRef('');
+  const notesTimeoutRef = useRef(null);
   const [speechStatus, setSpeechStatus] = useState('Voice Controls Offline');
 
   const [micVolume, setMicVolume] = useState(0);
@@ -400,6 +402,8 @@ function HotJobsReview({ user }) {
     setIsListeningForCompanyType(false);
     setIsListeningForNotes(false);
     setIsListeningForHiring(false);
+    if (notesTimeoutRef.current) clearTimeout(notesTimeoutRef.current);
+    spokenNotesAccumulatorRef.current = '';
     setSpeechStatus('Voice Assistant Paused (Say "Resume" to activate)');
     speak("Voice assistant paused.");
   };
@@ -459,7 +463,9 @@ function HotJobsReview({ user }) {
       setIsListeningForJobs(false);
       setIsListeningForCompanyType(false);
       setIsListeningForNotes(false);
+      if (notesTimeoutRef.current) clearTimeout(notesTimeoutRef.current);
       spokenJobsAccumulatorRef.current = '';
+      spokenNotesAccumulatorRef.current = '';
       currentSessionTranscriptRef.current = '';
       if (voiceActiveRef.current) {
         speak(`Job ${nextIdx + 1}.`, () => {
@@ -477,7 +483,9 @@ function HotJobsReview({ user }) {
       setIsListeningForJobs(false);
       setIsListeningForCompanyType(false);
       setIsListeningForNotes(false);
+      if (notesTimeoutRef.current) clearTimeout(notesTimeoutRef.current);
       spokenJobsAccumulatorRef.current = '';
+      spokenNotesAccumulatorRef.current = '';
       currentSessionTranscriptRef.current = '';
       if (voiceActiveRef.current) {
         speak(`Job ${prevIdx + 1}.`, () => {
@@ -497,7 +505,9 @@ function HotJobsReview({ user }) {
       setIsListeningForJobs(false);
       setIsListeningForCompanyType(false);
       setIsListeningForNotes(false);
+      if (notesTimeoutRef.current) clearTimeout(notesTimeoutRef.current);
       spokenJobsAccumulatorRef.current = '';
+      spokenNotesAccumulatorRef.current = '';
       currentSessionTranscriptRef.current = '';
       if (recognitionRef.current) {
         try {
@@ -636,7 +646,7 @@ function HotJobsReview({ user }) {
       console.log("[Voice Assistant] Starting a new speech recognition session...");
       try {
         rec = new SpeechRecognition();
-        rec.continuous = isListeningForJobsRef.current;
+        rec.continuous = isListeningForJobsRef.current || isListeningForNotesRef.current;
         rec.interimResults = false;
         rec.lang = 'en-US';
         recognitionRef.current = rec;
@@ -776,12 +786,84 @@ function HotJobsReview({ user }) {
           }
 
           if (isListeningForNotesRef.current) {
-            if (transcriptLower.includes("pause")) {
-              handlePauseVoice();
+            let currentTranscript = '';
+            let interimTranscript = '';
+            for (let i = 0; i < event.results.length; ++i) {
+              if (event.results[i].isFinal) {
+                currentTranscript += event.results[i][0].transcript + ' ';
+              } else {
+                interimTranscript += event.results[i][0].transcript + ' ';
+              }
+            }
+            currentTranscript = currentTranscript.trim();
+            currentSessionTranscriptRef.current = currentTranscript;
+
+            const fullTranscript = (spokenNotesAccumulatorRef.current + ' ' + currentTranscript + ' ' + interimTranscript).trim().replace(/\s+/g, ' ');
+            console.log("[Voice Assistant] Spoken notes so far:", fullTranscript);
+            setLastHeard(fullTranscript);
+
+            const fullTranscriptLower = fullTranscript.toLowerCase();
+
+            if (fullTranscriptLower.includes("cancel")) {
+              setIsListeningForNotes(false);
+              spokenNotesAccumulatorRef.current = '';
+              currentSessionTranscriptRef.current = '';
+              speak("Cancelled updating notes.");
+              if (rec) {
+                try { rec.stop(); } catch (e) { }
+              }
               return;
             }
-            processSpokenNotes(transcript);
-            setIsListeningForNotes(false);
+
+            if (fullTranscriptLower.includes("pause")) {
+              handlePauseVoice();
+              if (rec) {
+                try { rec.stop(); } catch (e) { }
+              }
+              return;
+            }
+
+            if (notesTimeoutRef.current) {
+              clearTimeout(notesTimeoutRef.current);
+            }
+
+            const stopWords = ["done", "finish", "finished", "complete", "completed", "stop"];
+            let foundStop = false;
+            let stopWordUsed = "";
+            for (const word of stopWords) {
+              const regex = new RegExp(`\\b${word}\\b`, 'i');
+              if (regex.test(fullTranscriptLower)) {
+                foundStop = true;
+                stopWordUsed = word;
+                break;
+              }
+            }
+
+            if (foundStop) {
+              const index = fullTranscriptLower.indexOf(stopWordUsed);
+              const cleanText = fullTranscript.substring(0, index).trim();
+
+              setIsListeningForNotes(false);
+              spokenNotesAccumulatorRef.current = '';
+              currentSessionTranscriptRef.current = '';
+              processSpokenNotes(cleanText);
+              if (rec) {
+                try { rec.stop(); } catch (e) { }
+              }
+              return;
+            }
+
+            notesTimeoutRef.current = setTimeout(() => {
+              console.log("[Voice Assistant] Notes auto-finalized after pause.");
+              setIsListeningForNotes(false);
+              spokenNotesAccumulatorRef.current = '';
+              currentSessionTranscriptRef.current = '';
+              processSpokenNotes(fullTranscript);
+              if (rec) {
+                try { rec.stop(); } catch (e) { }
+              }
+            }, 3000); // Wait 3 seconds of pause
+
             return;
           }
 
@@ -822,6 +904,8 @@ function HotJobsReview({ user }) {
             speak("Please say the hiring job types now. Say 'done' or 'finish' when you are finished listing them.");
           } else if (transcriptLower.includes("update additional notes") || transcriptLower.includes("update notes") || transcriptLower.includes("change notes") || transcriptLower.includes("edit notes") || transcriptLower.includes("add notes")) {
             setIsListeningForNotes(true);
+            spokenNotesAccumulatorRef.current = '';
+            currentSessionTranscriptRef.current = '';
             speak("Please say the additional notes now.");
           } else if (transcriptLower.includes("update currently hiring status") || transcriptLower.includes("update hiring status") || transcriptLower.includes("change currently hiring status") || transcriptLower.includes("change hiring status") || transcriptLower.includes("edit currently hiring status") || transcriptLower.includes("edit hiring status") || transcriptLower.includes("update hiring")) {
             setIsListeningForHiring(true);
@@ -886,6 +970,11 @@ function HotJobsReview({ user }) {
             currentSessionTranscriptRef.current = '';
           }
 
+          if (isListeningForNotesRef.current) {
+            spokenNotesAccumulatorRef.current = (spokenNotesAccumulatorRef.current + ' ' + currentSessionTranscriptRef.current).trim();
+            currentSessionTranscriptRef.current = '';
+          }
+
           // Restart after a short delay if still active
           setTimeout(() => {
             if (active && voiceActiveRef.current) {
@@ -915,6 +1004,9 @@ function HotJobsReview({ user }) {
           // ignore
         }
       }
+      if (notesTimeoutRef.current) {
+        clearTimeout(notesTimeoutRef.current);
+      }
       recognitionRef.current = null;
     };
   }, [voiceActive, speechTrigger]);
@@ -936,7 +1028,9 @@ function HotJobsReview({ user }) {
       setIsListeningForNotes(false);
       setIsListeningForHiring(false);
       isListeningForHiringRef.current = false;
+      if (notesTimeoutRef.current) clearTimeout(notesTimeoutRef.current);
       spokenJobsAccumulatorRef.current = '';
+      spokenNotesAccumulatorRef.current = '';
       currentSessionTranscriptRef.current = '';
       if (recognitionRef.current) {
         try {
