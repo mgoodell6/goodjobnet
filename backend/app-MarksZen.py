@@ -631,7 +631,7 @@ def hot_jobs_review():
                 "contact_email": row.get("Hiring Contact Email") or row.get("Contact Email") or row.get("contact_email", ""),
                 "currently_hiring": str(row.get("Currently Hiring", "Yes")),
                 "available_jobs": row.get("Available Jobs") or row.get("Job Title", ""),
-                "notes": row.get("Notes") or row.get("notes", ""),
+                "notes": row.get("General Notes") or row.get("Any additional Notes") or row.get("Notes") or row.get("notes", ""),
                 "date_last_verified": date_str,
                 "age_days": age_days
             }
@@ -672,7 +672,7 @@ def update_hot_job():
             "contact_phone": ["Hiring Contact Phone", "Contact Phone", "contact_phone"],
             "contact_email": ["Hiring Contact Email", "Contact Email", "contact_email"],
             "available_jobs": ["Available Jobs", "Job Title"],
-            "notes": ["Notes", "notes"],
+            "notes": ["General Notes", "Any additional Notes", "Notes", "notes"],
             "currently_hiring": ["Currently Hiring"]
         }
         
