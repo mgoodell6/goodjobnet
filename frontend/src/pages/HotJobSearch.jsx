@@ -155,6 +155,7 @@ function HotJobSearch({ user }) {
                       <th>Location</th>
                       <th>Distance</th>
                       <th>Career Website</th>
+                      <th>Notes</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -169,6 +170,7 @@ function HotJobSearch({ user }) {
                             <a href={job.career_website} target="_blank" rel="noopener noreferrer">View Posting</a>
                           ) : 'N/A'}
                         </td>
+                        <td>{job.notes || 'N/A'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -187,6 +189,7 @@ function HotJobSearch({ user }) {
                       <th>Location</th>
                       <th>Distance</th>
                       <th>Career Website</th>
+                      <th>Notes</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -201,6 +204,7 @@ function HotJobSearch({ user }) {
                             <a href={job.career_website} target="_blank" rel="noopener noreferrer">View Posting</a>
                           ) : 'N/A'}
                         </td>
+                        <td>{job.notes || 'N/A'}</td>
                       </tr>
                     ))}
                   </tbody>

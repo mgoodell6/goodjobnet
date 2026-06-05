@@ -388,7 +388,8 @@ def search_jobs():
                 "role": row.get("Available Jobs") or row.get("Job Title") or "Various",
                 "location": location,
                 "distance": f"{round(dist_miles, 1)} miles" if dist_miles != float('inf') else ("" if not origin_zip else "N/A"),
-                "career_website": row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
+                "career_website": row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or "",
+                "notes": row.get("General Notes") or row.get("Any additional Notes") or row.get("Notes") or row.get("notes", "")
             }
             
             date_verified_str = row.get("Date last verified", row.get("Date Entered", ""))
