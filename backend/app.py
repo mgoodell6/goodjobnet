@@ -312,6 +312,7 @@ def search_jobs():
     job_types = data.get("job_types", [])
     address = data.get("address", "")
     radius = data.get("radius", 20)
+    company_name = data.get("company_name", "").strip()
     
     try:
         radius = float(radius)
@@ -338,6 +339,12 @@ def search_jobs():
             is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
             if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
                 continue
+                
+            # Filter by company name if provided
+            if company_name:
+                row_company = str(row.get("Name") or row.get("Company Name") or "").strip().lower()
+                if company_name.lower() not in row_company:
+                    continue
                 
             # Filter by job type
             row_job_type = str(row.get("Available Jobs", row.get("Job Title", "")))

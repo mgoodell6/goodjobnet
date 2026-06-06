@@ -20,7 +20,8 @@ function HotJobSearch({ user }) {
     const data = {
       job_types: jobTypes,
       address: formData.get('address'),
-      radius: formData.get('radius')
+      radius: formData.get('radius'),
+      company_name: formData.get('company_name')
     };
 
     try {
@@ -111,6 +112,11 @@ function HotJobSearch({ user }) {
             <div className="input-group">
               <label>Find a job near this location (Street, City, Zipcode)</label>
               <textarea name="address" rows="4" placeholder="Enter full address..."></textarea>
+            </div>
+
+            <div className="input-group">
+              <label>Company Name (Optional)</label>
+              <input type="text" name="company_name" placeholder="Search by company name..." />
             </div>
 
             <div className="input-group">
