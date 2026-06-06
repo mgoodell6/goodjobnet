@@ -725,7 +725,9 @@ def update_hot_job():
 # Win32 Global Keyboard Hook & Window Closure for Accessibility
 import ctypes
 import threading
-from ctypes import wintypes
+import sys
+
+is_windows = sys.platform.startswith("win")
 
 call_active = False
 _hook_id = None
@@ -733,195 +735,210 @@ _hook_thread = None
 _hook_thread_id = None
 _hook_lock = threading.Lock()
 
-user32 = ctypes.windll.user32
-kernel32 = ctypes.windll.kernel32
+if is_windows:
+    from ctypes import wintypes
+    user32 = ctypes.windll.user32
+    kernel32 = ctypes.windll.kernel32
 
-# Setup ctypes signatures to prevent 64-bit handle truncation
-user32.IsWindowVisible.argtypes = [wintypes.HWND]
-user32.IsWindowVisible.restype = wintypes.BOOL
+    # Setup ctypes signatures to prevent 64-bit handle truncation
+    user32.IsWindowVisible.argtypes = [wintypes.HWND]
+    user32.IsWindowVisible.restype = wintypes.BOOL
 
-user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
-user32.GetWindowTextLengthW.restype = ctypes.c_int
+    user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+    user32.GetWindowTextLengthW.restype = ctypes.c_int
 
-user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
-user32.GetWindowTextW.restype = ctypes.c_int
+    user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    user32.GetWindowTextW.restype = ctypes.c_int
 
-WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
-user32.EnumWindows.argtypes = [WNDENUMPROC, wintypes.LPARAM]
-user32.EnumWindows.restype = wintypes.BOOL
+    WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    user32.EnumWindows.argtypes = [WNDENUMPROC, wintypes.LPARAM]
+    user32.EnumWindows.restype = wintypes.BOOL
 
-user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
-user32.PostMessageW.restype = wintypes.BOOL
+    user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    user32.PostMessageW.restype = wintypes.BOOL
 
-user32.IsWindow.argtypes = [wintypes.HWND]
-user32.IsWindow.restype = wintypes.BOOL
+    user32.IsWindow.argtypes = [wintypes.HWND]
+    user32.IsWindow.restype = wintypes.BOOL
 
-user32.SetForegroundWindow.argtypes = [wintypes.HWND]
-user32.SetForegroundWindow.restype = wintypes.BOOL
+    user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+    user32.SetForegroundWindow.restype = wintypes.BOOL
 
-HOOKPROC = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM)
+    HOOKPROC = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM)
 
-user32.CallNextHookEx.argtypes = [wintypes.HHOOK, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM]
-user32.CallNextHookEx.restype = ctypes.c_longlong
+    user32.CallNextHookEx.argtypes = [wintypes.HHOOK, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM]
+    user32.CallNextHookEx.restype = ctypes.c_longlong
 
-user32.SetWindowsHookExW.argtypes = [ctypes.c_int, HOOKPROC, wintypes.HMODULE, wintypes.DWORD]
-user32.SetWindowsHookExW.restype = wintypes.HHOOK
+    user32.SetWindowsHookExW.argtypes = [ctypes.c_int, HOOKPROC, wintypes.HMODULE, wintypes.DWORD]
+    user32.SetWindowsHookExW.restype = wintypes.HHOOK
 
-user32.UnhookWindowsHookEx.argtypes = [wintypes.HHOOK]
-user32.UnhookWindowsHookEx.restype = wintypes.BOOL
+    user32.UnhookWindowsHookEx.argtypes = [wintypes.HHOOK]
+    user32.UnhookWindowsHookEx.restype = wintypes.BOOL
 
-user32.PostThreadMessageW.argtypes = [wintypes.DWORD, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
-user32.PostThreadMessageW.restype = wintypes.BOOL
+    user32.PostThreadMessageW.argtypes = [wintypes.DWORD, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    user32.PostThreadMessageW.restype = wintypes.BOOL
 
-user32.GetMessageW.argtypes = [ctypes.POINTER(wintypes.MSG), wintypes.HWND, wintypes.UINT, wintypes.UINT]
-user32.GetMessageW.restype = wintypes.BOOL
+    user32.GetMessageW.argtypes = [ctypes.POINTER(wintypes.MSG), wintypes.HWND, wintypes.UINT, wintypes.UINT]
+    user32.GetMessageW.restype = wintypes.BOOL
 
-user32.TranslateMessage.argtypes = [ctypes.POINTER(wintypes.MSG)]
-user32.TranslateMessage.restype = wintypes.BOOL
+    user32.TranslateMessage.argtypes = [ctypes.POINTER(wintypes.MSG)]
+    user32.TranslateMessage.restype = wintypes.BOOL
 
-user32.DispatchMessageW.argtypes = [ctypes.POINTER(wintypes.MSG)]
-user32.DispatchMessageW.restype = wintypes.LPARAM
+    user32.DispatchMessageW.argtypes = [ctypes.POINTER(wintypes.MSG)]
+    user32.DispatchMessageW.restype = wintypes.LPARAM
 
-kernel32.GetCurrentThreadId.argtypes = []
-kernel32.GetCurrentThreadId.restype = wintypes.DWORD
+    kernel32.GetCurrentThreadId.argtypes = []
+    kernel32.GetCurrentThreadId.restype = wintypes.DWORD
 
-kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
-kernel32.GetModuleHandleW.restype = wintypes.HMODULE
+    kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+    kernel32.GetModuleHandleW.restype = wintypes.HMODULE
 
-WH_KEYBOARD_LL = 13
-WM_KEYDOWN = 0x0100
-WM_SYSKEYDOWN = 0x0104
+    WH_KEYBOARD_LL = 13
+    WM_KEYDOWN = 0x0100
+    WM_SYSKEYDOWN = 0x0104
 
-class KBDLLHOOKSTRUCT(ctypes.Structure):
-    _fields_ = [
-        ("vkCode", wintypes.DWORD),
-        ("scanCode", wintypes.DWORD),
-        ("flags", wintypes.DWORD),
-        ("time", wintypes.DWORD),
-        ("dwExtraInfo", ctypes.POINTER(wintypes.ULONG))
-    ]
+    class KBDLLHOOKSTRUCT(ctypes.Structure):
+        _fields_ = [
+            ("vkCode", wintypes.DWORD),
+            ("scanCode", wintypes.DWORD),
+            ("flags", wintypes.DWORD),
+            ("time", wintypes.DWORD),
+            ("dwExtraInfo", ctypes.POINTER(wintypes.ULONG))
+        ]
 
-def close_google_voice_window():
-    try:
-        found_hwnd = []
-        
-        def enum_windows_callback(hwnd, lParam):
-            if user32.IsWindowVisible(hwnd):
-                length = user32.GetWindowTextLengthW(hwnd)
-                if length > 0:
-                    buf = ctypes.create_unicode_buffer(length + 1)
-                    user32.GetWindowTextW(hwnd, buf, length + 1)
-                    title = buf.value
-                    if "Google Voice" in title or title.startswith("Voice - "):
-                        found_hwnd.append(hwnd)
-            return True
+    def close_google_voice_window():
+        try:
+            found_hwnd = []
             
-        user32.EnumWindows(WNDENUMPROC(enum_windows_callback), 0)
-        
-        for hwnd in found_hwnd:
-            print(f"[Backend Hangup] Setting foreground window and sending WM_CLOSE to handle {hwnd}")
-            user32.SetForegroundWindow(hwnd)
-            import time
-            time.sleep(0.2)
-            user32.PostMessageW(hwnd, 0x0010, 0, 0) # WM_CLOSE = 0x0010
+            def enum_windows_callback(hwnd, lParam):
+                if user32.IsWindowVisible(hwnd):
+                    length = user32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        buf = ctypes.create_unicode_buffer(length + 1)
+                        user32.GetWindowTextW(hwnd, buf, length + 1)
+                        title = buf.value
+                        if "Google Voice" in title or title.startswith("Voice - "):
+                            found_hwnd.append(hwnd)
+                return True
+                
+            user32.EnumWindows(WNDENUMPROC(enum_windows_callback), 0)
             
-            # Wait for 0.4 seconds to see if window is closed or blocked by "Leave site?" prompt
-            time.sleep(0.4)
-            if user32.IsWindow(hwnd):
-                print(f"[Backend Hangup] Window {hwnd} is still open (likely blocked by prompt). Sending ENTER key...")
-                # VK_RETURN = 0x0D
-                user32.keybd_event(0x0D, 0, 0, 0) # Key press
-                time.sleep(0.05)
-                user32.keybd_event(0x0D, 0, 2, 0) # Key release (KEYEVENTF_KEYUP = 2)
-            else:
-                print(f"[Backend Hangup] Window {hwnd} closed successfully without prompt.")
-            
-        return len(found_hwnd) > 0
-    except Exception as ex:
-        print("[Backend Hangup] Error closing Google Voice window:", str(ex))
-        return False
+            for hwnd in found_hwnd:
+                print(f"[Backend Hangup] Setting foreground window and sending WM_CLOSE to handle {hwnd}")
+                user32.SetForegroundWindow(hwnd)
+                import time
+                time.sleep(0.2)
+                user32.PostMessageW(hwnd, 0x0010, 0, 0) # WM_CLOSE = 0x0010
+                
+                # Wait for 0.4 seconds to see if window is closed or blocked by "Leave site?" prompt
+                time.sleep(0.4)
+                if user32.IsWindow(hwnd):
+                    print(f"[Backend Hangup] Window {hwnd} is still open (likely blocked by prompt). Sending ENTER key...")
+                    # VK_RETURN = 0x0D
+                    user32.keybd_event(0x0D, 0, 0, 0) # Key press
+                    time.sleep(0.05)
+                    user32.keybd_event(0x0D, 0, 2, 0) # Key release (KEYEVENTF_KEYUP = 2)
+                else:
+                    print(f"[Backend Hangup] Window {hwnd} closed successfully without prompt.")
+                
+            return len(found_hwnd) > 0
+        except Exception as ex:
+            print("[Backend Hangup] Error closing Google Voice window:", str(ex))
+            return False
 
-def do_global_hangup():
-    global call_active
-    print("[Global Hook] Hanging up call via global hook...")
-    call_active = False
-    stop_global_key_listener()
-    
-    # Close Google Voice window
-    close_google_voice_window()
-    
-    # Fallback: Find Phone Link window and close it
-    try:
-        import subprocess
-        ps_script = """
-        $proc = Get-Process | Where-Object { $_.MainWindowTitle -like "*Phone Link*" } | Select-Object -First 1
-        if ($proc) {
-            $proc.CloseMainWindow()
-        }
-        """
-        subprocess.run(["powershell", "-Command", ps_script], capture_output=True)
-    except Exception as ex:
-        print("[Global Hook] Error executing Phone Link close fallback:", str(ex))
-
-def _keyboard_hook_proc(nCode, wParam, lParam):
-    global _hook_id
-    if nCode >= 0 and (wParam == WM_KEYDOWN or wParam == WM_SYSKEYDOWN):
-        kbd = KBDLLHOOKSTRUCT.from_address(lParam)
-        # Ignore simulated keypresses (flags bit 4 / 0x10 is LLKHF_INJECTED)
-        is_injected = bool(kbd.flags & 0x10)
-        if not is_injected:
-            vk = kbd.vkCode
-            # VK_ESCAPE = 0x1B, VK_RETURN = 0x0D, H/h = 0x48
-            if vk in (0x1B, 0x0D, 0x48):
-                print(f"[Global Hook] Intercepted user hangup key: {hex(vk)}")
-                threading.Thread(target=do_global_hangup, daemon=True).start()
-            
-    return user32.CallNextHookEx(_hook_id, nCode, wParam, lParam)
-
-_hook_callback_ptr = HOOKPROC(_keyboard_hook_proc)
-
-def hook_message_loop():
-    global _hook_id, _hook_thread_id
-    _hook_thread_id = kernel32.GetCurrentThreadId()
-    hmod = kernel32.GetModuleHandleW(None)
-    _hook_id = user32.SetWindowsHookExW(
-        WH_KEYBOARD_LL,
-        _hook_callback_ptr,
-        hmod,
-        0
-    )
-    if not _hook_id:
-        print(f"[Global Hook] Failed to set hook! Error code: {ctypes.GetLastError()}")
-        return
+    def do_global_hangup():
+        global call_active
+        print("[Global Hook] Hanging up call via global hook...")
+        call_active = False
+        stop_global_key_listener()
         
-    print("[Global Hook] Keyboard hook set successfully. Message loop starting...")
-    msg = wintypes.MSG()
-    while user32.GetMessageW(ctypes.byref(msg), 0, 0, 0) != 0:
-        user32.TranslateMessage(ctypes.byref(msg))
-        user32.DispatchMessageW(ctypes.byref(msg))
+        # Close Google Voice window
+        close_google_voice_window()
         
-    print("[Global Hook] Message loop exited.")
+        # Fallback: Find Phone Link window and close it
+        try:
+            import subprocess
+            ps_script = """
+            $proc = Get-Process | Where-Object { $_.MainWindowTitle -like "*Phone Link*" } | Select-Object -First 1
+            if ($proc) {
+                $proc.CloseMainWindow()
+            }
+            """
+            subprocess.run(["powershell", "-Command", ps_script], capture_output=True)
+        except Exception as ex:
+            print("[Global Hook] Error executing Phone Link close fallback:", str(ex))
 
-def start_global_key_listener():
-    global _hook_thread, _hook_id
-    with _hook_lock:
-        if _hook_thread is not None:
+    def _keyboard_hook_proc(nCode, wParam, lParam):
+        global _hook_id
+        if nCode >= 0 and (wParam == WM_KEYDOWN or wParam == WM_SYSKEYDOWN):
+            kbd = KBDLLHOOKSTRUCT.from_address(lParam)
+            # Ignore simulated keypresses (flags bit 4 / 0x10 is LLKHF_INJECTED)
+            is_injected = bool(kbd.flags & 0x10)
+            if not is_injected:
+                vk = kbd.vkCode
+                # VK_ESCAPE = 0x1B, VK_RETURN = 0x0D, H/h = 0x48
+                if vk in (0x1B, 0x0D, 0x48):
+                    print(f"[Global Hook] Intercepted user hangup key: {hex(vk)}")
+                    threading.Thread(target=do_global_hangup, daemon=True).start()
+                
+        return user32.CallNextHookEx(_hook_id, nCode, wParam, lParam)
+
+    _hook_callback_ptr = HOOKPROC(_keyboard_hook_proc)
+
+    def hook_message_loop():
+        global _hook_id, _hook_thread_id
+        _hook_thread_id = kernel32.GetCurrentThreadId()
+        hmod = kernel32.GetModuleHandleW(None)
+        _hook_id = user32.SetWindowsHookExW(
+            WH_KEYBOARD_LL,
+            _hook_callback_ptr,
+            hmod,
+            0
+        )
+        if not _hook_id:
+            print(f"[Global Hook] Failed to set hook! Error code: {ctypes.GetLastError()}")
             return
             
-        _hook_thread = threading.Thread(target=hook_message_loop, daemon=True)
-        _hook_thread.start()
+        print("[Global Hook] Keyboard hook set successfully. Message loop starting...")
+        msg = wintypes.MSG()
+        while user32.GetMessageW(ctypes.byref(msg), 0, 0, 0) != 0:
+            user32.TranslateMessage(ctypes.byref(msg))
+            user32.DispatchMessageW(ctypes.byref(msg))
+            
+        print("[Global Hook] Message loop exited.")
 
-def stop_global_key_listener():
-    global _hook_thread, _hook_id, _hook_thread_id
-    with _hook_lock:
-        if _hook_id:
-            user32.UnhookWindowsHookEx(_hook_id)
-            _hook_id = None
-            if _hook_thread_id:
-                user32.PostThreadMessageW(_hook_thread_id, 0x0012, 0, 0) # WM_QUIT = 0x0012
-        _hook_thread = None
-        _hook_thread_id = None
-        print("[Global Hook] Keyboard hook stopped.")
+    def start_global_key_listener():
+        global _hook_thread, _hook_id
+        with _hook_lock:
+            if _hook_thread is not None:
+                return
+                
+            _hook_thread = threading.Thread(target=hook_message_loop, daemon=True)
+            _hook_thread.start()
+
+    def stop_global_key_listener():
+        global _hook_thread, _hook_id, _hook_thread_id
+        with _hook_lock:
+            if _hook_id:
+                user32.UnhookWindowsHookEx(_hook_id)
+                _hook_id = None
+                if _hook_thread_id:
+                    user32.PostThreadMessageW(_hook_thread_id, 0x0012, 0, 0) # WM_QUIT = 0x0012
+            _hook_thread = None
+            _hook_thread_id = None
+            print("[Global Hook] Keyboard hook stopped.")
+else:
+    # Safe fallback placeholders for non-Windows platforms
+    def close_google_voice_window():
+        return False
+
+    def do_global_hangup():
+        pass
+
+    def start_global_key_listener():
+        pass
+
+    def stop_global_key_listener():
+        pass
 
 @app.route('/api/dial', methods=['POST'])
 def dial_number():
@@ -944,6 +961,9 @@ def dial_number():
         global call_active
         call_active = True
         
+        if not is_windows:
+            return jsonify({"success": True, "message": "Dial simulated on non-Windows platform (no actions taken)"})
+            
         import subprocess
         import time
         
@@ -1044,6 +1064,10 @@ def hangup_call():
     try:
         global call_active
         call_active = False
+        
+        if not is_windows:
+            return jsonify({"success": True, "message": "Hangup command executed (non-Windows platform, no actions taken)", "closed_gv": False})
+            
         stop_global_key_listener()
         
         # Close Google Voice window directly
