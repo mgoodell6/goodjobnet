@@ -30,6 +30,51 @@ function HotJobsReview({ user }) {
   const [selectedJobTypes, setSelectedJobTypes] = useState([]);
   const [reviewTitle, setReviewTitle] = useState('Hot Jobs Review');
 
+  const [callMethod, setCallMethod] = useState(() => {
+    return localStorage.getItem('goodjobnet_call_method') || 'google-voice';
+  });
+  const [pendingCallPhone, setPendingCallPhone] = useState(null);
+  const [pendingCallCompany, setPendingCallCompany] = useState('');
+  const [isCallActive, setIsCallActive] = useState(false);
+  const pendingCallPhoneRef = useRef(null);
+  const gvWindowRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem('goodjobnet_call_method', callMethod);
+  }, [callMethod]);
+
+  useEffect(() => {
+    pendingCallPhoneRef.current = pendingCallPhone;
+  }, [pendingCallPhone]);
+
+  // Poll active call status when call is active to sync with global keyboard listener
+  useEffect(() => {
+    let interval;
+    if (isCallActive) {
+      interval = setInterval(() => {
+        fetch('/api/call-status')
+          .then(res => res.json())
+          .then(data => {
+            if (!data.active) {
+              setIsCallActive(false);
+              if (gvWindowRef.current) {
+                try {
+                  gvWindowRef.current.close();
+                } catch (e) {}
+                gvWindowRef.current = null;
+              }
+              speak("Call disconnected.");
+            }
+          })
+          .catch(err => {
+            console.error("Error polling call status:", err);
+          });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isCallActive]);
 
   // Accessibility and Voice Assistant States
   const [voiceActive, setVoiceActive] = useState(false);
@@ -173,18 +218,61 @@ function HotJobsReview({ user }) {
 
   // Telephone call handler
   const handleCallCompany = () => {
+    // Blur any active element to prevent space bar from triggering click/actions on them
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
     const job = jobsRef.current[currentIndexRef.current];
     if (job && job.contact_phone && job.contact_phone.trim()) {
       const phoneNumber = job.contact_phone.trim();
-      const cleanDigits = phoneNumber.replace(/\D/g, '');
-      const spokenDigits = cleanDigits.split('').join(', ');
-      speak(`Here is the phone number to call.`, () => {
-        speak(spokenDigits, null, 0.6);
-      });
+      const companyName = job.company_name || 'unknown';
+      
+      if (callMethod === 'speak-only') {
+        const cleanDigits = phoneNumber.replace(/\D/g, '');
+        const spokenDigits = cleanDigits.split('').join(', ');
+        speak(`Here is the phone number to call.`, () => {
+          speak(spokenDigits, null, 0.6);
+        });
+      } else {
+        const methodName = callMethod === 'google-voice' ? 'Google Voice' : 'Phone Link';
+        pendingCallPhoneRef.current = phoneNumber; // Set ref synchronously to prevent race conditions
+        setPendingCallPhone(phoneNumber);
+        setPendingCallCompany(companyName);
+        speak(`Ready to call ${companyName} at ${phoneNumber} using ${methodName}. Press the space bar now to initiate the call, or press any other key to cancel.`);
+      }
     } else {
       playChirp('error');
       speak("There is no phone number listed for this job.");
     }
+  };
+
+  // Hangup call handler
+  const handleHangup = () => {
+    setIsCallActive(false);
+    if (callMethod === 'google-voice' && gvWindowRef.current && !gvWindowRef.current.closed) {
+      try {
+        gvWindowRef.current.close();
+        gvWindowRef.current = null;
+        console.log("[Voice Assistant] Closed Google Voice tab from frontend.");
+      } catch (e) {
+        console.error("[Voice Assistant] Failed to close Google Voice tab:", e);
+      }
+    }
+    speak("Hanging up.", () => {
+      fetch('/api/hangup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success) {
+          console.error("Hangup error:", data.error);
+        }
+      })
+      .catch(err => {
+        console.error("Hangup fetch error:", err);
+      });
+    });
   };
 
   // Fuzzy matching for multiple spoken job types
@@ -1064,6 +1152,87 @@ function HotJobsReview({ user }) {
         return;
       }
 
+      if (isCallActive) {
+        if (e.key === 'h' || e.key === 'H' || e.key === 'Escape' || e.key === 'Enter') {
+          e.preventDefault();
+          handleHangup();
+          return;
+        }
+      }
+
+      if (pendingCallPhoneRef.current) {
+        if (e.key === ' ' || e.key === 'Spacebar' || e.key === 'Enter') {
+          e.preventDefault();
+          // Blur any active element just in case
+          if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+          }
+          const phoneToDial = pendingCallPhoneRef.current;
+          pendingCallPhoneRef.current = null; // Clear ref synchronously to prevent double keypresses
+          setPendingCallPhone(null);
+          
+          speak("Dialing now.");
+          
+          if (callMethod === 'google-voice') {
+            const cleanDigits = phoneToDial.replace(/\D/g, '');
+            const cleanPhone = cleanDigits.length === 10 ? '1' + cleanDigits : cleanDigits;
+            const url = `https://voice.google.com/calls?a=nc,%2B${cleanPhone}`;
+            
+            try {
+              gvWindowRef.current = window.open(url, '_blank', 'width=1000,height=750');
+              setIsCallActive(true);
+            } catch (err) {
+              console.error("[Voice Assistant] Failed to open window from frontend:", err);
+            }
+            
+            fetch('/api/dial', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: phoneToDial, method: 'google-voice-keypress-only' })
+            })
+            .then(res => res.json())
+            .then(data => {
+              if (!data.success) {
+                console.error("Dial error:", data.error);
+                speak("Failed to initiate call on the device.");
+                setIsCallActive(false);
+              }
+            })
+            .catch(err => {
+              console.error("Dial fetch error:", err);
+              speak("Network error initiating call.");
+              setIsCallActive(false);
+            });
+          } else {
+            setIsCallActive(true);
+            fetch('/api/dial', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: phoneToDial, method: callMethod })
+            })
+            .then(res => res.json())
+            .then(data => {
+              if (!data.success) {
+                console.error("Dial error:", data.error);
+                speak("Failed to initiate call on the device.");
+                setIsCallActive(false);
+              }
+            })
+            .catch(err => {
+              console.error("Dial fetch error:", err);
+              speak("Network error initiating call.");
+              setIsCallActive(false);
+            });
+          }
+        } else {
+          e.preventDefault();
+          pendingCallPhoneRef.current = null; // Clear ref synchronously to prevent double keypresses
+          setPendingCallPhone(null);
+          speak("Call cancelled.");
+        }
+        return;
+      }
+
       if (e.key === 'ArrowRight') {
         e.preventDefault();
         handleNext();
@@ -1078,6 +1247,9 @@ function HotJobsReview({ user }) {
       } else if (e.key === 'c' || e.key === 'C') {
         e.preventDefault();
         handleCallCompany();
+      } else if (e.key === 'h' || e.key === 'H' || e.key === 'Escape') {
+        e.preventDefault();
+        handleHangup();
       } else if (e.key === 'v' || e.key === 'V') {
         e.preventDefault();
         toggleVoiceActive();
@@ -1088,7 +1260,7 @@ function HotJobsReview({ user }) {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [voiceActive]);
+  }, [voiceActive, callMethod, pendingCallPhone, isCallActive]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1286,6 +1458,28 @@ function HotJobsReview({ user }) {
                 {voiceActive ? (isVoicePaused ? 'Voice Assistant PAUSED' : 'Voice Assistant ON') : 'Turn On Voice Assistant'}
               </button>
 
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.3rem 0.6rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: '500' }}>Call Mode:</span>
+                <select
+                  value={callMethod}
+                  onChange={e => setCallMethod(e.target.value)}
+                  style={{ background: 'white', color: 'var(--text-dark)', border: '1px solid #ced4da', padding: '0.3rem 0.6rem', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none' }}
+                >
+                  <option value="google-voice">Google Voice (Automated)</option>
+                  <option value="phone-link">Phone Link (Automated)</option>
+                  <option value="speak-only">Read Phone Only</option>
+                </select>
+                <button
+                  type="button"
+                  className="btn secondary-btn"
+                  onClick={handleCallCompany}
+                  style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', gap: '0.3rem', display: 'inline-flex', alignItems: 'center', borderColor: '#27ae60', color: '#27ae60' }}
+                  title="Press 'C' to call company"
+                >
+                  <FaPhone />
+                  Call
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', minWidth: '220px' }}>

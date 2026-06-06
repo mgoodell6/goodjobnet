@@ -716,11 +716,359 @@ def update_hot_job():
         if submitter_col != -1 and submitter_name:
             wks.update_value((row_index, submitter_col), submitter_name)
             
-        invalidate_cache('master_jobs_records')
+            invalidate_cache('master_jobs_records')
         return jsonify({"success": True, "message": "Job successfully updated!"})
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+
+# Win32 Global Keyboard Hook & Window Closure for Accessibility
+import ctypes
+import threading
+from ctypes import wintypes
+
+call_active = False
+_hook_id = None
+_hook_thread = None
+_hook_thread_id = None
+_hook_lock = threading.Lock()
+
+user32 = ctypes.windll.user32
+kernel32 = ctypes.windll.kernel32
+
+# Setup ctypes signatures to prevent 64-bit handle truncation
+user32.IsWindowVisible.argtypes = [wintypes.HWND]
+user32.IsWindowVisible.restype = wintypes.BOOL
+
+user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+user32.GetWindowTextLengthW.restype = ctypes.c_int
+
+user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+user32.GetWindowTextW.restype = ctypes.c_int
+
+WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+user32.EnumWindows.argtypes = [WNDENUMPROC, wintypes.LPARAM]
+user32.EnumWindows.restype = wintypes.BOOL
+
+user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+user32.PostMessageW.restype = wintypes.BOOL
+
+user32.IsWindow.argtypes = [wintypes.HWND]
+user32.IsWindow.restype = wintypes.BOOL
+
+user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+user32.SetForegroundWindow.restype = wintypes.BOOL
+
+HOOKPROC = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM)
+
+user32.CallNextHookEx.argtypes = [wintypes.HHOOK, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM]
+user32.CallNextHookEx.restype = ctypes.c_longlong
+
+user32.SetWindowsHookExW.argtypes = [ctypes.c_int, HOOKPROC, wintypes.HMODULE, wintypes.DWORD]
+user32.SetWindowsHookExW.restype = wintypes.HHOOK
+
+user32.UnhookWindowsHookEx.argtypes = [wintypes.HHOOK]
+user32.UnhookWindowsHookEx.restype = wintypes.BOOL
+
+user32.PostThreadMessageW.argtypes = [wintypes.DWORD, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+user32.PostThreadMessageW.restype = wintypes.BOOL
+
+user32.GetMessageW.argtypes = [ctypes.POINTER(wintypes.MSG), wintypes.HWND, wintypes.UINT, wintypes.UINT]
+user32.GetMessageW.restype = wintypes.BOOL
+
+user32.TranslateMessage.argtypes = [ctypes.POINTER(wintypes.MSG)]
+user32.TranslateMessage.restype = wintypes.BOOL
+
+user32.DispatchMessageW.argtypes = [ctypes.POINTER(wintypes.MSG)]
+user32.DispatchMessageW.restype = wintypes.LPARAM
+
+kernel32.GetCurrentThreadId.argtypes = []
+kernel32.GetCurrentThreadId.restype = wintypes.DWORD
+
+kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+kernel32.GetModuleHandleW.restype = wintypes.HMODULE
+
+WH_KEYBOARD_LL = 13
+WM_KEYDOWN = 0x0100
+WM_SYSKEYDOWN = 0x0104
+
+class KBDLLHOOKSTRUCT(ctypes.Structure):
+    _fields_ = [
+        ("vkCode", wintypes.DWORD),
+        ("scanCode", wintypes.DWORD),
+        ("flags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", ctypes.POINTER(wintypes.ULONG))
+    ]
+
+def close_google_voice_window():
+    try:
+        found_hwnd = []
+        
+        def enum_windows_callback(hwnd, lParam):
+            if user32.IsWindowVisible(hwnd):
+                length = user32.GetWindowTextLengthW(hwnd)
+                if length > 0:
+                    buf = ctypes.create_unicode_buffer(length + 1)
+                    user32.GetWindowTextW(hwnd, buf, length + 1)
+                    title = buf.value
+                    if "Google Voice" in title or title.startswith("Voice - "):
+                        found_hwnd.append(hwnd)
+            return True
+            
+        user32.EnumWindows(WNDENUMPROC(enum_windows_callback), 0)
+        
+        for hwnd in found_hwnd:
+            print(f"[Backend Hangup] Setting foreground window and sending WM_CLOSE to handle {hwnd}")
+            user32.SetForegroundWindow(hwnd)
+            import time
+            time.sleep(0.2)
+            user32.PostMessageW(hwnd, 0x0010, 0, 0) # WM_CLOSE = 0x0010
+            
+            # Wait for 0.4 seconds to see if window is closed or blocked by "Leave site?" prompt
+            time.sleep(0.4)
+            if user32.IsWindow(hwnd):
+                print(f"[Backend Hangup] Window {hwnd} is still open (likely blocked by prompt). Sending ENTER key...")
+                # VK_RETURN = 0x0D
+                user32.keybd_event(0x0D, 0, 0, 0) # Key press
+                time.sleep(0.05)
+                user32.keybd_event(0x0D, 0, 2, 0) # Key release (KEYEVENTF_KEYUP = 2)
+            else:
+                print(f"[Backend Hangup] Window {hwnd} closed successfully without prompt.")
+            
+        return len(found_hwnd) > 0
+    except Exception as ex:
+        print("[Backend Hangup] Error closing Google Voice window:", str(ex))
+        return False
+
+def do_global_hangup():
+    global call_active
+    print("[Global Hook] Hanging up call via global hook...")
+    call_active = False
+    stop_global_key_listener()
+    
+    # Close Google Voice window
+    close_google_voice_window()
+    
+    # Fallback: Find Phone Link window and close it
+    try:
+        import subprocess
+        ps_script = """
+        $proc = Get-Process | Where-Object { $_.MainWindowTitle -like "*Phone Link*" } | Select-Object -First 1
+        if ($proc) {
+            $proc.CloseMainWindow()
+        }
+        """
+        subprocess.run(["powershell", "-Command", ps_script], capture_output=True)
+    except Exception as ex:
+        print("[Global Hook] Error executing Phone Link close fallback:", str(ex))
+
+def _keyboard_hook_proc(nCode, wParam, lParam):
+    global _hook_id
+    if nCode >= 0 and (wParam == WM_KEYDOWN or wParam == WM_SYSKEYDOWN):
+        kbd = KBDLLHOOKSTRUCT.from_address(lParam)
+        # Ignore simulated keypresses (flags bit 4 / 0x10 is LLKHF_INJECTED)
+        is_injected = bool(kbd.flags & 0x10)
+        if not is_injected:
+            vk = kbd.vkCode
+            # VK_ESCAPE = 0x1B, VK_RETURN = 0x0D, H/h = 0x48
+            if vk in (0x1B, 0x0D, 0x48):
+                print(f"[Global Hook] Intercepted user hangup key: {hex(vk)}")
+                threading.Thread(target=do_global_hangup, daemon=True).start()
+            
+    return user32.CallNextHookEx(_hook_id, nCode, wParam, lParam)
+
+_hook_callback_ptr = HOOKPROC(_keyboard_hook_proc)
+
+def hook_message_loop():
+    global _hook_id, _hook_thread_id
+    _hook_thread_id = kernel32.GetCurrentThreadId()
+    hmod = kernel32.GetModuleHandleW(None)
+    _hook_id = user32.SetWindowsHookExW(
+        WH_KEYBOARD_LL,
+        _hook_callback_ptr,
+        hmod,
+        0
+    )
+    if not _hook_id:
+        print(f"[Global Hook] Failed to set hook! Error code: {ctypes.GetLastError()}")
+        return
+        
+    print("[Global Hook] Keyboard hook set successfully. Message loop starting...")
+    msg = wintypes.MSG()
+    while user32.GetMessageW(ctypes.byref(msg), 0, 0, 0) != 0:
+        user32.TranslateMessage(ctypes.byref(msg))
+        user32.DispatchMessageW(ctypes.byref(msg))
+        
+    print("[Global Hook] Message loop exited.")
+
+def start_global_key_listener():
+    global _hook_thread, _hook_id
+    with _hook_lock:
+        if _hook_thread is not None:
+            return
+            
+        _hook_thread = threading.Thread(target=hook_message_loop, daemon=True)
+        _hook_thread.start()
+
+def stop_global_key_listener():
+    global _hook_thread, _hook_id, _hook_thread_id
+    with _hook_lock:
+        if _hook_id:
+            user32.UnhookWindowsHookEx(_hook_id)
+            _hook_id = None
+            if _hook_thread_id:
+                user32.PostThreadMessageW(_hook_thread_id, 0x0012, 0, 0) # WM_QUIT = 0x0012
+        _hook_thread = None
+        _hook_thread_id = None
+        print("[Global Hook] Keyboard hook stopped.")
+
+@app.route('/api/dial', methods=['POST'])
+def dial_number():
+    data = request.json
+    if not data or not data.get("phone"):
+        return jsonify({"success": False, "error": "No phone number provided"}), 400
+        
+    phone = data.get("phone")
+    method = data.get("method", "google-voice")
+    
+    # Clean phone number (digits only)
+    clean_phone = "".join(c for c in phone if c.isdigit())
+    if len(clean_phone) == 10:
+        clean_phone = "1" + clean_phone
+        
+    if not clean_phone:
+        return jsonify({"success": False, "error": "Invalid phone number"}), 400
+        
+    try:
+        global call_active
+        call_active = True
+        
+        import subprocess
+        import time
+        
+        if method == "google-voice" or method == "google-voice-keypress-only":
+            if method == "google-voice":
+                # Form Google Voice URL with nc (new call) parameter and the phone number (with country code)
+                # We omit the '/u/0/' account index to automatically use the default logged-in account
+                url = f"https://voice.google.com/calls?a=nc,%2B{clean_phone}"
+                import webbrowser
+                webbrowser.open(url)
+            
+            # Wait for browser to open and load the tab
+            time.sleep(2.5)
+            
+            # Send Enter key using PowerShell (with System.Windows.Forms.SendKeys)
+            # Since Chrome/Edge is now in focus and the input field contains the number,
+            # pressing Enter starts the call automatically.
+            ps_cmd = '[System.Windows.Forms.SendKeys]::SendWait("{ENTER}")'
+            subprocess.run(["powershell", "-Command", f"Add-Type -AssemblyName System.Windows.Forms; {ps_cmd}"], capture_output=True)
+            
+        elif method == "phone-link":
+            # Launch Phone Link using tel protocol
+            subprocess.run(["cmd.exe", "/c", f"start tel:{clean_phone}"], shell=True)
+            
+            # Wait for Phone Link to launch and focus
+            time.sleep(2.0)
+            
+            # PowerShell script using UI Automation to find the 'Call' or 'Dial' button
+            # in Phone Link and invoke it to start the call programmatically.
+            ps_script = """
+            Add-Type -AssemblyName UIAutomationClient
+            Add-Type -AssemblyName UIAutomationTypes
+            
+            $root = [Windows.Automation.AutomationElement]::RootElement
+            
+            # Search for Phone Link window
+            $condition = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::NameProperty, "Phone Link")
+            $window = $root.FindFirst([Windows.Automation.TreeScope]::Children, $condition)
+            
+            if (-not $window) {
+                # Fallback to process name PhoneExperienceHost
+                $procs = Get-Process -Name "PhoneExperienceHost" -ErrorAction SilentlyContinue
+                if ($procs) {
+                    $condition = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ProcessIdProperty, $procs[0].Id)
+                    $window = $root.FindFirst([Windows.Automation.TreeScope]::Children, $condition)
+                }
+            }
+            
+            if ($window) {
+                # Find Call button dynamically with retry loop (waiting for UI render)
+                $button = $null
+                for ($retry = 0; $retry -lt 8; $retry++) {
+                    $elements = $window.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)
+                    foreach ($el in $elements) {
+                        if ($el.Current.ClassName -eq "Button") {
+                            $name = $el.Current.Name
+                            $autoId = $el.Current.AutomationId
+                            if (($name -like "*Call*") -or ($name -like "*Dial*") -or ($autoId -like "*Call*") -or ($autoId -like "*Dial*")) {
+                                $button = $el
+                                break
+                            }
+                        }
+                    }
+                    if ($button) { break }
+                    Start-Sleep -Milliseconds 500
+                }
+                
+                if ($button) {
+                    # Click call button
+                    $button.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+                    Write-Host "Success clicking button: $($button.Current.Name)"
+                } else {
+                    # Fallback to sending Enter key
+                    Add-Type -AssemblyName System.Windows.Forms
+                    [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+                    Write-Host "Fallback Enter sent"
+                }
+            } else {
+                # General fallback: send Enter key to active window
+                Add-Type -AssemblyName System.Windows.Forms
+                [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+                Write-Host "Window not found, fallback Enter sent"
+            }
+            """
+            subprocess.run(["powershell", "-Command", ps_script], capture_output=True)
+            
+        # Start global key listener with a 0.5s delay to ensure the simulated dial Enter key clears from system
+        threading.Timer(0.5, start_global_key_listener).start()
+        
+        return jsonify({"success": True, "message": f"Dialed {clean_phone} using {method}"})
+        
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Failed to dial", "details": str(e)}), 500
+
+@app.route('/api/hangup', methods=['POST'])
+def hangup_call():
+    try:
+        global call_active
+        call_active = False
+        stop_global_key_listener()
+        
+        # Close Google Voice window directly
+        closed_gv = close_google_voice_window()
+        
+        # Fallback: Find Phone Link window and close it
+        import subprocess
+        ps_script = """
+        $proc = Get-Process | Where-Object { $_.MainWindowTitle -like "*Phone Link*" } | Select-Object -First 1
+        if ($proc) {
+            $proc.CloseMainWindow()
+        }
+        """
+        subprocess.run(["powershell", "-Command", ps_script], capture_output=True)
+        
+        return jsonify({"success": True, "message": "Hangup command executed", "closed_gv": closed_gv})
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Failed to hang up", "details": str(e)}), 500
+
+@app.route('/api/call-status', methods=['GET'])
+def call_status():
+    global call_active
+    return jsonify({"active": call_active})
+
 
 @app.route('/api/login', methods=['POST'])
 def login():
