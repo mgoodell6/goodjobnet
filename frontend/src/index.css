@@ -532,3 +532,47 @@ tr:hover td {
     box-shadow: 0 0 0 0 rgba(46, 204, 113, 0);
   }
 }
+
+/* Custom Scrollable Multiple Select Fields */
+select[multiple] {
+  height: 220px !important;
+  padding: 0.6rem !important;
+  overflow-y: auto !important;
+}
+
+select[multiple] option {
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  margin-bottom: 2px;
+  transition: var(--transition);
+}
+
+select[multiple] option:checked {
+  background: var(--primary-color) linear-gradient(0deg, var(--primary-color) 0%, var(--primary-color) 100%) !important;
+  color: white !important;
+}
+
+/* Webkit Scrollbars for Select lists and Tables */
+select[multiple]::-webkit-scrollbar,
+.table-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+select[multiple]::-webkit-scrollbar-track,
+.table-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+select[multiple]::-webkit-scrollbar-thumb,
+.table-container::-webkit-scrollbar-thumb {
+  background: rgba(58, 123, 213, 0.3);
+  border-radius: 4px;
+  transition: var(--transition);
+}
+
+select[multiple]::-webkit-scrollbar-thumb:hover,
+.table-container::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-color);
+}
