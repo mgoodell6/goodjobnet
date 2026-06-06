@@ -12,6 +12,9 @@ import HotJobsReview from './pages/HotJobsReview';
 import JobSeekerDashboard from './pages/JobSeekerDashboard';
 import JobSeekerMatchesReport from './pages/JobSeekerMatchesReport';
 
+// Manual Version Configuration - Update this string to change the application version displayed in the header
+const APP_VERSION = "Beta v0.11";
+
 function TopBar({ user, handleLogout }) {
   const location = useLocation();
   const isJobSeekerDashboard = location.pathname === '/' || location.pathname === '/job-seeker-dashboard';
@@ -23,7 +26,7 @@ function TopBar({ user, handleLogout }) {
   return (
     <div className="top-bar">
       <Link to={user.role === 'admin' ? '/admin-dashboard' : '/dashboard'} className="brand" style={{ display: 'flex', flexDirection: 'column', textDecoration: 'none' }}>
-        <div>GoodJobNet - <span style={{ color: 'red' }}>Beta</span></div>
+        <div>GoodJobNet - <span style={{ color: 'red' }}>{APP_VERSION}</span></div>
         <div style={{ fontSize: '0.75rem', fontWeight: '400', color: 'var(--text-light)', marginTop: '2px' }}>Click here to return to dashboard</div>
       </Link>
       <div className="user-controls">
