@@ -48,29 +48,48 @@ function HotJobsReview({ user }) {
     pendingCallPhoneRef.current = pendingCallPhone;
   }, [pendingCallPhone]);
 
-  // Poll active call status when call is active to sync with global keyboard listener
+  // Poll active call status when call is active to sync with global keyboard listener or local window close
   useEffect(() => {
     let interval;
-    if (isCallActive && isHookActive) {
+    if (isCallActive) {
       interval = setInterval(() => {
-        fetch('/api/call-status')
-          .then(res => res.json())
-          .then(data => {
-            if (!data.active) {
-              setIsCallActive(false);
-              setIsHookActive(false);
-              if (gvWindowRef.current) {
-                try {
-                  gvWindowRef.current.close();
-                } catch (e) { }
-                gvWindowRef.current = null;
+        // 1. Check if the popup window was closed locally in the browser (e.g. Ctrl+W or close button)
+        if (gvWindowRef.current && gvWindowRef.current.closed) {
+          setIsCallActive(false);
+          setIsHookActive(false);
+          gvWindowRef.current = null;
+          speak("Call disconnected.");
+
+          // Notify backend
+          fetch('/api/hangup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          }).catch(err => console.error("Hangup notify error:", err));
+
+          return;
+        }
+
+        // 2. Only poll backend status if the Win32 hook is active
+        if (isHookActive) {
+          fetch('/api/call-status')
+            .then(res => res.json())
+            .then(data => {
+              if (!data.active) {
+                setIsCallActive(false);
+                setIsHookActive(false);
+                if (gvWindowRef.current) {
+                  try {
+                    gvWindowRef.current.close();
+                  } catch (e) { }
+                  gvWindowRef.current = null;
+                }
+                speak("Call disconnected.");
               }
-              speak("Call disconnected.");
-            }
-          })
-          .catch(err => {
-            console.error("Error polling call status:", err);
-          });
+            })
+            .catch(err => {
+              console.error("Error polling call status:", err);
+            });
+        }
       }, 1000);
     }
     return () => {
@@ -1210,6 +1229,7 @@ function HotJobsReview({ user }) {
                 .then(data => {
                   if (data.success) {
                     setIsHookActive(!!data.hook_active);
+                    speak("Dialing now.");
                   } else {
                     console.error("Dial error:", data.error);
                     speak("Failed to initiate call on the device.");
@@ -1242,6 +1262,7 @@ function HotJobsReview({ user }) {
               .then(data => {
                 if (data.success) {
                   setIsHookActive(!!data.hook_active);
+                  speak("Dialing now.");
                 } else {
                   console.error("Dial error:", data.error);
                   speak("Failed to initiate call on the device.");
@@ -1504,29 +1525,6 @@ function HotJobsReview({ user }) {
                   <option value="phone-link">Phone Link (Automated)</option>
                   <option value="speak-only">Read Phone Only</option>
                 </select>
-                {isCallActive ? (
-                  <button
-                    type="button"
-                    className="btn secondary-btn"
-                    onClick={handleHangup}
-                    style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', gap: '0.3rem', display: 'inline-flex', alignItems: 'center', borderColor: '#e74c3c', color: '#e74c3c', backgroundColor: 'rgba(231, 76, 60, 0.1)' }}
-                    title="Press 'H' or 'Esc' to hang up"
-                  >
-                    <FaPhone style={{ transform: 'rotate(135deg)' }} />
-                    Hang Up
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn secondary-btn"
-                    onClick={handleCallCompany}
-                    style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', gap: '0.3rem', display: 'inline-flex', alignItems: 'center', borderColor: '#27ae60', color: '#27ae60' }}
-                    title="Press 'C' to call company"
-                  >
-                    <FaPhone />
-                    Call
-                  </button>
-                )}
               </div>
             </div>
 
