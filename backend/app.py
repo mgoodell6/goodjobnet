@@ -968,8 +968,13 @@ def dial_number():
         global call_active
         call_active = True
         
+        is_local_client = request.remote_addr in ('127.0.0.1', 'localhost', '::1')
+        
         if not is_windows:
             return jsonify({"success": True, "message": "Dial simulated on non-Windows platform (no actions taken)"})
+            
+        if not is_local_client:
+            return jsonify({"success": True, "message": "Dial simulated for remote client (no keyboard/window actions taken)"})
             
         import subprocess
         import time
@@ -1072,8 +1077,13 @@ def hangup_call():
         global call_active
         call_active = False
         
+        is_local_client = request.remote_addr in ('127.0.0.1', 'localhost', '::1')
+        
         if not is_windows:
             return jsonify({"success": True, "message": "Hangup command executed (non-Windows platform, no actions taken)", "closed_gv": False})
+            
+        if not is_local_client:
+            return jsonify({"success": True, "message": "Hangup command executed for remote client (no windows closed on server)", "closed_gv": False})
             
         stop_global_key_listener()
         

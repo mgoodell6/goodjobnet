@@ -60,7 +60,7 @@ function HotJobsReview({ user }) {
               if (gvWindowRef.current) {
                 try {
                   gvWindowRef.current.close();
-                } catch (e) {}
+                } catch (e) { }
                 gvWindowRef.current = null;
               }
               speak("Call disconnected.");
@@ -226,7 +226,7 @@ function HotJobsReview({ user }) {
     if (job && job.contact_phone && job.contact_phone.trim()) {
       const phoneNumber = job.contact_phone.trim();
       const companyName = job.company_name || 'unknown';
-      
+
       if (callMethod === 'speak-only') {
         const cleanDigits = phoneNumber.replace(/\D/g, '');
         const spokenDigits = cleanDigits.split('').join(', ');
@@ -263,15 +263,15 @@ function HotJobsReview({ user }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })
-      .then(res => res.json())
-      .then(data => {
-        if (!data.success) {
-          console.error("Hangup error:", data.error);
-        }
-      })
-      .catch(err => {
-        console.error("Hangup fetch error:", err);
-      });
+        .then(res => res.json())
+        .then(data => {
+          if (!data.success) {
+            console.error("Hangup error:", data.error);
+          }
+        })
+        .catch(err => {
+          console.error("Hangup fetch error:", err);
+        });
     });
   };
 
@@ -1170,39 +1170,65 @@ function HotJobsReview({ user }) {
           const phoneToDial = pendingCallPhoneRef.current;
           pendingCallPhoneRef.current = null; // Clear ref synchronously to prevent double keypresses
           setPendingCallPhone(null);
-          
+
           speak("Dialing now.");
-          
+
           if (callMethod === 'google-voice') {
             const cleanDigits = phoneToDial.replace(/\D/g, '');
             const cleanPhone = cleanDigits.length === 10 ? '1' + cleanDigits : cleanDigits;
             const url = `https://voice.google.com/calls?a=nc,%2B${cleanPhone}`;
-            
+
+            let gvWindow = null;
             try {
-              gvWindowRef.current = window.open(url, '_blank', 'width=1000,height=750');
-              setIsCallActive(true);
+              gvWindow = window.open(url, '_blank', 'width=1000,height=750');
             } catch (err) {
               console.error("[Voice Assistant] Failed to open window from frontend:", err);
             }
-            
-            fetch('/api/dial', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone: phoneToDial, method: 'google-voice-keypress-only' })
-            })
-            .then(res => res.json())
-            .then(data => {
-              if (!data.success) {
-                console.error("Dial error:", data.error);
-                speak("Failed to initiate call on the device.");
-                setIsCallActive(false);
-              }
-            })
-            .catch(err => {
-              console.error("Dial fetch error:", err);
-              speak("Network error initiating call.");
+
+            if (!gvWindow || gvWindow.closed || typeof gvWindow.closed === 'undefined') {
+              console.warn("[Voice Assistant] Google Voice popup was blocked by the browser.");
+              speak("Google Voice window was blocked by your browser's popup blocker. Please enable popups for this website in your address bar and try again.");
+              setMessage("Google Voice popup blocked! Please allow popups for this site in your browser's address bar.");
+              setSuccess(false);
               setIsCallActive(false);
-            });
+            } else {
+              gvWindowRef.current = gvWindow;
+              setIsCallActive(true);
+
+              // Silently focus back to the parent window after 5 seconds to receive keyboard shortcuts
+              setTimeout(() => {
+                if (gvWindowRef.current && !gvWindowRef.current.closed) {
+                  window.focus();
+                }
+              }, 5000);
+
+              fetch('/api/dial', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: phoneToDial, method: 'google-voice-keypress-only' })
+              })
+                .then(res => res.json())
+                .then(data => {
+                  if (!data.success) {
+                    console.error("Dial error:", data.error);
+                    speak("Failed to initiate call on the device.");
+                    setIsCallActive(false);
+                    if (gvWindowRef.current) {
+                      try { gvWindowRef.current.close(); } catch (e) { }
+                      gvWindowRef.current = null;
+                    }
+                  }
+                })
+                .catch(err => {
+                  console.error("Dial fetch error:", err);
+                  speak("Network error initiating call.");
+                  setIsCallActive(false);
+                  if (gvWindowRef.current) {
+                    try { gvWindowRef.current.close(); } catch (e) { }
+                    gvWindowRef.current = null;
+                  }
+                });
+            }
           } else {
             setIsCallActive(true);
             fetch('/api/dial', {
@@ -1210,19 +1236,19 @@ function HotJobsReview({ user }) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ phone: phoneToDial, method: callMethod })
             })
-            .then(res => res.json())
-            .then(data => {
-              if (!data.success) {
-                console.error("Dial error:", data.error);
-                speak("Failed to initiate call on the device.");
+              .then(res => res.json())
+              .then(data => {
+                if (!data.success) {
+                  console.error("Dial error:", data.error);
+                  speak("Failed to initiate call on the device.");
+                  setIsCallActive(false);
+                }
+              })
+              .catch(err => {
+                console.error("Dial fetch error:", err);
+                speak("Network error initiating call.");
                 setIsCallActive(false);
-              }
-            })
-            .catch(err => {
-              console.error("Dial fetch error:", err);
-              speak("Network error initiating call.");
-              setIsCallActive(false);
-            });
+              });
           }
         } else {
           e.preventDefault();
@@ -1370,7 +1396,7 @@ function HotJobsReview({ user }) {
                 >
                   {JOB_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
-                
+
                 <div style={{ display: 'flex', gap: '1rem' }}>
                   <input
                     type="text"
@@ -1469,16 +1495,29 @@ function HotJobsReview({ user }) {
                   <option value="phone-link">Phone Link (Automated)</option>
                   <option value="speak-only">Read Phone Only</option>
                 </select>
-                <button
-                  type="button"
-                  className="btn secondary-btn"
-                  onClick={handleCallCompany}
-                  style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', gap: '0.3rem', display: 'inline-flex', alignItems: 'center', borderColor: '#27ae60', color: '#27ae60' }}
-                  title="Press 'C' to call company"
-                >
-                  <FaPhone />
-                  Call
-                </button>
+                {isCallActive ? (
+                  <button
+                    type="button"
+                    className="btn secondary-btn"
+                    onClick={handleHangup}
+                    style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', gap: '0.3rem', display: 'inline-flex', alignItems: 'center', borderColor: '#e74c3c', color: '#e74c3c', backgroundColor: 'rgba(231, 76, 60, 0.1)' }}
+                    title="Press 'H' or 'Esc' to hang up"
+                  >
+                    <FaPhone style={{ transform: 'rotate(135deg)' }} />
+                    Hang Up
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn secondary-btn"
+                    onClick={handleCallCompany}
+                    style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem', gap: '0.3rem', display: 'inline-flex', alignItems: 'center', borderColor: '#27ae60', color: '#27ae60' }}
+                    title="Press 'C' to call company"
+                  >
+                    <FaPhone />
+                    Call
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1546,6 +1585,7 @@ function HotJobsReview({ user }) {
               <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', background: 'rgba(241, 196, 15, 0.1)', borderLeft: '3px solid #f1c40f', padding: '0.4rem 0.8rem', borderRadius: '4px', marginTop: '0.4rem' }}>
                 <strong>Troubleshooting:</strong> If <em>Mic Level</em> stays at 0%, click the lock/settings icon next to the URL in the address bar. Ensure "Microphone" is set to "Allow". If it is allowed, check Chrome Settings &gt; Privacy and security &gt; Site settings &gt; Microphone to verify the correct physical device is selected as your default.
               </div>
+
             </div>
           )}
         </div>
@@ -1656,9 +1696,9 @@ function HotJobsReview({ user }) {
                     name="currently_hiring"
                     defaultValue={
                       (currentJob.currently_hiring === 'TRUE' ||
-                       currentJob.currently_hiring === 'Yes' ||
-                       currentJob.currently_hiring === true ||
-                       String(currentJob.currently_hiring).toUpperCase() === 'TRUE')
+                        currentJob.currently_hiring === 'Yes' ||
+                        currentJob.currently_hiring === true ||
+                        String(currentJob.currently_hiring).toUpperCase() === 'TRUE')
                         ? 'Yes'
                         : 'No'
                     }
