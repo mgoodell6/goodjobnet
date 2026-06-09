@@ -309,6 +309,46 @@ def submit_seeker():
 @app.route('/api/search-jobs', methods=['POST'])
 def search_jobs():
     data = request.json
+    search_type = data.get("search_type", "type-location")
+    company_name = data.get("company_name", "").strip()
+    
+    if search_type == "company":
+        try:
+            all_records = get_master_jobs_records()
+            results = []
+            for row in all_records:
+                row_company = str(row.get("Name") or row.get("Company Name") or "").strip().lower()
+                if company_name.lower() in row_company:
+                    address_val = row.get('Address', row.get('company_street', ''))
+                    city_val = row.get('City', '')
+                    state_val = row.get('State', 'FL')
+                    location = f"{address_val}, {city_val}, {state_val}".strip(", ")
+                    
+                    is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
+                    currently_hiring = "Yes" if is_hiring_val in ["TRUE", "YES", "1", "Y"] else "No"
+                    
+                    date_verified_str = row.get("Date last verified", row.get("Date Entered", ""))
+                    
+                    job_entry = {
+                        "company": row.get("Name") or row.get("Company Name") or "Unknown",
+                        "role": row.get("Available Jobs") or row.get("Job Title") or "Various",
+                        "location": location,
+                        "distance": "",
+                        "career_website": row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or "",
+                        "notes": row.get("General Notes") or row.get("Any additional Notes") or row.get("Notes") or row.get("notes", ""),
+                        "currently_hiring": currently_hiring,
+                        "date_verified": date_verified_str
+                    }
+                    results.append(job_entry)
+            return jsonify({
+                "success": True,
+                "search_type": "company",
+                "results": results
+            })
+        except Exception as e:
+            print(traceback.format_exc())
+            return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+
     job_types = data.get("job_types", [])
     address = data.get("address", "")
     radius = data.get("radius", 20)
