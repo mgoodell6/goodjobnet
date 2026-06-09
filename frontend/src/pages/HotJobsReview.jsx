@@ -58,7 +58,6 @@ function HotJobsReview({ user }) {
           setIsCallActive(false);
           setIsHookActive(false);
           gvWindowRef.current = null;
-          speak("Call disconnected.");
 
           // Notify backend
           fetch('/api/hangup', {
@@ -83,7 +82,6 @@ function HotJobsReview({ user }) {
                   } catch (e) { }
                   gvWindowRef.current = null;
                 }
-                speak("Call disconnected.");
               }
             })
             .catch(err => {
@@ -280,21 +278,19 @@ function HotJobsReview({ user }) {
         console.error("[Voice Assistant] Failed to close Google Voice tab:", e);
       }
     }
-    speak("Hanging up.", () => {
-      fetch('/api/hangup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+    fetch('/api/hangup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success) {
+          console.error("Hangup error:", data.error);
+        }
       })
-        .then(res => res.json())
-        .then(data => {
-          if (!data.success) {
-            console.error("Hangup error:", data.error);
-          }
-        })
-        .catch(err => {
-          console.error("Hangup fetch error:", err);
-        });
-    });
+      .catch(err => {
+        console.error("Hangup fetch error:", err);
+      });
   };
 
   // Fuzzy matching for multiple spoken job types
@@ -1280,7 +1276,6 @@ function HotJobsReview({ user }) {
           e.preventDefault();
           pendingCallPhoneRef.current = null; // Clear ref synchronously to prevent double keypresses
           setPendingCallPhone(null);
-          speak("Call cancelled.");
         }
         return;
       }
