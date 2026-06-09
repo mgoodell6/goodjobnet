@@ -1148,10 +1148,6 @@ function HotJobsReview({ user }) {
   // Keyboard accessibility shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'SELECT') {
-        return;
-      }
-
       if (isCallActive) {
         if (e.key === 'h' || e.key === 'H' || e.key === 'Escape' || e.key === 'Enter') {
           e.preventDefault();
@@ -1256,6 +1252,10 @@ function HotJobsReview({ user }) {
           setPendingCallPhone(null);
           speak("Call cancelled.");
         }
+        return;
+      }
+
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'SELECT') {
         return;
       }
 
