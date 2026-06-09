@@ -36,6 +36,7 @@ function HotJobsReview({ user }) {
   const [pendingCallPhone, setPendingCallPhone] = useState(null);
   const [pendingCallCompany, setPendingCallCompany] = useState('');
   const [isCallActive, setIsCallActive] = useState(false);
+  const [isHookActive, setIsHookActive] = useState(false);
   const pendingCallPhoneRef = useRef(null);
   const gvWindowRef = useRef(null);
 
@@ -50,13 +51,14 @@ function HotJobsReview({ user }) {
   // Poll active call status when call is active to sync with global keyboard listener
   useEffect(() => {
     let interval;
-    if (isCallActive) {
+    if (isCallActive && isHookActive) {
       interval = setInterval(() => {
         fetch('/api/call-status')
           .then(res => res.json())
           .then(data => {
             if (!data.active) {
               setIsCallActive(false);
+              setIsHookActive(false);
               if (gvWindowRef.current) {
                 try {
                   gvWindowRef.current.close();
@@ -74,7 +76,7 @@ function HotJobsReview({ user }) {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isCallActive]);
+  }, [isCallActive, isHookActive]);
 
   // Accessibility and Voice Assistant States
   const [voiceActive, setVoiceActive] = useState(false);
@@ -249,6 +251,7 @@ function HotJobsReview({ user }) {
   // Hangup call handler
   const handleHangup = () => {
     setIsCallActive(false);
+    setIsHookActive(false);
     if (callMethod === 'google-voice' && gvWindowRef.current && !gvWindowRef.current.closed) {
       try {
         gvWindowRef.current.close();
@@ -1205,10 +1208,13 @@ function HotJobsReview({ user }) {
               })
                 .then(res => res.json())
                 .then(data => {
-                  if (!data.success) {
+                  if (data.success) {
+                    setIsHookActive(!!data.hook_active);
+                  } else {
                     console.error("Dial error:", data.error);
                     speak("Failed to initiate call on the device.");
                     setIsCallActive(false);
+                    setIsHookActive(false);
                     if (gvWindowRef.current) {
                       try { gvWindowRef.current.close(); } catch (e) { }
                       gvWindowRef.current = null;
@@ -1234,10 +1240,13 @@ function HotJobsReview({ user }) {
             })
               .then(res => res.json())
               .then(data => {
-                if (!data.success) {
+                if (data.success) {
+                  setIsHookActive(!!data.hook_active);
+                } else {
                   console.error("Dial error:", data.error);
                   speak("Failed to initiate call on the device.");
                   setIsCallActive(false);
+                  setIsHookActive(false);
                 }
               })
               .catch(err => {

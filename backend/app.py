@@ -971,10 +971,10 @@ def dial_number():
         is_local_client = request.remote_addr in ('127.0.0.1', 'localhost', '::1')
         
         if not is_windows:
-            return jsonify({"success": True, "message": "Dial simulated on non-Windows platform (no actions taken)"})
+            return jsonify({"success": True, "hook_active": False, "message": "Dial simulated on non-Windows platform (no actions taken)"})
             
         if not is_local_client:
-            return jsonify({"success": True, "message": "Dial simulated for remote client (no keyboard/window actions taken)"})
+            return jsonify({"success": True, "hook_active": False, "message": "Dial simulated for remote client (no keyboard/window actions taken)"})
             
         import subprocess
         import time
@@ -1065,7 +1065,7 @@ def dial_number():
         # Start global key listener with a 0.5s delay to ensure the simulated dial Enter key clears from system
         threading.Timer(0.5, start_global_key_listener).start()
         
-        return jsonify({"success": True, "message": f"Dialed {clean_phone} using {method}"})
+        return jsonify({"success": True, "hook_active": True, "message": f"Dialed {clean_phone} using {method}"})
         
     except Exception as e:
         print(traceback.format_exc())
