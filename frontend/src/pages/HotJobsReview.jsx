@@ -252,6 +252,7 @@ function HotJobsReview({ user }) {
         speak(`Here is the phone number to call.`, () => {
           speak(spokenDigits, null, 0.6);
         });
+        handlePauseVoiceSilently();
       } else {
         const methodName = callMethod === 'google-voice' ? 'Google Voice' : 'Phone Link';
         pendingCallPhoneRef.current = phoneNumber; // Set ref synchronously to prevent race conditions
@@ -501,7 +502,7 @@ function HotJobsReview({ user }) {
     speak(`Updated additional notes to: ${transcript}. You can say "save" to submit, or "update notes" to try again.`);
   };
 
-  const handlePauseVoice = () => {
+  const handlePauseVoiceSilently = () => {
     setIsVoicePaused(true);
     isVoicePausedRef.current = true;
     setIsListeningForJobs(false);
@@ -511,6 +512,10 @@ function HotJobsReview({ user }) {
     if (notesTimeoutRef.current) clearTimeout(notesTimeoutRef.current);
     spokenNotesAccumulatorRef.current = '';
     setSpeechStatus('Voice Assistant Paused (Say "Resume" to activate)');
+  };
+
+  const handlePauseVoice = () => {
+    handlePauseVoiceSilently();
     speak("Voice assistant paused.");
   };
 
@@ -1186,6 +1191,7 @@ function HotJobsReview({ user }) {
           setPendingCallPhone(null);
 
           speak("Dialing now.");
+          handlePauseVoiceSilently();
 
           if (callMethod === 'google-voice') {
             const cleanDigits = phoneToDial.replace(/\D/g, '');
