@@ -504,8 +504,7 @@ def dashboard_stats():
         
         for row in all_records:
             is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
-            if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
-                continue
+            is_currently_hiring = is_hiring_val in ["TRUE", "YES", "1", "Y"]
 
             date_str = str(row.get("Date last verified", row.get("Date Entered", ""))).strip()
             age_days = 9999
@@ -521,27 +520,28 @@ def dashboard_stats():
                 except:
                     pass
 
-            if has_date:
-                career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
-                has_career_page = bool(str(career_page).strip())
-                if 16 <= age_days <= 21 and has_career_page:
-                    expiring_in_5_days_count += 1
-                if 22 <= age_days <= 36 and has_career_page:
-                    expired_recently_count += 1
+            if is_currently_hiring:
+                if has_date:
+                    career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
+                    has_career_page = bool(str(career_page).strip())
+                    if 16 <= age_days <= 21 and has_career_page:
+                        expiring_in_5_days_count += 1
+                    if 22 <= age_days <= 36 and has_career_page:
+                        expired_recently_count += 1
+                        
+                if 640 <= age_days < 730:
+                    reaching_2_years_count += 1
                     
-            if 640 <= age_days < 730:
-                reaching_2_years_count += 1
-                
-            is_hot = (0 <= age_days <= 21)
-            if is_hot:
-                total_hot_jobs_matched += 1
-                job_title = str(row.get("Available Jobs", row.get("Job Title", ""))).lower()
-                matched_type = "Other"
-                for st in STANDARD_TYPES:
-                    if st.lower() in job_title:
-                        matched_type = st
-                        break
-                job_type_counts[matched_type] = job_type_counts.get(matched_type, 0) + 1
+                is_hot = (0 <= age_days <= 21)
+                if is_hot:
+                    total_hot_jobs_matched += 1
+                    job_title = str(row.get("Available Jobs", row.get("Job Title", ""))).lower()
+                    matched_type = "Other"
+                    for st in STANDARD_TYPES:
+                        if st.lower() in job_title:
+                            matched_type = st
+                            break
+                    job_type_counts[matched_type] = job_type_counts.get(matched_type, 0) + 1
                 
             if age_days > 21:
                 career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
@@ -642,7 +642,7 @@ def hot_jobs_review():
                         continue
                 
                 is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
-                if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
+                if category != "unverified_no_career" and is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
                     continue
                     
                 career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
