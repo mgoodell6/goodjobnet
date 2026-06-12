@@ -11,6 +11,7 @@ import InformationAndHelp from './pages/InformationAndHelp';
 import HotJobsReview from './pages/HotJobsReview';
 import JobSeekerDashboard from './pages/JobSeekerDashboard';
 import JobSeekerMatchesReport from './pages/JobSeekerMatchesReport';
+import ResumeCoach from './pages/ResumeCoach';
 
 // Manual Version Configuration - Update this string to change the application version displayed in the header
 const APP_VERSION = "Beta v0.12";
@@ -63,6 +64,7 @@ function App() {
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="/job-seeker-dashboard" element={<JobSeekerDashboard />} />
         <Route path="/hot-job-search" element={<HotJobSearch user={user} />} />
+        <Route path="/resume-coach" element={<ResumeCoach />} />
         {user ? (
           <>
             <Route path="/dashboard" element={<GeneralDashboard />} />
