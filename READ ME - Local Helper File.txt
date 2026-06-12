@@ -1,0 +1,31 @@
+READ ME - Local Helper File to use with Voice Assistant
+
+[NEW] 
+local_helper.py
+Create a new standalone script to run locally on your PC. It will:
+
+Listen on http://127.0.0.1:5001.
+Support CORS so that the Render origin (or localhost) can call it.
+Implement /api/dial, /api/hangup, and /api/call-status.
+Launch the browser to Google Voice using webbrowser.open() locally.
+Wait 2.5 seconds, then send the ENTER key using PowerShell automation.
+Setup a low-level global keyboard hook (WH_KEYBOARD_LL via ctypes) to capture Escape, Enter, or H/h keystrokes globally.
+Close the Google Voice window using the WM_CLOSE window message and send ENTER to clear any "Leave site?" prompts.
+Implement a background monitoring thread that automatically sets call_active to False if the Google Voice or Phone Link window is closed manually.
+
+
+Operator Interaction Flow
+Once both the Voice Assistant is active and local_helper.py is running:
+
+Triggering the Call:
+The operator says "call company", "call", or "dial" (or clicks the Call button, or presses the C key).
+Confirmation:
+The Voice Assistant speaks: "Ready to call [Company Name] at [Phone Number] using Google Voice. Press the space bar now to initiate the call, or press any other key to cancel."
+Initiating the Call:
+The operator presses the Space Bar (or Enter) to confirm. (Any other key cancels the request).
+Automated Dialing (No operator action required):
+The default browser opens the Google Voice page.
+The local helper script automatically waits 2.5 seconds (allowing the page to load) and simulates pressing Enter to start the call.
+Hanging Up:
+To hang up, the operator simply presses Escape, Enter, or H / h (or clicks the Hang Up button in the web app UI).
+The local helper script intercepts this keypress globally (even though Google Voice has the keyboard focus), terminates the call, closes the Google Voice tab/window, and brings focus back to the web application.
