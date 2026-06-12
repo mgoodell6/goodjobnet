@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FaMapMarkedAlt, FaSearch } from 'react-icons/fa';
+import { FaMapMarkedAlt, FaSearch, FaFileAlt } from 'react-icons/fa';
 
 function JobSeekerDashboard() {
   return (
@@ -22,6 +22,10 @@ function JobSeekerDashboard() {
           <Link to="/hot-job-search" className="nav-card">
             <FaSearch />
             <h3>Search for nearby jobs</h3>
+          </Link>
+          <Link to="/resume-coach" className="nav-card">
+            <FaFileAlt />
+            <h3>Virtual Resume Coach</h3>
           </Link>
         </div>
 

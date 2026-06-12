@@ -12,6 +12,39 @@ import csv
 import io
 import urllib.request
 from werkzeug.security import generate_password_hash, check_password_hash
+from openai import OpenAI
+from pypdf import PdfReader
+import docx
+from pydantic import BaseModel
+from typing import List
+
+# Configure OpenAI (DeepInfra)
+client = OpenAI(
+    api_key="5p0ju8oblFU2XVMuyvC4VM948SbQZde8",
+    base_url="https://api.deepinfra.com/v1/openai",
+)
+
+class Suggestion(BaseModel):
+    section: str
+    original: str
+    suggested: str
+    rationale: str
+
+class ResumeAnalysis(BaseModel):
+    overall_score: int
+    readability_score: int
+    impact_score: int
+    strengths: List[str]
+    weaknesses: List[str]
+    suggestions: List[Suggestion]
+    rationale: str
+
+    impact_score: int
+    alignment_score: int
+    strengths: list[str]
+    weaknesses: list[str]
+    suggestions: list[Suggestion]
+    coaching_summary: str
 
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist'))
 app = Flask(__name__, static_folder=frontend_dir, static_url_path='/static_dist')
@@ -1695,6 +1728,104 @@ def search_seekers():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+
+
+@app.route('/api/resume/parse-pdf', methods=['POST'])
+def parse_pdf():
+    if 'file' not in request.files:
+        return jsonify({"success": False, "error": "No file uploaded"}), 400
+    file = request.files['file']
+    try:
+        filename = file.filename.lower()
+        text = ""
+        
+        if filename.endswith('.pdf'):
+            reader = PdfReader(file)
+            for page in reader.pages:
+                text += page.extract_text() or ""
+        elif filename.endswith('.docx'):
+            doc = docx.Document(file)
+            text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        elif filename.endswith('.txt'):
+            text = file.read().decode('utf-8')
+        else:
+            return jsonify({"success": False, "error": "Unsupported file format. Please upload .pdf, .docx, or .txt"}), 400
+            
+        return jsonify({"success": True, "text": text})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/resume/analyze', methods=['POST'])
+def analyze_resume():
+    data = request.json or {}
+    resume_text = data.get("resume_text", "")
+    target_job = data.get("target_job", "")
+
+    prompt = f"""
+    You are an expert career coach. Analyze the following resume:
+    ---
+    {resume_text}
+    ---
+    Target Job/Industry: {target_job}
+    
+    Provide structured feedback. Suggest actionable, high-impact bullet point rewrites.
+    """
+
+    schema_str = json.dumps(ResumeAnalysis.model_json_schema(), indent=2)
+    system_prompt = f"You are an expert career coach. You must reply ONLY with valid JSON. Do not include markdown formatting. Use the following schema:\n{schema_str}"
+
+    try:
+        completion = client.chat.completions.create(
+            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"}
+        )
+        response_text = completion.choices[0].message.content.strip()
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        if response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+        
+        analysis_result = json.loads(response_text)
+        return jsonify({"success": True, "analysis": analysis_result})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/resume/chat', methods=['POST'])
+def resume_chat():
+    data = request.json or {}
+    message = data.get("message", "")
+    history = data.get("history", [])
+    resume_context = data.get("resume_context", "")
+
+    try:
+        system_instruction = f"You are a helpful resume coach. The user's current resume text is:\n{resume_context}\n\nKeep answers encouraging, brief, and highly practical."
+        
+        messages = [{"role": "system", "content": system_instruction}]
+        
+        # Add history (which should now be coming as role and content)
+        for msg in history:
+            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+            
+        # Add current message
+        messages.append({"role": "user", "content": message})
+        
+        completion = client.chat.completions.create(
+            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            messages=messages
+        )
+        
+        reply_text = completion.choices[0].message.content
+        return jsonify({"success": True, "reply": reply_text})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":
