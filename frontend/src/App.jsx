@@ -13,7 +13,9 @@ import JobSeekerDashboard from './pages/JobSeekerDashboard';
 import JobSeekerMatchesReport from './pages/JobSeekerMatchesReport';
 
 // Manual Version Configuration - Update this string to change the application version displayed in the header
-const APP_VERSION = "Beta v0.12";
+
+const APP_VERSION = "Beta v0.13";
+
 
 function TopBar({ user, handleLogout }) {
   const location = useLocation();
