@@ -12,6 +12,39 @@ import csv
 import io
 import urllib.request
 from werkzeug.security import generate_password_hash, check_password_hash
+from openai import OpenAI
+from pypdf import PdfReader
+import docx
+from pydantic import BaseModel
+from typing import List
+
+# Configure OpenAI (DeepInfra)
+client = OpenAI(
+    api_key="5p0ju8oblFU2XVMuyvC4VM948SbQZde8",
+    base_url="https://api.deepinfra.com/v1/openai",
+)
+
+class Suggestion(BaseModel):
+    section: str
+    original: str
+    suggested: str
+    rationale: str
+
+class ResumeAnalysis(BaseModel):
+    overall_score: int
+    readability_score: int
+    impact_score: int
+    strengths: List[str]
+    weaknesses: List[str]
+    suggestions: List[Suggestion]
+    rationale: str
+
+    impact_score: int
+    alignment_score: int
+    strengths: list[str]
+    weaknesses: list[str]
+    suggestions: list[Suggestion]
+    coaching_summary: str
 
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist'))
 app = Flask(__name__, static_folder=frontend_dir, static_url_path='/static_dist')
@@ -510,8 +543,7 @@ def dashboard_stats():
         
         for row in all_records:
             is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
-            if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
-                continue
+            is_currently_hiring = is_hiring_val in ["TRUE", "YES", "1", "Y"]
 
             date_str = str(row.get("Date last verified", row.get("Date Entered", ""))).strip()
             age_days = 9999
@@ -527,27 +559,28 @@ def dashboard_stats():
                 except:
                     pass
 
-            if has_date:
-                career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
-                has_career_page = bool(str(career_page).strip())
-                if 16 <= age_days <= 21 and has_career_page:
-                    expiring_in_5_days_count += 1
-                if 22 <= age_days <= 36 and has_career_page:
-                    expired_recently_count += 1
+            if is_currently_hiring:
+                if has_date:
+                    career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
+                    has_career_page = bool(str(career_page).strip())
+                    if 16 <= age_days <= 21 and has_career_page:
+                        expiring_in_5_days_count += 1
+                    if 22 <= age_days <= 36 and has_career_page:
+                        expired_recently_count += 1
+                        
+                if 640 <= age_days < 730:
+                    reaching_2_years_count += 1
                     
-            if 640 <= age_days < 730:
-                reaching_2_years_count += 1
-                
-            is_hot = (0 <= age_days <= 21)
-            if is_hot:
-                total_hot_jobs_matched += 1
-                job_title = str(row.get("Available Jobs", row.get("Job Title", ""))).lower()
-                matched_type = "Other"
-                for st in STANDARD_TYPES:
-                    if st.lower() in job_title:
-                        matched_type = st
-                        break
-                job_type_counts[matched_type] = job_type_counts.get(matched_type, 0) + 1
+                is_hot = (0 <= age_days <= 21)
+                if is_hot:
+                    total_hot_jobs_matched += 1
+                    job_title = str(row.get("Available Jobs", row.get("Job Title", ""))).lower()
+                    matched_type = "Other"
+                    for st in STANDARD_TYPES:
+                        if st.lower() in job_title:
+                            matched_type = st
+                            break
+                    job_type_counts[matched_type] = job_type_counts.get(matched_type, 0) + 1
                 
             if age_days > 21:
                 career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
@@ -640,6 +673,57 @@ def hot_jobs_review():
                 job_types_list = [t.strip().lower() for t in job_type.split(",") if t.strip()]
                 if not job_types_list or not any(t in row_type for t in job_types_list):
                     continue
+            elif category == "company":
+                import difflib
+                company_query = request.args.get("company", "").strip().lower()
+                if not company_query:
+                    continue
+                row_company = str(row.get("Name") or row.get("Company Name") or "").strip().lower()
+                
+                match = False
+                if company_query in row_company:
+                    match = True
+                else:
+                    q_clean = "".join(c for c in company_query if c.isalnum())
+                    t_clean = "".join(c for c in row_company if c.isalnum())
+                    if q_clean and q_clean in t_clean:
+                        match = True
+                    else:
+                        if q_clean and len(q_clean) >= 3 and difflib.SequenceMatcher(None, q_clean, t_clean).ratio() > 0.8:
+                            match = True
+                        else:
+                            q_words_raw = [w for w in company_query.split() if w]
+                            q_words_clean = ["".join(c for c in w if c.isalnum()) for w in q_words_raw]
+                            q_words_clean = [w for w in q_words_clean if w]
+                            
+                            t_words_raw = [w for w in row_company.split() if w]
+                            t_words_clean = ["".join(c for c in w if c.isalnum()) for w in t_words_raw]
+                            t_words_clean = [w for w in t_words_clean if w]
+                            
+                            if q_words_clean:
+                                all_query_words_matched = True
+                                for qw in q_words_clean:
+                                    word_matched = False
+                                    for tw in t_words_clean:
+                                        if len(qw) <= 2:
+                                            if qw == tw:
+                                                word_matched = True
+                                                break
+                                        else:
+                                            if qw in tw:
+                                                word_matched = True
+                                                break
+                                            if len(tw) >= 3:
+                                                if difflib.SequenceMatcher(None, qw, tw).ratio() > 0.8:
+                                                    word_matched = True
+                                                    break
+                                    if not word_matched:
+                                        all_query_words_matched = False
+                                        break
+                                if all_query_words_matched:
+                                    match = True
+                if not match:
+                    continue
             else:
                 if not has_valid_date:
                     if category == "unverified_no_career":
@@ -648,7 +732,7 @@ def hot_jobs_review():
                         continue
                 
                 is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
-                if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
+                if category != "unverified_no_career" and is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
                     continue
                     
                 career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
@@ -1644,6 +1728,104 @@ def search_seekers():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+
+
+@app.route('/api/resume/parse-pdf', methods=['POST'])
+def parse_pdf():
+    if 'file' not in request.files:
+        return jsonify({"success": False, "error": "No file uploaded"}), 400
+    file = request.files['file']
+    try:
+        filename = file.filename.lower()
+        text = ""
+        
+        if filename.endswith('.pdf'):
+            reader = PdfReader(file)
+            for page in reader.pages:
+                text += page.extract_text() or ""
+        elif filename.endswith('.docx'):
+            doc = docx.Document(file)
+            text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        elif filename.endswith('.txt'):
+            text = file.read().decode('utf-8')
+        else:
+            return jsonify({"success": False, "error": "Unsupported file format. Please upload .pdf, .docx, or .txt"}), 400
+            
+        return jsonify({"success": True, "text": text})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/resume/analyze', methods=['POST'])
+def analyze_resume():
+    data = request.json or {}
+    resume_text = data.get("resume_text", "")
+    target_job = data.get("target_job", "")
+
+    prompt = f"""
+    You are an expert career coach. Analyze the following resume:
+    ---
+    {resume_text}
+    ---
+    Target Job/Industry: {target_job}
+    
+    Provide structured feedback. Suggest actionable, high-impact bullet point rewrites.
+    """
+
+    schema_str = json.dumps(ResumeAnalysis.model_json_schema(), indent=2)
+    system_prompt = f"You are an expert career coach. You must reply ONLY with valid JSON. Do not include markdown formatting. Use the following schema:\n{schema_str}"
+
+    try:
+        completion = client.chat.completions.create(
+            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"}
+        )
+        response_text = completion.choices[0].message.content.strip()
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        if response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+        
+        analysis_result = json.loads(response_text)
+        return jsonify({"success": True, "analysis": analysis_result})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/resume/chat', methods=['POST'])
+def resume_chat():
+    data = request.json or {}
+    message = data.get("message", "")
+    history = data.get("history", [])
+    resume_context = data.get("resume_context", "")
+
+    try:
+        system_instruction = f"You are a helpful resume coach. The user's current resume text is:\n{resume_context}\n\nKeep answers encouraging, brief, and highly practical."
+        
+        messages = [{"role": "system", "content": system_instruction}]
+        
+        # Add history (which should now be coming as role and content)
+        for msg in history:
+            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+            
+        # Add current message
+        messages.append({"role": "user", "content": message})
+        
+        completion = client.chat.completions.create(
+            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            messages=messages
+        )
+        
+        reply_text = completion.choices[0].message.content
+        return jsonify({"success": True, "reply": reply_text})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":

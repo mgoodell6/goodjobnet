@@ -11,13 +11,18 @@ import InformationAndHelp from './pages/InformationAndHelp';
 import HotJobsReview from './pages/HotJobsReview';
 import JobSeekerDashboard from './pages/JobSeekerDashboard';
 import JobSeekerMatchesReport from './pages/JobSeekerMatchesReport';
+import ResumeCoach from './pages/ResumeCoach';
 
 // Manual Version Configuration - Update this string to change the application version displayed in the header
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 const APP_VERSION = "Beta v0.11";
 =======
 const APP_VERSION = "Beta v0.13";
 >>>>>>> Stashed changes
+=======
+const APP_VERSION = "Beta v0.12";
+>>>>>>> contributor/master
 
 function TopBar({ user, handleLogout }) {
   const location = useLocation();
@@ -67,6 +72,7 @@ function App() {
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="/job-seeker-dashboard" element={<JobSeekerDashboard />} />
         <Route path="/hot-job-search" element={<HotJobSearch user={user} />} />
+        <Route path="/resume-coach" element={<ResumeCoach />} />
         {user ? (
           <>
             <Route path="/dashboard" element={<GeneralDashboard />} />
