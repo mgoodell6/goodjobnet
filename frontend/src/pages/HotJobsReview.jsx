@@ -28,6 +28,7 @@ function HotJobsReview({ user }) {
   const [categorySelected, setCategorySelected] = useState(false);
   const [jobTypeQuery, setJobTypeQuery] = useState('');
   const [selectedJobTypes, setSelectedJobTypes] = useState([]);
+  const [companySearchQuery, setCompanySearchQuery] = useState('');
   const [reviewTitle, setReviewTitle] = useState('Hot Jobs Review');
 
   const [callMethod, setCallMethod] = useState(() => {
@@ -510,16 +511,20 @@ function HotJobsReview({ user }) {
     speak(`Updated currently hiring status to: ${status}. You can say "save" to submit, or "update currently hiring status" to try again.`);
   };
 
-  const fetchJobs = (category, type = '') => {
+  const fetchJobs = (category, type = '', company = '') => {
     setLoading(true);
     setCategorySelected(true);
+    setCurrentIndex(0);
+    setMessage('');
+    setSuccess(false);
 
     if (category === '5days') setReviewTitle('Review Jobs Expiring Soon (5 days)');
     else if (category === '46weeks') setReviewTitle('Review Expired Jobs (4-6 weeks)');
     else if (category === 'type') setReviewTitle(`Review Jobs by Type: ${type}`);
     else if (category === 'unverified_no_career') setReviewTitle('Phone Verification Queue');
+    else if (category === 'company') setReviewTitle(`Review Jobs by Company: ${company}`);
 
-    fetch(`/api/hot-jobs-review?category=${category}&type=${encodeURIComponent(type)}`)
+    fetch(`/api/hot-jobs-review?category=${category}&type=${encodeURIComponent(type)}&company=${encodeURIComponent(company)}`)
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -580,6 +585,9 @@ function HotJobsReview({ user }) {
   const handleGoBack = () => {
     setCategorySelected(false);
     setJobs([]);
+    setCurrentIndex(0);
+    setMessage('');
+    setSuccess(false);
     // Stop voice and synthesis when exiting reviews
     if (voiceActive) {
       setVoiceActive(false);
@@ -606,8 +614,9 @@ function HotJobsReview({ user }) {
     const params = new URLSearchParams(window.location.search);
     const category = params.get('category');
     const type = params.get('type') || '';
+    const company = params.get('company') || '';
     if (category) {
-      fetchJobs(category, type);
+      fetchJobs(category, type, company);
     }
   }, []);
 
@@ -1362,6 +1371,32 @@ function HotJobsReview({ user }) {
                     Search
                   </button>
                 </div>
+              </div>
+            </div>
+
+            <div className="input-group full-width mt-2" style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '1.5rem' }}>
+              <label style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Or search by Company Name</label>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <input
+                  type="text"
+                  placeholder="Enter company name..."
+                  value={companySearchQuery}
+                  onChange={e => setCompanySearchQuery(e.target.value)}
+                  style={{ flex: 1 }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && companySearchQuery.trim()) {
+                      fetchJobs('company', '', companySearchQuery.trim());
+                    }
+                  }}
+                />
+                <button
+                  className="btn secondary-btn"
+                  onClick={() => fetchJobs('company', '', companySearchQuery.trim())}
+                  style={{ width: 'auto' }}
+                  disabled={!companySearchQuery.trim()}
+                >
+                  Search
+                </button>
               </div>
             </div>
           </div>
