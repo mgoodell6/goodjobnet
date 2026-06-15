@@ -11,7 +11,9 @@ import math
 import csv
 import io
 import urllib.request
+import gc as garbage_collector
 from werkzeug.security import generate_password_hash, check_password_hash
+
 
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist'))
 app = Flask(__name__, static_folder=frontend_dir, static_url_path='/static_dist')
@@ -65,22 +67,35 @@ def invalidate_cache(key=None):
         print("Invalidated entire cache")
 
 # ZIP Code Distance Helpers
+_zip_cache = {}
+
 def get_zip_coordinates(zip_code):
-    db_path = os.path.join(os.path.dirname(__file__), "zips.db")
     zip_str = str(zip_code).strip()[:5]
     if not zip_str.isdigit():
         return None
+    if zip_str in _zip_cache:
+        return _zip_cache[zip_str]
+        
+    db_path = os.path.join(os.path.dirname(__file__), "zips.db")
+    conn = None
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT lat, lon FROM zips WHERE zip = ?", (zip_str,))
         row = cursor.fetchone()
-        conn.close()
         if row:
-            return row[0], row[1]
+            coords = (row[0], row[1])
+            _zip_cache[zip_str] = coords
+            return coords
+        else:
+            _zip_cache[zip_str] = None
     except Exception as e:
         print(f"Error querying ZIP {zip_str}: {e}")
+    finally:
+        if conn:
+            conn.close()
     return None
+
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     R = 3958.8  # Earth radius in miles
@@ -174,6 +189,18 @@ def get_new_seekers_records():
         }
     return get_cached_data('new_seekers_records', fetch_new_seekers)
 
+def get_users_records():
+    def fetch_users():
+        gc = get_gsheets_client()
+        try:
+            sh = gc.open("GoodJobNet_Users")
+            wks = sh.worksheet_by_title("Users")
+            return wks.get_all_records()
+        except (pygsheets.SpreadsheetNotFound, pygsheets.WorksheetNotFound):
+            return []
+    return get_cached_data('users_records', fetch_users)
+
+
 # Authentication helper
 def get_gsheets_client():
     global _gsheets_client
@@ -203,108 +230,116 @@ def serve(path):
 
 @app.route('/api/submit-job', methods=['POST'])
 def submit_job():
-    data = request.json
-    if not data:
-        return jsonify({"success": False, "error": "No data provided"}), 400
-
-    jobs_raw = data.get("available_jobs", "")
-    if jobs_raw:
-        jobs_list = [j.strip() for j in jobs_raw.split('\n') if j.strip()]
-        available_jobs_str = ", ".join(jobs_list)
-    else:
-        available_jobs_str = ""
-
-    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-
-    row_data = [
-        data.get("company_name", ""),
-        data.get("company_street", ""),
-        data.get("company_city", ""),
-        data.get("company_state", ""),
-        data.get("company_zip", ""),
-        data.get("contact_name", ""),
-        data.get("contact_phone", ""),
-        data.get("contact_email", ""),
-        "TRUE" if data.get("currently_hiring", "Yes") == "Yes" else "FALSE",
-        available_jobs_str,
-        data.get("company_type", ""),
-        data.get("career_website", ""),
-        data.get("notes", ""),
-        current_date,
-        data.get("submitter_name", ""),
-        data.get("submitter_ward", ""),
-        data.get("submitter_stake", ""),
-        data.get("submitter_phone", ""),
-        data.get("submitter_email", "")
-    ]
-
     try:
-        gc = get_gsheets_client()
-        sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
-        wks = sh.worksheet_by_title(WORKSHEET_NAME_JOBS)
-        wks.append_table(values=[row_data])
-        invalidate_cache('new_jobs_records')
-        invalidate_cache('master_jobs_records')
-        return jsonify({"success": True, "message": "Job successfully added to Google Sheets!"})
-    except Exception as e:
-        print(traceback.format_exc())
-        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+        data = request.json
+        if not data:
+            return jsonify({"success": False, "error": "No data provided"}), 400
+
+        jobs_raw = data.get("available_jobs", "")
+        if jobs_raw:
+            jobs_list = [j.strip() for j in jobs_raw.split('\n') if j.strip()]
+            available_jobs_str = ", ".join(jobs_list)
+        else:
+            available_jobs_str = ""
+
+        current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+
+        row_data = [
+            data.get("company_name", ""),
+            data.get("company_street", ""),
+            data.get("company_city", ""),
+            data.get("company_state", ""),
+            data.get("company_zip", ""),
+            data.get("contact_name", ""),
+            data.get("contact_phone", ""),
+            data.get("contact_email", ""),
+            "TRUE" if data.get("currently_hiring", "Yes") == "Yes" else "FALSE",
+            available_jobs_str,
+            data.get("company_type", ""),
+            data.get("career_website", ""),
+            data.get("notes", ""),
+            current_date,
+            data.get("submitter_name", ""),
+            data.get("submitter_ward", ""),
+            data.get("submitter_stake", ""),
+            data.get("submitter_phone", ""),
+            data.get("submitter_email", "")
+        ]
+
+        try:
+            gc = get_gsheets_client()
+            sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
+            wks = sh.worksheet_by_title(WORKSHEET_NAME_JOBS)
+            wks.append_table(values=[row_data])
+            invalidate_cache('new_jobs_records')
+            invalidate_cache('master_jobs_records')
+            return jsonify({"success": True, "message": "Job successfully added to Google Sheets!"})
+        except Exception as e:
+            print(traceback.format_exc())
+            return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
 
 
 @app.route('/api/submit-seeker', methods=['POST'])
 def submit_seeker():
-    data = request.json
-    if not data:
-        return jsonify({"success": False, "error": "No data provided"}), 400
-
-    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-
-    # Assuming these fields from frontend
-    row_data = [
-        data.get("name", ""),
-        data.get("street", ""),
-        data.get("city", ""),
-        data.get("zipcode", ""),
-        data.get("ward", ""),
-        data.get("stake", ""),
-        data.get("phone", ""),
-        data.get("email", ""),
-        data.get("skills_education", ""),
-        data.get("job_needed", ""),
-        ", ".join(data.get("desired_job_types", [])),
-        data.get("general_notes", ""),
-        "Yes" if data.get("resume_assistance") else "No",
-        "Yes" if data.get("interview_coaching") else "No",
-        "Yes" if data.get("job_search_assistance") else "No",
-        current_date,
-        data.get("submitter_name", ""),
-        data.get("submitter_ward", ""),
-        data.get("submitter_stake", ""),
-        data.get("submitter_phone", ""),
-        data.get("submitter_email", "")
-    ]
-
     try:
-        gc = get_gsheets_client()
+        data = request.json
+        if not data:
+            return jsonify({"success": False, "error": "No data provided"}), 400
+
+        current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+
+        # Assuming these fields from frontend
+        row_data = [
+            data.get("name", ""),
+            data.get("street", ""),
+            data.get("city", ""),
+            data.get("zipcode", ""),
+            data.get("ward", ""),
+            data.get("stake", ""),
+            data.get("phone", ""),
+            data.get("email", ""),
+            data.get("skills_education", ""),
+            data.get("job_needed", ""),
+            ", ".join(data.get("desired_job_types", [])),
+            data.get("general_notes", ""),
+            "Yes" if data.get("resume_assistance") else "No",
+            "Yes" if data.get("interview_coaching") else "No",
+            "Yes" if data.get("job_search_assistance") else "No",
+            current_date,
+            data.get("submitter_name", ""),
+            data.get("submitter_ward", ""),
+            data.get("submitter_stake", ""),
+            data.get("submitter_phone", ""),
+            data.get("submitter_email", "")
+        ]
+
         try:
-            sh = gc.open(SPREADSHEET_NAME_SEEKERS)
-        except pygsheets.SpreadsheetNotFound:
-            sh = gc.create(SPREADSHEET_NAME_SEEKERS)
-        
-        try:
-            wks = sh.worksheet_by_title(WORKSHEET_NAME_SEEKERS)
-        except pygsheets.WorksheetNotFound:
-            wks = sh.sheet1
-            wks.title = WORKSHEET_NAME_SEEKERS
-            # Set headers if new
-            wks.update_row(1, ["Name", "Street", "City", "Zipcode", "Ward", "Stake", "Phone", "Email", "Skills/Education", "Job Needed", "Desired Types", "General Notes", "Resume Asst", "Interview Coach", "Job Search Asst", "Date Entered", "Entered by - Name", "Ward", "Stake", "Phone", "email"])
+            gc = get_gsheets_client()
+            try:
+                sh = gc.open(SPREADSHEET_NAME_SEEKERS)
+            except pygsheets.SpreadsheetNotFound:
+                sh = gc.create(SPREADSHEET_NAME_SEEKERS)
             
-        wks.append_table(values=[row_data])
-        invalidate_cache('new_seekers_records')
-        return jsonify({"success": True, "message": "Job Seeker successfully added to Google Sheets!"})
-    except Exception as e:
-        print(traceback.format_exc())
-        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+            try:
+                wks = sh.worksheet_by_title(WORKSHEET_NAME_SEEKERS)
+            except pygsheets.WorksheetNotFound:
+                wks = sh.sheet1
+                wks.title = WORKSHEET_NAME_SEEKERS
+                # Set headers if new
+                wks.update_row(1, ["Name", "Street", "City", "Zipcode", "Ward", "Stake", "Phone", "Email", "Skills/Education", "Job Needed", "Desired Types", "General Notes", "Resume Asst", "Interview Coach", "Job Search Asst", "Date Entered", "Entered by - Name", "Ward", "Stake", "Phone", "email"])
+                
+            wks.append_table(values=[row_data])
+            invalidate_cache('new_seekers_records')
+            return jsonify({"success": True, "message": "Job Seeker successfully added to Google Sheets!"})
+        except Exception as e:
+            print(traceback.format_exc())
+            return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
 
 @app.route('/api/search-jobs', methods=['POST'])
 def search_jobs():
@@ -348,6 +383,8 @@ def search_jobs():
         except Exception as e:
             print(traceback.format_exc())
             return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+        finally:
+            garbage_collector.collect()
 
     job_types = data.get("job_types", [])
     address = data.get("address", "")
@@ -479,6 +516,8 @@ def search_jobs():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
 
 @app.route('/api/dashboard-stats', methods=['GET'])
 def dashboard_stats():
@@ -607,6 +646,8 @@ def dashboard_stats():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
 
 @app.route('/api/hot-jobs-review', methods=['GET'])
 def hot_jobs_review():
@@ -739,6 +780,8 @@ def hot_jobs_review():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
 
 @app.route('/api/update-hot-job', methods=['POST'])
 def update_hot_job():
@@ -818,6 +861,8 @@ def update_hot_job():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
 
 # Win32 Global Keyboard Hook & Window Closure for Accessibility
 import ctypes
@@ -1160,6 +1205,8 @@ def dial_number():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Failed to dial", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
 
 @app.route('/api/hangup', methods=['POST'])
 def hangup_call():
@@ -1194,6 +1241,8 @@ def hangup_call():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Failed to hang up", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
 
 @app.route('/api/call-status', methods=['GET'])
 def call_status():
@@ -1211,15 +1260,7 @@ def login():
     password = data.get("password", "")
     
     try:
-        gc = get_gsheets_client()
-        try:
-            sh = gc.open("GoodJobNet_Users")
-            wks = sh.worksheet_by_title("Users")
-        except (pygsheets.SpreadsheetNotFound, pygsheets.WorksheetNotFound):
-            return jsonify({"success": False, "error": "Invalid credentials"}), 401
-            
-        # Get all records
-        records = wks.get_all_records()
+        records = get_users_records()
         for idx, row in enumerate(records):
             if row.get("Username") == username:
                 if check_password_hash(row.get("PasswordHash", ""), password):
@@ -1230,10 +1271,14 @@ def login():
 
                     # Update Date Last Logged In
                     try:
+                        gc = get_gsheets_client()
+                        sh = gc.open("GoodJobNet_Users")
+                        wks = sh.worksheet_by_title("Users")
                         headers = wks.get_row(1)
                         if "Date Last Logged In" in headers:
                             col_idx = headers.index("Date Last Logged In") + 1
                             wks.update_value((idx + 2, col_idx), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                            invalidate_cache('users_records')
                     except Exception as ex:
                         print("Failed to update last login date:", str(ex))
                         
@@ -1254,6 +1299,8 @@ def login():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -1262,6 +1309,15 @@ def register():
         return jsonify({"success": False, "error": "No data provided"}), 400
         
     try:
+        # Check if username already exists
+        try:
+            records = get_users_records()
+            for r in records:
+                if str(r.get("Username", "")).strip().lower() == str(data.get("username", "")).strip().lower():
+                    return jsonify({"success": False, "error": "Username already exists. Please choose a unique username."}), 400
+        except Exception as ex:
+            print("Failed to check duplicate username:", str(ex))
+            
         gc = get_gsheets_client()
         try:
             sh = gc.open("GoodJobNet_Users")
@@ -1273,15 +1329,6 @@ def register():
             
         wks = sh.worksheet_by_title("Users")
         
-        # Check if username already exists
-        try:
-            records = wks.get_all_records()
-            for r in records:
-                if str(r.get("Username", "")).strip().lower() == str(data.get("username", "")).strip().lower():
-                    return jsonify({"success": False, "error": "Username already exists. Please choose a unique username."}), 400
-        except Exception as ex:
-            print("Failed to check duplicate username:", str(ex))
-            
         calling = data.get("calling", "")
         role = "admin" if calling == "Employment Center missionary/volunteer" else "user"
         
@@ -1312,9 +1359,13 @@ def register():
         }
         row_data = [row_dict.get(h, "") for h in headers]
         wks.append_table(values=[row_data])
+        invalidate_cache('users_records')
         return jsonify({"success": True, "role": role})
     except Exception as e:
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
 
 @app.route('/api/update-snapshot', methods=['POST'])
 def update_snapshot():
@@ -1423,6 +1474,8 @@ def update_snapshot():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
 
 
 @app.route('/api/job-seeker-matches-report', methods=['GET'])
@@ -1580,6 +1633,8 @@ def job_seeker_matches_report():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
 
 
 @app.route('/api/search-seekers', methods=['POST'])
@@ -1695,6 +1750,8 @@ def search_seekers():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
 
 
 if __name__ == "__main__":
