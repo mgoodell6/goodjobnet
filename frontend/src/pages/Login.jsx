@@ -148,7 +148,7 @@ function Login({ onLogin }) {
             <div className="form-grid">
               <div className="input-group full-width">
                 <label>Name</label>
-                <input type="text" name="name" required value={username} onChange={e => setUsername(e.target.value)} />
+                <input type="text" name="name" required />
               </div>
               <div className="input-group">
                 <label>Ward</label>

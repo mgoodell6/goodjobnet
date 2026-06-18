@@ -49,52 +49,32 @@ function HotJobsReview({ user }) {
     pendingCallPhoneRef.current = pendingCallPhone;
   }, [pendingCallPhone]);
 
-  // Poll active call status when call is active to sync with global keyboard listener or local window close
+  // Poll active call status when call is active to sync with local helper
   useEffect(() => {
     let interval;
     if (isCallActive) {
       interval = setInterval(() => {
-        // 1. Check if the popup window was closed locally in the browser (e.g. Ctrl+W or close button)
-        if (gvWindowRef.current && gvWindowRef.current.closed) {
-          setIsCallActive(false);
-          setIsHookActive(false);
-          gvWindowRef.current = null;
-
-          // Notify backend
-          fetch('/api/hangup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          }).catch(err => console.error("Hangup notify error:", err));
-
-          return;
-        }
-
-        // 2. Only poll backend status if the Win32 hook is active
-        if (isHookActive) {
-          fetch('/api/call-status')
-            .then(res => res.json())
-            .then(data => {
-              if (!data.active) {
-                setIsCallActive(false);
-                setIsHookActive(false);
-                if (gvWindowRef.current) {
-                  try {
-                    gvWindowRef.current.close();
-                  } catch (e) { }
-                  gvWindowRef.current = null;
-                }
-              }
-            })
-            .catch(err => {
-              console.error("Error polling call status:", err);
-            });
-        }
+        // Poll local helper status
+        fetch('http://127.0.0.1:5001/api/call-status')
+          .then(res => res.json())
+          .then(data => {
+            if (!data.active) {
+              setIsCallActive(false);
+              setIsHookActive(false);
+            }
+          })
+          .catch(err => {
+            console.error("Error polling call status from local helper:", err);
+            // Revert state if helper connection fails
+            setIsCallActive(false);
+            setIsHookActive(false);
+          });
       }, 1000);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isCallActive, isHookActive]);
+  }, [isCallActive]);
 
   // Accessibility and Voice Assistant States
   const [voiceActive, setVoiceActive] = useState(false);
@@ -271,16 +251,7 @@ function HotJobsReview({ user }) {
   const handleHangup = () => {
     setIsCallActive(false);
     setIsHookActive(false);
-    if (callMethod === 'google-voice' && gvWindowRef.current && !gvWindowRef.current.closed) {
-      try {
-        gvWindowRef.current.close();
-        gvWindowRef.current = null;
-        console.log("[Voice Assistant] Closed Google Voice tab from frontend.");
-      } catch (e) {
-        console.error("[Voice Assistant] Failed to close Google Voice tab:", e);
-      }
-    }
-    fetch('/api/hangup', {
+    fetch('http://127.0.0.1:5001/api/hangup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     })
@@ -291,7 +262,7 @@ function HotJobsReview({ user }) {
         }
       })
       .catch(err => {
-        console.error("Hangup fetch error:", err);
+        console.error("Hangup fetch error from local helper:", err);
       });
   };
 
@@ -1202,91 +1173,31 @@ function HotJobsReview({ user }) {
           speak("Dialing now.");
           handlePauseVoiceSilently();
 
-          if (callMethod === 'google-voice') {
-            const cleanDigits = phoneToDial.replace(/\D/g, '');
-            const cleanPhone = cleanDigits.length === 10 ? '1' + cleanDigits : cleanDigits;
-            const url = `https://voice.google.com/calls?a=nc,%2B${cleanPhone}`;
-
-            let gvWindow = null;
-            try {
-              gvWindow = window.open(url, '_blank', 'width=1000,height=750');
-            } catch (err) {
-              console.error("[Voice Assistant] Failed to open window from frontend:", err);
-            }
-
-            if (!gvWindow || gvWindow.closed || typeof gvWindow.closed === 'undefined') {
-              console.warn("[Voice Assistant] Google Voice popup was blocked by the browser.");
-              speak("Google Voice window was blocked by your browser's popup blocker. Please enable popups for this website in your address bar and try again.");
-              setMessage("Google Voice popup blocked! Please allow popups for this site in your browser's address bar.");
+          setIsCallActive(true);
+          fetch('http://127.0.0.1:5001/api/dial', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: phoneToDial, method: callMethod })
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (data.success) {
+                setIsHookActive(!!data.hook_active);
+              } else {
+                console.error("Dial error:", data.error);
+                speak("Failed to initiate call on the device.");
+                setIsCallActive(false);
+                setIsHookActive(false);
+              }
+            })
+            .catch(err => {
+              console.error("Dial fetch error from local helper:", err);
+              speak("Local helper script is not running. Please start local helper dot p y on your computer.");
+              setMessage("Local helper script is not running on port 5001! Please start local_helper.py.");
               setSuccess(false);
               setIsCallActive(false);
-            } else {
-              gvWindowRef.current = gvWindow;
-              setIsCallActive(true);
-
-              // Silently focus back to the parent window after 5 seconds to receive keyboard shortcuts
-              setTimeout(() => {
-                if (gvWindowRef.current && !gvWindowRef.current.closed) {
-                  window.focus();
-                }
-              }, 5000);
-
-              fetch('/api/dial', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: phoneToDial, method: 'google-voice-keypress-only' })
-              })
-                .then(res => res.json())
-                .then(data => {
-                  if (data.success) {
-                    setIsHookActive(!!data.hook_active);
-                    speak("Dialing now.");
-                  } else {
-                    console.error("Dial error:", data.error);
-                    speak("Failed to initiate call on the device.");
-                    setIsCallActive(false);
-                    setIsHookActive(false);
-                    if (gvWindowRef.current) {
-                      try { gvWindowRef.current.close(); } catch (e) { }
-                      gvWindowRef.current = null;
-                    }
-                  }
-                })
-                .catch(err => {
-                  console.error("Dial fetch error:", err);
-                  speak("Network error initiating call.");
-                  setIsCallActive(false);
-                  if (gvWindowRef.current) {
-                    try { gvWindowRef.current.close(); } catch (e) { }
-                    gvWindowRef.current = null;
-                  }
-                });
-            }
-          } else {
-            setIsCallActive(true);
-            fetch('/api/dial', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone: phoneToDial, method: callMethod })
-            })
-              .then(res => res.json())
-              .then(data => {
-                if (data.success) {
-                  setIsHookActive(!!data.hook_active);
-                  speak("Dialing now.");
-                } else {
-                  console.error("Dial error:", data.error);
-                  speak("Failed to initiate call on the device.");
-                  setIsCallActive(false);
-                  setIsHookActive(false);
-                }
-              })
-              .catch(err => {
-                console.error("Dial fetch error:", err);
-                speak("Network error initiating call.");
-                setIsCallActive(false);
-              });
-          }
+              setIsHookActive(false);
+            });
         } else {
           e.preventDefault();
           pendingCallPhoneRef.current = null; // Clear ref synchronously to prevent double keypresses
