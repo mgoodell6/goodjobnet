@@ -548,6 +548,9 @@ def dashboard_stats():
         total_hot_jobs_matched = 0
         
         for row in all_records:
+            company_name = str(row.get("Name") or row.get("Company Name") or "").strip()
+            if not company_name:
+                continue
             is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
             is_currently_hiring = is_hiring_val in ["TRUE", "YES", "1", "Y"]
 
@@ -661,6 +664,9 @@ def hot_jobs_review():
         jobs_to_review = []
         
         for idx, row in enumerate(all_records):
+            company_name = str(row.get("Name") or row.get("Company Name") or "").strip()
+            if not company_name:
+                continue
             date_str = str(row.get("Date last verified", row.get("Date Entered", ""))).strip()
             age_days = 0
             has_valid_date = False
