@@ -409,6 +409,7 @@ def search_jobs():
         older = []
         
         three_weeks_ago = datetime.datetime.now() - datetime.timedelta(days=21)
+        two_years_ago = datetime.datetime.now() - datetime.timedelta(days=730)
         
         for row in all_records:
             # Check if Currently Hiring is true (defaults to True if column doesn't exist)
@@ -475,23 +476,23 @@ def search_jobs():
                 "notes": row.get("General Notes") or row.get("Any additional Notes") or row.get("Notes") or row.get("notes", "")
             }
             
-            date_verified_str = row.get("Date last verified", row.get("Date Entered", ""))
+            date_verified_str = str(row.get("Date last verified", row.get("Date Entered", ""))).strip()
+            if not date_verified_str:
+                continue
                 
-            is_recent = False
-            if date_verified_str:
-                try:
-                    # Try parsing M/D/YYYY or YYYY-MM-DD
-                    if "-" in date_verified_str:
-                        date_obj = datetime.datetime.strptime(date_verified_str.split(" ")[0], "%Y-%m-%d")
-                    else:
-                        date_obj = datetime.datetime.strptime(date_verified_str.split(" ")[0], "%m/%d/%Y")
-                    
-                    if date_obj >= three_weeks_ago:
-                        is_recent = True
-                except:
-                    pass # If date parsing fails, it goes to older
-            
-            if is_recent:
+            try:
+                # Try parsing M/D/YYYY or YYYY-MM-DD
+                if "-" in date_verified_str:
+                    date_obj = datetime.datetime.strptime(date_verified_str.split(" ")[0], "%Y-%m-%d")
+                else:
+                    date_obj = datetime.datetime.strptime(date_verified_str.split(" ")[0], "%m/%d/%Y")
+            except Exception:
+                continue
+                
+            if date_obj < two_years_ago:
+                continue
+                
+            if date_obj >= three_weeks_ago:
                 recent.append(job_entry)
             else:
                 older.append(job_entry)
