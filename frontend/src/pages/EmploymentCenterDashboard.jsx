@@ -157,17 +157,23 @@ function EmploymentCenterDashboard() {
         <div className="alerts-section mb-2" style={{ background: 'rgba(231, 76, 60, 0.05)', border: '1px solid rgba(231, 76, 60, 0.2)', padding: '1.5rem', borderRadius: '12px' }}>
           <h3 style={{ color: '#c0392b', marginBottom: '1rem' }}>Attention Needed</h3>
           <ul style={{ listStyle: 'none', padding: 0 }}>
-            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between' }}>
-              <span>Hot Jobs expiring in 5 days:</span>
-              <strong>{stats.expiring_soon}</strong>
+            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+              <Link to="/hot-jobs-5review" className="dashboard-alert-link">
+                <span>Hot Jobs expiring in 5 days:</span>
+                <strong>{stats.expiring_soon}</strong>
+              </Link>
             </li>
-            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between' }}>
-              <span>Hot Jobs that expired 4 - 6 weeks ago:</span>
-              <strong>{stats.expired_recently}</strong>
+            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+              <Link to="/hot-jobs-46review" className="dashboard-alert-link">
+                <span>Hot Jobs that expired 4 - 6 weeks ago:</span>
+                <strong>{stats.expired_recently}</strong>
+              </Link>
             </li>
-            <li style={{ padding: '0.5rem 0', display: 'flex', justifyContent: 'space-between' }}>
-              <span>Hot Jobs unverified &gt; 3 weeks (Phone Verification Required):</span>
-              <strong>{stats.unverified_no_career_count}</strong>
+            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+              <Link to="/hot-jobs-review?category=unverified_no_career" className="dashboard-alert-link">
+                <span>Hot Jobs unverified &gt; 3 weeks (Phone Verification Required):</span>
+                <strong>{stats.unverified_no_career_count}</strong>
+              </Link>
             </li>
             <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between' }}>
               <span>JobBank rows reaching 2 years in next 3 months:</span>

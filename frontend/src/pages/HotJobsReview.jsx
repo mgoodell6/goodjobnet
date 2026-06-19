@@ -25,6 +25,7 @@ function HotJobsReview({ user }) {
   const [message, setMessage] = useState('');
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const [categorySelected, setCategorySelected] = useState(false);
   const [jobTypeQuery, setJobTypeQuery] = useState('');
   const [selectedJobTypes, setSelectedJobTypes] = useState([]);
@@ -609,16 +610,23 @@ function HotJobsReview({ user }) {
     navigate('/hot-jobs-review', { replace: true });
   };
 
-  // URL queries parser on mount
+  // URL queries parser on mount/location change
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const category = params.get('category');
-    const type = params.get('type') || '';
-    const company = params.get('company') || '';
-    if (category) {
-      fetchJobs(category, type, company);
+    const pathname = location.pathname;
+    if (pathname === '/hot-jobs-5review') {
+      fetchJobs('5days');
+    } else if (pathname === '/hot-jobs-46review') {
+      fetchJobs('46weeks');
+    } else {
+      const params = new URLSearchParams(location.search);
+      const category = params.get('category');
+      const type = params.get('type') || '';
+      const company = params.get('company') || '';
+      if (category) {
+        fetchJobs(category, type, company);
+      }
     }
-  }, []);
+  }, [location]);
 
   // Web Audio API Microphone Volume Level Diagnostics
   useEffect(() => {

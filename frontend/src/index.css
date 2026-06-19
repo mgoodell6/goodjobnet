@@ -576,3 +576,22 @@ select[multiple]::-webkit-scrollbar-thumb:hover,
 .table-container::-webkit-scrollbar-thumb:hover {
   background: var(--primary-color);
 }
+
+/* Dashboard Alert Links */
+.dashboard-alert-link {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-dark);
+  text-decoration: none;
+  width: 100%;
+  transition: var(--transition);
+  padding: 0.2rem 0.5rem;
+  margin: 0 -0.5rem;
+  border-radius: 6px;
+}
+
+.dashboard-alert-link:hover {
+  background: rgba(58, 123, 213, 0.08);
+  color: var(--primary-color);
+  transform: translateX(4px);
+}

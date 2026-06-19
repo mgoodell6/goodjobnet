@@ -575,7 +575,7 @@ def dashboard_stats():
                     has_career_page = bool(str(career_page).strip())
                     if 16 <= age_days <= 21 and has_career_page:
                         expiring_in_5_days_count += 1
-                    if 22 <= age_days <= 36 and has_career_page:
+                    if 28 <= age_days <= 42 and has_career_page:
                         expired_recently_count += 1
                         
                 if 640 <= age_days < 730:
@@ -757,7 +757,7 @@ def hot_jobs_review():
                     if not (16 <= age_days <= 21) or not has_career_page:
                         continue
                 elif category == "46weeks":
-                    if not (22 <= age_days <= 36) or not has_career_page:
+                    if not (28 <= age_days <= 42) or not has_career_page:
                         continue
                 elif category == "unverified_no_career":
                     if age_days <= 21 or has_career_page:
