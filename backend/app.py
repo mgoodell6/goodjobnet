@@ -1651,7 +1651,7 @@ def search_seekers():
         return jsonify({"success": False, "error": "No data provided"}), 400
         
     job_types = data.get("job_types", [])
-    address = data.get("address", "")
+    address = str(data.get("address", "")).strip()
     radius = data.get("radius", 20)
     
     try:
@@ -1659,21 +1659,20 @@ def search_seekers():
     except (ValueError, TypeError):
         radius = 20.0
         
-    if not address or not address.strip():
-        return jsonify({"success": False, "error": "Address is required"}), 400
-        
-    # Extract 5-digit zip code from address
-    import re
-    zip_match = re.search(r'\b\d{5}\b', address)
-    if not zip_match:
-        return jsonify({"success": False, "error": "No valid 5-digit US zip code found in the address. Please include a zip code (e.g. 32801)."}), 400
-    origin_zip = zip_match.group(0)
+    origin_zip = None
+    if address:
+        # Extract 5-digit zip code from address
+        import re
+        zip_match = re.search(r'\b\d{5}\b', address)
+        if zip_match:
+            origin_zip = zip_match.group(0)
     
     try:
         # Load seekers from Unemployed List spreadsheet
         seekers_records = get_seekers_records()
         
-        results = []
+        nearby = []
+        other = []
         has_other = any(jt.lower() == "other" for jt in job_types)
         
         # Normalize helper
@@ -1718,40 +1717,57 @@ def search_seekers():
                     continue
                     
             # Calculate distance
-            seeker_zip_5 = seeker_zip[:5]
-            origin_zip_5 = origin_zip[:5]
-            
-            if not seeker_zip_5:
-                continue
-                
+            seeker_zip_5 = seeker_zip[:5] if seeker_zip else ""
             dist_miles = float('inf')
-            if seeker_zip_5 == origin_zip_5:
-                dist_miles = 0.0
+            
+            if origin_zip and seeker_zip_5:
+                origin_zip_5 = origin_zip[:5]
+                if seeker_zip_5 == origin_zip_5:
+                    dist_miles = 0.0
+                else:
+                    try:
+                        coords1 = get_zip_coordinates(origin_zip_5)
+                        coords2 = get_zip_coordinates(seeker_zip_5)
+                        if coords1 and coords2:
+                            dist_miles = calculate_distance(coords1[0], coords1[1], coords2[0], coords2[1])
+                    except Exception:
+                        pass
+            
+            seeker_entry = {
+                "name": name,
+                "street": street,
+                "city": city,
+                "zipcode": seeker_zip,
+                "ward": str(seeker.get("Ward", "")).strip(),
+                "stake": str(seeker.get("Stake", "")).strip(),
+                "phone": phone,
+                "email": email,
+                "skills_education": str(seeker.get("Skills/Education", "")).strip(),
+                "job_needed": str(seeker.get("Job Needed", "")).strip(),
+                "desired_job_types": seeker_job_types,
+                "general_notes": str(seeker.get("General Notes", "")).strip(),
+                "resume_assistance": str(seeker.get("Resume Asst", seeker.get("Resume assistance", ""))).strip().lower() in ["yes", "true", "on"],
+                "interview_coaching": str(seeker.get("Interview Coach", seeker.get("Interview coaching", ""))).strip().lower() in ["yes", "true", "on"],
+                "job_search_assistance": str(seeker.get("Job Search Asst", seeker.get("Job Search assistance", ""))).strip().lower() in ["yes", "true", "on"],
+                "address": seeker_address,
+                "distance": round(dist_miles, 1) if dist_miles != float('inf') else "N/A"
+            }
+            
+            if origin_zip and dist_miles <= radius:
+                nearby.append(seeker_entry)
             else:
-                try:
-                    coords1 = get_zip_coordinates(origin_zip_5)
-                    coords2 = get_zip_coordinates(seeker_zip_5)
-                    if coords1 and coords2:
-                        dist_miles = calculate_distance(coords1[0], coords1[1], coords2[0], coords2[1])
-                except Exception:
-                    pass
-                    
-            if dist_miles <= radius:
-                results.append({
-                    "name": name,
-                    "address": seeker_address,
-                    "phone": phone,
-                    "email": email,
-                    "job_types": seeker_job_types,
-                    "distance": round(dist_miles, 1) if dist_miles != float('inf') else "N/A"
-                })
+                other.append(seeker_entry)
                 
         # Sort results by distance
-        results.sort(key=lambda x: x["distance"] if isinstance(x["distance"], (int, float)) else float('inf'))
+        nearby.sort(key=lambda x: x["distance"] if isinstance(x["distance"], (int, float)) else float('inf'))
+        other.sort(key=lambda x: x["distance"] if isinstance(x["distance"], (int, float)) else float('inf'))
         
         return jsonify({
             "success": True,
-            "results": results
+            "results": {
+                "nearby": nearby,
+                "other": other
+            }
         })
         
     except Exception as e:

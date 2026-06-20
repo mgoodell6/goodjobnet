@@ -1,11 +1,34 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+
+const standardOptions = [
+  "HVAC Repair", "Accountant", "Airport (Baggage/customer service/ground ops)",
+  "Auto Parts", "Car Wash Attendant", "Cashier", "Catering", "CDL Driver",
+  "Cement Mason/finisher", "Computer / IT", "Computer Programmer", "Construction",
+  "Corrections", "Custodian", "Customer service", "Data Entry", "Day Care / Preschool",
+  "Delivery Driver", "Drywaller", "Educator", "Electrician", "Engineering",
+  "Event Staff", "Fast food", "Gas Station Attendant", "Grocery Store",
+  "Healthcare", "Hotel/Hospitality", "Housekeeper", "Information Technology (IT)",
+  "Landscaping", "Manager (Department/Project)", "Manager (Store/Crew)", "Mechanic",
+  "Manufacturing", "Nursing", "Painter", "Pest Control", "Plumbing",
+  "Restaurant (Cook/Waiter/Host)", "Retail", "Sales", "Security", "Stocking",
+  "Telephone/Call Center/Scheduling", "Theme Park", "Trucking/Transportation",
+  "Warehousing/Logistics"
+];
 
 function JobSeekerEntry({ user }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const seeker = location.state?.seeker;
+
+  const seekerTypes = seeker?.desired_job_types ? seeker.desired_job_types.split(',').map(t => t.trim()) : [];
+  const standardSelected = seekerTypes.filter(t => standardOptions.includes(t));
+  const customSelected = seekerTypes.filter(t => !standardOptions.includes(t)).join(', ');
+
+  const [selectedJobTypes, setSelectedJobTypes] = useState(standardSelected);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -70,52 +93,52 @@ function JobSeekerEntry({ user }) {
           <div className="form-grid">
             <div className="input-group full-width">
               <label>Name of Job Seeker <span className="required">*</span></label>
-              <input type="text" name="name" required />
+              <input type="text" name="name" defaultValue={seeker?.name || ''} required />
             </div>
 
             <div className="input-group full-width">
               <label>Street Address</label>
-              <input type="text" name="street" />
+              <input type="text" name="street" defaultValue={seeker?.street || ''} />
             </div>
 
             <div className="input-group">
               <label>City <span className="required">*</span></label>
-              <input type="text" name="city" required />
+              <input type="text" name="city" defaultValue={seeker?.city || ''} required />
             </div>
 
             <div className="input-group">
               <label>Zipcode <span className="required">*</span></label>
-              <input type="text" name="zipcode" required />
+              <input type="text" name="zipcode" defaultValue={seeker?.zipcode || ''} required />
             </div>
 
             <div className="input-group">
               <label>Ward</label>
-              <input type="text" name="ward" />
+              <input type="text" name="ward" defaultValue={seeker?.ward || ''} />
             </div>
 
             <div className="input-group">
               <label>Stake</label>
-              <input type="text" name="stake" />
+              <input type="text" name="stake" defaultValue={seeker?.stake || ''} />
             </div>
 
             <div className="input-group">
               <label>Phone</label>
-              <input type="tel" name="phone" />
+              <input type="tel" name="phone" defaultValue={seeker?.phone || ''} />
             </div>
 
             <div className="input-group">
               <label>Email</label>
-              <input type="email" name="email" />
+              <input type="email" name="email" defaultValue={seeker?.email || ''} />
             </div>
 
             <div className="input-group full-width">
               <label>Skills/Education</label>
-              <textarea name="skills_education" rows="3" placeholder="Enter skills and education..."></textarea>
+              <textarea name="skills_education" rows="3" placeholder="Enter skills and education..." defaultValue={seeker?.skills_education || ''}></textarea>
             </div>
 
             <div className="input-group full-width">
               <label>Desired Company Type for employer</label>
-              <select name="job_needed">
+              <select name="job_needed" defaultValue={seeker?.job_needed || ''}>
                 <option value="">Select Type...</option>
                 <option value="Construction">Construction</option>
                 <option value="Driving">Driving</option>
@@ -134,7 +157,13 @@ function JobSeekerEntry({ user }) {
 
             <div className="input-group full-width">
               <label>Desired Job type(s) (Hold Ctrl/Cmd to select multiple)</label>
-              <select name="desired_job_types" multiple size="4">
+              <select 
+                name="desired_job_types" 
+                multiple 
+                size="4" 
+                value={selectedJobTypes} 
+                onChange={e => setSelectedJobTypes(Array.from(e.target.selectedOptions, option => option.value))}
+              >
                 <option value="HVAC Repair">HVAC Repair</option>
                 <option value="Accountant">Accountant</option>
                 <option value="Airport (Baggage/customer service/ground ops)">Airport (Baggage/customer service/ground ops)</option>
@@ -188,26 +217,26 @@ function JobSeekerEntry({ user }) {
 
             <div className="input-group full-width">
               <label>Other Job Type (Not in list)</label>
-              <input type="text" name="other_job_type" placeholder="Enter other job type..." />
+              <input type="text" name="other_job_type" placeholder="Enter other job type..." defaultValue={customSelected} />
             </div>
 
             <div className="input-group full-width">
               <label>General Notes</label>
-              <textarea name="general_notes" rows="3" placeholder="Any additional notes..."></textarea>
+              <textarea name="general_notes" rows="3" placeholder="Any additional notes..." defaultValue={seeker?.general_notes || ''}></textarea>
             </div>
 
             <div className="input-group full-width">
               <label>Employment Center Assistance Requested?</label>
               <div className="checkbox-group">
-                <input type="checkbox" id="resume_assistance" name="resume_assistance" />
+                <input type="checkbox" id="resume_assistance" name="resume_assistance" defaultChecked={seeker?.resume_assistance} />
                 <label htmlFor="resume_assistance" style={{ margin: 0, fontWeight: 400 }}>Resume assistance</label>
               </div>
               <div className="checkbox-group">
-                <input type="checkbox" id="interview_coaching" name="interview_coaching" />
+                <input type="checkbox" id="interview_coaching" name="interview_coaching" defaultChecked={seeker?.interview_coaching} />
                 <label htmlFor="interview_coaching" style={{ margin: 0, fontWeight: 400 }}>Interview coaching</label>
               </div>
               <div className="checkbox-group">
-                <input type="checkbox" id="job_search_assistance" name="job_search_assistance" />
+                <input type="checkbox" id="job_search_assistance" name="job_search_assistance" defaultChecked={seeker?.job_search_assistance} />
                 <label htmlFor="job_search_assistance" style={{ margin: 0, fontWeight: 400 }}>Job Search assistance</label>
               </div>
             </div>
@@ -220,8 +249,24 @@ function JobSeekerEntry({ user }) {
           )}
 
           <div className="actions mt-2 mb-1" style={{ display: 'flex', gap: '1rem' }}>
-            <button type="button" className="btn secondary-btn" onClick={() => navigate(user?.role === 'admin' ? '/admin-dashboard' : '/dashboard')}>Cancel</button>
-            <button type="submit" className="btn primary-btn" disabled={loading}>
+            <button 
+              type="button" 
+              className="btn secondary-btn" 
+              onClick={() => {
+                if (seeker) {
+                  navigate('/job-seeker-search');
+                } else {
+                  navigate(user?.role === 'admin' ? '/admin-dashboard' : '/dashboard');
+                }
+              }}
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              className="btn primary-btn" 
+              disabled={loading || !!seeker}
+            >
               {loading ? 'Submitting...' : 'Submit Job Seeker'}
             </button>
           </div>
