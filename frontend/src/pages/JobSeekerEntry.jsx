@@ -23,6 +23,7 @@ function JobSeekerEntry({ user }) {
   const navigate = useNavigate();
   const location = useLocation();
   const seeker = location.state?.seeker;
+  const fromSearch = location.state?.fromSearch;
 
   const seekerTypes = seeker?.desired_job_types ? seeker.desired_job_types.split(',').map(t => t.trim()) : [];
   const standardSelected = seekerTypes.filter(t => standardOptions.includes(t));
@@ -60,7 +61,12 @@ function JobSeekerEntry({ user }) {
     }
 
     try {
-      const response = await fetch('/api/submit-seeker', {
+      const endpoint = fromSearch ? '/api/update-seeker' : '/api/submit-seeker';
+      if (fromSearch && seeker?.row_index) {
+        data.row_index = seeker.row_index;
+      }
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -68,8 +74,51 @@ function JobSeekerEntry({ user }) {
       const result = await response.json();
       if (result.success) {
         setSuccess(true);
-        setMessage('Job Seeker successfully added!');
-        e.target.reset();
+        setMessage(fromSearch ? 'Job Seeker successfully updated!' : 'Job Seeker successfully added!');
+        
+        if (fromSearch) {
+          // Update the sessionStorage cache so the report has the updated seeker data
+          try {
+            const savedResultsStr = sessionStorage.getItem('seeker_search_results');
+            if (savedResultsStr) {
+              const savedResults = JSON.parse(savedResultsStr);
+              const updateSeekerInList = (list) => {
+                if (!list) return list;
+                return list.map(s => {
+                  if (s.row_index === seeker.row_index) {
+                    return {
+                      ...s,
+                      name: data.name,
+                      street: data.street,
+                      city: data.city,
+                      zipcode: data.zipcode,
+                      ward: data.ward,
+                      stake: data.stake,
+                      phone: data.phone,
+                      email: data.email,
+                      skills_education: data.skills_education,
+                      job_needed: data.job_needed,
+                      desired_job_types: data.desired_job_types.join(', '),
+                      general_notes: data.general_notes,
+                      resume_assistance: data.resume_assistance,
+                      interview_coaching: data.interview_coaching,
+                      job_search_assistance: data.job_search_assistance,
+                      address: [data.street, data.city, data.zipcode].filter(Boolean).join(', ')
+                    };
+                  }
+                  return s;
+                });
+              };
+              if (savedResults.nearby) savedResults.nearby = updateSeekerInList(savedResults.nearby);
+              if (savedResults.other) savedResults.other = updateSeekerInList(savedResults.other);
+              sessionStorage.setItem('seeker_search_results', JSON.stringify(savedResults));
+            }
+          } catch (cacheErr) {
+            console.error('Failed to update search results cache:', cacheErr);
+          }
+        } else {
+          e.target.reset();
+        }
       } else {
         setSuccess(false);
         setMessage(result.error || 'Failed to submit');
@@ -253,21 +302,23 @@ function JobSeekerEntry({ user }) {
               type="button" 
               className="btn secondary-btn" 
               onClick={() => {
-                if (seeker) {
+                if (fromSearch) {
+                  navigate('/job-seeker-search');
+                } else if (seeker) {
                   navigate('/job-seeker-search');
                 } else {
                   navigate(user?.role === 'admin' ? '/admin-dashboard' : '/dashboard');
                 }
               }}
             >
-              Cancel
+              {fromSearch ? 'Return to report' : 'Cancel'}
             </button>
             <button 
               type="submit" 
               className="btn primary-btn" 
-              disabled={loading || !!seeker}
+              disabled={loading || (!!seeker && !fromSearch)}
             >
-              {loading ? 'Submitting...' : 'Submit Job Seeker'}
+              {loading ? 'Submitting...' : (fromSearch ? 'Submit changes' : 'Submit Job Seeker')}
             </button>
           </div>
         </form>

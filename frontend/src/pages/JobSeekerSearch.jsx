@@ -194,7 +194,7 @@ function JobSeekerSearch() {
                         {list.map((seeker, idx) => (
                           <tr key={idx}>
                             <td style={{ fontWeight: 'bold' }}>
-                              <Link to="/job-seeker-entry" state={{ seeker }} style={{ color: 'var(--primary-color)', textDecoration: 'none' }} className="seeker-name-link">
+                              <Link to="/job-seeker-entry" state={{ seeker, fromSearch: true }} style={{ color: 'var(--primary-color)', textDecoration: 'none' }} className="seeker-name-link">
                                 {seeker.name}
                               </Link>
                             </td>
@@ -242,7 +242,7 @@ function JobSeekerSearch() {
                         {list.map((seeker, idx) => (
                           <tr key={idx}>
                             <td style={{ fontWeight: 'bold' }}>
-                              <Link to="/job-seeker-entry" state={{ seeker }} style={{ color: 'var(--primary-color)', textDecoration: 'none' }} className="seeker-name-link">
+                              <Link to="/job-seeker-entry" state={{ seeker, fromSearch: true }} style={{ color: 'var(--primary-color)', textDecoration: 'none' }} className="seeker-name-link">
                                 {seeker.name}
                               </Link>
                             </td>
