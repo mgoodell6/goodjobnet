@@ -1451,6 +1451,9 @@ function HotJobsReview({ user }) {
             <div style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>
               Age: {currentJob.age_days} days
             </div>
+            <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginTop: '2px' }}>
+              Interested Seekers: {currentJob.seekers_looking || '0'}
+            </div>
           </div>
         </header>
 

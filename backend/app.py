@@ -779,7 +779,8 @@ def hot_jobs_review():
                 "available_jobs": row.get("Available Jobs") or row.get("Job Title", ""),
                 "notes": row.get("General Notes") or row.get("Any additional Notes") or row.get("Notes") or row.get("notes", ""),
                 "date_last_verified": date_str,
-                "age_days": age_days
+                "age_days": age_days,
+                "seekers_looking": str(row.get("Number of Job Seekers looking for this type of employment") or "0")
             }
             jobs_to_review.append(job)
                     
