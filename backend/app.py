@@ -157,6 +157,36 @@ def is_loose_match(seeker_job, bank_job):
                 return True
     return False
 
+def matches_name_loose(query_name, seeker_name):
+    import difflib
+    q = str(query_name).lower().strip()
+    s = str(seeker_name).lower().strip()
+    if not q or not s:
+        return False
+    if q in s or s in q:
+        return True
+    
+    q_words = [w for w in q.split() if w]
+    s_words = [w for w in s.split() if w]
+    if not q_words or not s_words:
+        return False
+        
+    all_matched = True
+    for qw in q_words:
+        word_matched = False
+        for sw in s_words:
+            if qw == sw or qw in sw or sw in qw:
+                word_matched = True
+                break
+            if len(qw) >= 3 and len(sw) >= 3:
+                if difflib.SequenceMatcher(None, qw, sw).ratio() >= 0.75:
+                    word_matched = True
+                    break
+        if not word_matched:
+            all_matched = False
+            break
+    return all_matched
+
 # Cached Sheets Helpers
 def get_seekers_records():
     def fetch_seekers():
@@ -1772,6 +1802,7 @@ def search_seekers():
     job_types = data.get("job_types", [])
     address = str(data.get("address", "")).strip()
     radius = data.get("radius", 20)
+    name_query = str(data.get("name", "")).strip()
     
     try:
         radius = float(radius)
@@ -1802,6 +1833,41 @@ def search_seekers():
         
         for idx, seeker in enumerate(seekers_records):
             name = seeker.get(" Name", seeker.get("Name", "Unknown")).strip()
+            
+            # 1. Filter by Name if provided (semi-loose check)
+            if name_query:
+                if not matches_name_loose(name_query, name):
+                    continue
+            
+            # 2. Filter by Job Type if name is not provided
+            else:
+                street = str(seeker.get("Street", "")).strip()
+                city = str(seeker.get("City", "")).strip()
+                zip_val = str(seeker.get("Zip", seeker.get("Zipcode", ""))).strip()
+                
+                if zip_val.endswith('.0'):
+                    zip_val = zip_val[:-2]
+                seeker_zip = zip_val.strip()
+                
+                # Get and parse desired job types
+                seeker_job_types = str(seeker.get("Type of Job Needed", seeker.get("Desired Types", ""))).strip()
+                
+                if job_types and not has_other:
+                    seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
+                    match = False
+                    for req_type in job_types:
+                        if not req_type.strip():
+                            continue
+                        for st in seeker_types_list:
+                            if is_loose_match(st, req_type):
+                                match = True
+                                break
+                        if match:
+                            break
+                    if not match:
+                        continue
+            
+            # Extract seeker location details
             street = str(seeker.get("Street", "")).strip()
             city = str(seeker.get("City", "")).strip()
             zip_val = str(seeker.get("Zip", seeker.get("Zipcode", ""))).strip()
@@ -1821,22 +1887,6 @@ def search_seekers():
             # Get and parse desired job types
             seeker_job_types = str(seeker.get("Type of Job Needed", seeker.get("Desired Types", ""))).strip()
             
-            # Filter by job type (if job_types provided and doesn't contain "Other")
-            if job_types and not has_other:
-                seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
-                match = False
-                for req_type in job_types:
-                    if not req_type.strip():
-                        continue
-                    for st in seeker_types_list:
-                        if is_loose_match(st, req_type):
-                            match = True
-                            break
-                    if match:
-                        break
-                if not match:
-                    continue
-                    
             # Calculate distance
             seeker_zip_5 = seeker_zip[:5] if seeker_zip else ""
             dist_miles = float('inf')
@@ -1879,7 +1929,10 @@ def search_seekers():
             if origin_zip and dist_miles <= radius:
                 nearby.append(seeker_entry)
             else:
-                other.append(seeker_entry)
+                if name_query and not origin_zip:
+                    nearby.append(seeker_entry)
+                else:
+                    other.append(seeker_entry)
                 
         # Sort results by distance
         nearby.sort(key=lambda x: x["distance"] if isinstance(x["distance"], (int, float)) else float('inf'))

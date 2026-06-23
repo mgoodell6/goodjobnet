@@ -151,13 +151,13 @@ function JobSeekerEntry({ user }) {
             </div>
 
             <div className="input-group">
-              <label>City <span className="required">*</span></label>
-              <input type="text" name="city" defaultValue={seeker?.city || ''} required />
+              <label>City</label>
+              <input type="text" name="city" defaultValue={seeker?.city || ''} />
             </div>
 
             <div className="input-group">
-              <label>Zipcode <span className="required">*</span></label>
-              <input type="text" name="zipcode" defaultValue={seeker?.zipcode || ''} required />
+              <label>Zipcode</label>
+              <input type="text" name="zipcode" defaultValue={seeker?.zipcode || ''} />
             </div>
 
             <div className="input-group">
@@ -303,9 +303,9 @@ function JobSeekerEntry({ user }) {
               className="btn secondary-btn" 
               onClick={() => {
                 if (fromSearch) {
-                  navigate('/job-seeker-search');
+                  navigate('/job-seeker-search', { state: { keepResults: true } });
                 } else if (seeker) {
-                  navigate('/job-seeker-search');
+                  navigate('/job-seeker-search', { state: { keepResults: true } });
                 } else {
                   navigate(user?.role === 'admin' ? '/admin-dashboard' : '/dashboard');
                 }
