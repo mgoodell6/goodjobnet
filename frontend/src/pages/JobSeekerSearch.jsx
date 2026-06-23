@@ -1,21 +1,39 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 function JobSeekerSearch() {
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
   
   const [savedInputs, setSavedInputs] = useState(() => {
     const saved = sessionStorage.getItem('seeker_search_inputs');
-    return saved ? JSON.parse(saved) : { job_types: [], address: '', radius: '20', other_job_type: '' };
+    return saved ? JSON.parse(saved) : { name: '', job_types: [], address: '', radius: '20', other_job_type: '' };
   });
 
-  const [results, setResults] = useState(() => {
-    const saved = sessionStorage.getItem('seeker_search_results');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [results, setResults] = useState(null);
+  const [selectedJobTypes, setSelectedJobTypes] = useState(savedInputs.job_types || []);
 
-  const [selectedJobTypes, setSelectedJobTypes] = useState(savedInputs.job_types);
-  const navigate = useNavigate();
+  useEffect(() => {
+    if (location.state?.keepResults) {
+      const savedRes = sessionStorage.getItem('seeker_search_results');
+      if (savedRes) {
+        setResults(JSON.parse(savedRes));
+      }
+      const savedInp = sessionStorage.getItem('seeker_search_inputs');
+      if (savedInp) {
+        const parsedInp = JSON.parse(savedInp);
+        setSavedInputs(parsedInp);
+        setSelectedJobTypes(parsedInp.job_types || []);
+      }
+    } else {
+      sessionStorage.removeItem('seeker_search_results');
+      sessionStorage.removeItem('seeker_search_inputs');
+      setSavedInputs({ name: '', job_types: [], address: '', radius: '20', other_job_type: '' });
+      setSelectedJobTypes([]);
+      setResults(null);
+    }
+  }, [location.state]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -24,9 +42,11 @@ function JobSeekerSearch() {
     const formData = new FormData(e.target);
     const jobTypes = formData.getAll('job_type');
     const otherJobType = formData.get('other_job_type');
+    const name = formData.get('name') || '';
     
     // Store inputs in state & session storage
     const inputs = {
+      name: name,
       job_types: jobTypes,
       address: formData.get('address') || '',
       radius: formData.get('radius') || '20',
@@ -41,6 +61,7 @@ function JobSeekerSearch() {
     }
 
     const data = {
+      name: name,
       job_types: combinedJobTypes,
       address: formData.get('address'),
       radius: formData.get('radius')
@@ -78,6 +99,14 @@ function JobSeekerSearch() {
 
         <form onSubmit={handleSearch}>
           <div className="form-grid">
+            <div className="input-group full-width">
+              <label>Search by Name (Optional - Bypasses job types and location filters)</label>
+              <input type="text" name="name" placeholder="Enter seeker name..." defaultValue={savedInputs.name || ''} />
+              <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginTop: '0.6rem', fontWeight: '500' }}>
+                OR, search by job type(s) and radius from given location
+              </div>
+            </div>
+
             <div className="input-group">
               <label>Job Type (Hold Ctrl/Cmd to select multiple)</label>
               <select 

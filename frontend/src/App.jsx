@@ -14,7 +14,7 @@ import JobSeekerMatchesReport from './pages/JobSeekerMatchesReport';
 
 // Manual Version Configuration - Update this string to change the application version displayed in the header
 
-const APP_VERSION = "Beta v0.14";
+const APP_VERSION = "Beta v0.15";
 
 
 function TopBar({ user, handleLogout }) {

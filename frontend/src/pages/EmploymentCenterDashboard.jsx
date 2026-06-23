@@ -20,6 +20,53 @@ function EmploymentCenterDashboard() {
     unverified_no_career_count: '...'
   });
 
+  const [updating, setUpdating] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState(null);
+
+  const handleUpdateJobSeekerInfo = () => {
+    setUpdating(true);
+    setUpdateStatus(null);
+    fetch('/api/update-jobseeker-info', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        setUpdating(false);
+        if (data.success) {
+          setUpdateStatus({ success: true, message: data.message });
+          fetch('/api/dashboard-stats')
+            .then(res => res.json())
+            .then(statsData => {
+              if (statsData.success) {
+                setStats(prev => ({
+                  ...prev,
+                  total_hot_jobs: statsData.total_hot_jobs,
+                  total_job_seekers: statsData.total_job_seekers,
+                  job_types: statsData.job_types || {},
+                  seeker_types: statsData.seeker_types || {},
+                  expiring_soon: statsData.expiring_soon,
+                  two_years_soon: statsData.two_years_soon,
+                  new_jobs_count: statsData.new_jobs_count,
+                  new_seekers_count: statsData.new_seekers_count,
+                  expired_recently: statsData.expired_recently,
+                  unverified_no_career_count: statsData.unverified_no_career_count
+                }));
+              }
+            });
+        } else {
+          setUpdateStatus({ success: false, message: data.error || 'Failed to update.' });
+        }
+      })
+      .catch(err => {
+        setUpdating(false);
+        setUpdateStatus({ success: false, message: 'Network error occurred.' });
+        console.error('Error updating jobseeker info:', err);
+      });
+  };
+
   useEffect(() => {
     fetch('/api/dashboard-stats')
       .then(res => res.json())
@@ -232,6 +279,31 @@ function EmploymentCenterDashboard() {
             <FaUserTie />
             <h3>Job Seeker Entry</h3>
           </Link>
+        </div>
+
+        <div style={{ marginTop: '2.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            className="btn primary-btn" 
+            onClick={handleUpdateJobSeekerInfo} 
+            disabled={updating}
+            style={{ 
+              maxWidth: '420px', 
+              background: 'linear-gradient(135deg, #2e7d32, #1b5e20)',
+              boxShadow: '0 4px 15px rgba(46, 125, 50, 0.3)'
+            }}
+          >
+            {updating ? 'Updating jobBank jobSeeker information...' : 'Update jobBank jobSeeker information'}
+          </button>
+          {updateStatus && (
+            <p style={{ 
+              fontSize: '0.95rem', 
+              fontWeight: 500, 
+              color: updateStatus.success ? 'var(--success)' : 'var(--error)',
+              marginTop: '0.25rem'
+            }}>
+              {updateStatus.message}
+            </p>
+          )}
         </div>
 
       </div>

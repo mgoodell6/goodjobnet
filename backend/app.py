@@ -109,6 +109,84 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     except (ValueError, TypeError, ZeroDivisionError):
         return float('inf')
 
+# Helper functions for loose job type matching
+def clean_and_tokenize(s):
+    s = str(s).lower().strip()
+    # replace punctuation/separators
+    for char in ['/', '-', '&', '(', ')', '.', ',', '_']:
+        s = s.replace(char, ' ')
+    # normalize spelling
+    s = s.replace("warehouseing", "warehousing")
+    words = s.split()
+    
+    cleaned = []
+    for w in words:
+        # simple stemmer
+        if w.endswith('ies'):
+            w = w[:-3] + 'y'
+        elif w.endswith('ying'):
+            w = w[:-4] + 'y'
+        elif w.endswith('ing'):
+            w = w[:-3]
+        elif w.endswith('ers'):
+            w = w[:-3]
+        elif w.endswith('er'):
+            w = w[:-2]
+        elif w.endswith('es'):
+            w = w[:-2]
+        elif w.endswith('s') and not w.endswith('ss'):
+            w = w[:-1]
+        if len(w) > 1:
+            cleaned.append(w)
+    return cleaned
+
+def is_loose_match(seeker_job, bank_job):
+    seeker_words = clean_and_tokenize(seeker_job)
+    bank_words = clean_and_tokenize(bank_job)
+    
+    if not seeker_words or not bank_words:
+        return False
+        
+    for sw in seeker_words:
+        for jw in bank_words:
+            if sw == jw:
+                return True
+            if len(sw) >= 4 and sw in jw:
+                return True
+            if len(jw) >= 4 and jw in sw:
+                return True
+    return False
+
+def matches_name_loose(query_name, seeker_name):
+    import difflib
+    q = str(query_name).lower().strip()
+    s = str(seeker_name).lower().strip()
+    if not q or not s:
+        return False
+    if q in s or s in q:
+        return True
+    
+    q_words = [w for w in q.split() if w]
+    s_words = [w for w in s.split() if w]
+    if not q_words or not s_words:
+        return False
+        
+    all_matched = True
+    for qw in q_words:
+        word_matched = False
+        for sw in s_words:
+            if qw == sw or qw in sw or sw in qw:
+                word_matched = True
+                break
+            if len(qw) >= 3 and len(sw) >= 3:
+                if difflib.SequenceMatcher(None, qw, sw).ratio() >= 0.75:
+                    word_matched = True
+                    break
+        if not word_matched:
+            all_matched = False
+            break
+    return all_matched
+
 # Cached Sheets Helpers
 def get_seekers_records():
     def fetch_seekers():
@@ -779,7 +857,8 @@ def hot_jobs_review():
                 "available_jobs": row.get("Available Jobs") or row.get("Job Title", ""),
                 "notes": row.get("General Notes") or row.get("Any additional Notes") or row.get("Notes") or row.get("notes", ""),
                 "date_last_verified": date_str,
-                "age_days": age_days
+                "age_days": age_days,
+                "seekers_looking": str(row.get("Number of Job Seekers looking for this type of employment") or "0")
             }
             jobs_to_review.append(job)
                     
@@ -1723,6 +1802,7 @@ def search_seekers():
     job_types = data.get("job_types", [])
     address = str(data.get("address", "")).strip()
     radius = data.get("radius", 20)
+    name_query = str(data.get("name", "")).strip()
     
     try:
         radius = float(radius)
@@ -1753,6 +1833,41 @@ def search_seekers():
         
         for idx, seeker in enumerate(seekers_records):
             name = seeker.get(" Name", seeker.get("Name", "Unknown")).strip()
+            
+            # 1. Filter by Name if provided (semi-loose check)
+            if name_query:
+                if not matches_name_loose(name_query, name):
+                    continue
+            
+            # 2. Filter by Job Type if name is not provided
+            else:
+                street = str(seeker.get("Street", "")).strip()
+                city = str(seeker.get("City", "")).strip()
+                zip_val = str(seeker.get("Zip", seeker.get("Zipcode", ""))).strip()
+                
+                if zip_val.endswith('.0'):
+                    zip_val = zip_val[:-2]
+                seeker_zip = zip_val.strip()
+                
+                # Get and parse desired job types
+                seeker_job_types = str(seeker.get("Type of Job Needed", seeker.get("Desired Types", ""))).strip()
+                
+                if job_types and not has_other:
+                    seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
+                    match = False
+                    for req_type in job_types:
+                        if not req_type.strip():
+                            continue
+                        for st in seeker_types_list:
+                            if is_loose_match(st, req_type):
+                                match = True
+                                break
+                        if match:
+                            break
+                    if not match:
+                        continue
+            
+            # Extract seeker location details
             street = str(seeker.get("Street", "")).strip()
             city = str(seeker.get("City", "")).strip()
             zip_val = str(seeker.get("Zip", seeker.get("Zipcode", ""))).strip()
@@ -1772,20 +1887,6 @@ def search_seekers():
             # Get and parse desired job types
             seeker_job_types = str(seeker.get("Type of Job Needed", seeker.get("Desired Types", ""))).strip()
             
-            # Filter by job type (if job_types provided and doesn't contain "Other")
-            if normalized_req_types and not has_other:
-                seeker_types_list = [normalize(t) for t in seeker_job_types.split(",") if t.strip()]
-                match = False
-                for req_type in normalized_req_types:
-                    for st in seeker_types_list:
-                        if req_type in st or st in req_type:
-                            match = True
-                            break
-                    if match:
-                        break
-                if not match:
-                    continue
-                    
             # Calculate distance
             seeker_zip_5 = seeker_zip[:5] if seeker_zip else ""
             dist_miles = float('inf')
@@ -1816,6 +1917,7 @@ def search_seekers():
                 "skills_education": str(seeker.get("Skills/Education", "")).strip(),
                 "job_needed": str(seeker.get("Company Type", seeker.get("Job Needed", ""))).strip(),
                 "desired_job_types": seeker_job_types,
+                "job_types": seeker_job_types,
                 "general_notes": str(seeker.get("Notes", seeker.get("General Notes", ""))).strip(),
                 "resume_assistance": str(seeker.get("Resume Asst Needed", seeker.get("Resume Asst", seeker.get("Resume assistance", "")))).strip().lower() in ["yes", "true", "on"],
                 "interview_coaching": str(seeker.get("Interview Coach Needed", seeker.get("Interview Coach", seeker.get("Interview coaching", "")))).strip().lower() in ["yes", "true", "on"],
@@ -1827,7 +1929,10 @@ def search_seekers():
             if origin_zip and dist_miles <= radius:
                 nearby.append(seeker_entry)
             else:
-                other.append(seeker_entry)
+                if name_query and not origin_zip:
+                    nearby.append(seeker_entry)
+                else:
+                    other.append(seeker_entry)
                 
         # Sort results by distance
         nearby.sort(key=lambda x: x["distance"] if isinstance(x["distance"], (int, float)) else float('inf'))
@@ -1848,5 +1953,109 @@ def search_seekers():
         garbage_collector.collect()
 
 
+@app.route('/api/update-jobseeker-info', methods=['POST'])
+def update_jobseeker_info():
+    try:
+        gc = get_gsheets_client()
+        try:
+            sh = gc.open_by_key("1NxDQTta3xvch5jn_j-DpWvGg0zRfJhpGnLv9rFQxw6I")
+        except Exception:
+            sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
+            
+        wks = sh.sheet1
+        all_values = wks.get_all_values(include_tailing_empty_rows=False, include_tailing_empty=False)
+        
+        if not all_values or len(all_values) < 1:
+            return jsonify({"success": False, "error": "JobBank spreadsheet is empty."}), 400
+            
+        headers = all_values[0]
+        
+        # Locate or add 'Number of Job Seekers looking for this type of employment' column
+        target_header = "Number of Job Seekers looking for this type of employment"
+        col_idx = -1
+        for i, h in enumerate(headers):
+            if str(h).strip().lower() == target_header.lower():
+                col_idx = i + 1
+                break
+                
+        if col_idx == -1:
+            headers.append(target_header)
+            wks.update_row(1, headers)
+            col_idx = len(headers)
+            
+        # Locate 'Available Jobs' column
+        available_jobs_col_idx = -1
+        possible_job_headers = ["available jobs", "job title", "jobs", "title"]
+        for i, h in enumerate(headers):
+            if str(h).strip().lower() in possible_job_headers:
+                available_jobs_col_idx = i
+                break
+                
+        if available_jobs_col_idx == -1:
+            return jsonify({"success": False, "error": "Could not find 'Available Jobs' column in jobBank spreadsheet."}), 400
+            
+        # Get seekers from Unemployed List spreadsheet
+        try:
+            seekers_records = get_seekers_records()
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Error fetching seekers: {str(e)}"}), 500
+
+        # Calculate matches for each row
+        update_payload = []
+        for row in all_values[1:]:
+            available_jobs_str = ""
+            if available_jobs_col_idx < len(row):
+                available_jobs_str = str(row[available_jobs_col_idx]).strip()
+                
+            match_count = 0
+            if available_jobs_str:
+                jobBank_jobs = [j.strip() for j in available_jobs_str.split(",") if j.strip()]
+                
+                for seeker in seekers_records:
+                    seeker_job_type_str = str(seeker.get("Type of Job Needed", seeker.get("Desired Types", "")))
+                    if seeker_job_type_str:
+                        seeker_jobs = [s.strip() for s in seeker_job_type_str.split(",") if s.strip()]
+                        
+                        matched = False
+                        for s_job in seeker_jobs:
+                            for jb_job in jobBank_jobs:
+                                if is_loose_match(s_job, jb_job):
+                                    matched = True
+                                    break
+                            if matched:
+                                break
+                                
+                        if matched:
+                            match_count += 1
+                            
+            update_payload.append([str(match_count)])
+            
+        # Update the spreadsheet column using batch update starting from row 2
+        def col_idx_to_letter(col):
+            letter = ''
+            while col > 0:
+                col, remainder = divmod(col - 1, 26)
+                letter = chr(65 + remainder) + letter
+            return letter
+            
+        col_letter = col_idx_to_letter(col_idx)
+        range_str = f"{col_letter}2"
+        
+        wks.update_values(crange=range_str, values=update_payload)
+        
+        # Invalidate the cache to ensure the dashboard shows fresh data
+        invalidate_cache('master_jobs_records')
+        invalidate_cache('new_jobs_records')
+        
+        return jsonify({"success": True, "message": f"Successfully updated jobBank jobSeeker counts for {len(update_payload)} rows!"})
+        
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000, host="0.0.0.0")
+
