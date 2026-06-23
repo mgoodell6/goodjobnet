@@ -1761,5 +1761,157 @@ def search_seekers():
         garbage_collector.collect()
 
 
+@app.route('/api/update-jobseeker-info', methods=['POST'])
+def update_jobseeker_info():
+    try:
+        gc = get_gsheets_client()
+        try:
+            sh = gc.open_by_key("1NxDQTta3xvch5jn_j-DpWvGg0zRfJhpGnLv9rFQxw6I")
+        except Exception:
+            sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
+            
+        wks = sh.sheet1
+        all_values = wks.get_all_values(include_tailing_empty_rows=False, include_tailing_empty=False)
+        
+        if not all_values or len(all_values) < 1:
+            return jsonify({"success": False, "error": "JobBank spreadsheet is empty."}), 400
+            
+        headers = all_values[0]
+        
+        # Locate or add 'Number of Job Seekers looking for this type of employment' column
+        target_header = "Number of Job Seekers looking for this type of employment"
+        col_idx = -1
+        for i, h in enumerate(headers):
+            if str(h).strip().lower() == target_header.lower():
+                col_idx = i + 1
+                break
+                
+        if col_idx == -1:
+            headers.append(target_header)
+            wks.update_row(1, headers)
+            col_idx = len(headers)
+            
+        # Locate 'Available Jobs' column
+        available_jobs_col_idx = -1
+        possible_job_headers = ["available jobs", "job title", "jobs", "title"]
+        for i, h in enumerate(headers):
+            if str(h).strip().lower() in possible_job_headers:
+                available_jobs_col_idx = i
+                break
+                
+        if available_jobs_col_idx == -1:
+            return jsonify({"success": False, "error": "Could not find 'Available Jobs' column in jobBank spreadsheet."}), 400
+            
+        # Get seekers from Unemployed List spreadsheet
+        try:
+            seekers_records = get_seekers_records()
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Error fetching seekers: {str(e)}"}), 500
+            
+        # Helper function for loose matching
+        def clean_and_tokenize(s):
+            s = str(s).lower().strip()
+            # replace punctuation/separators
+            for char in ['/', '-', '&', '(', ')', '.', ',', '_']:
+                s = s.replace(char, ' ')
+            # normalize spelling
+            s = s.replace("warehouseing", "warehousing")
+            words = s.split()
+            
+            cleaned = []
+            for w in words:
+                # simple stemmer
+                if w.endswith('ies'):
+                    w = w[:-3] + 'y'
+                elif w.endswith('ying'):
+                    w = w[:-4] + 'y'
+                elif w.endswith('ing'):
+                    w = w[:-3]
+                elif w.endswith('ers'):
+                    w = w[:-3]
+                elif w.endswith('er'):
+                    w = w[:-2]
+                elif w.endswith('es'):
+                    w = w[:-2]
+                elif w.endswith('s') and not w.endswith('ss'):
+                    w = w[:-1]
+                if len(w) > 1:
+                    cleaned.append(w)
+            return cleaned
+
+        def is_loose_match(seeker_job, bank_job):
+            seeker_words = clean_and_tokenize(seeker_job)
+            bank_words = clean_and_tokenize(bank_job)
+            
+            if not seeker_words or not bank_words:
+                return False
+                
+            for sw in seeker_words:
+                for jw in bank_words:
+                    if sw == jw:
+                        return True
+                    if len(sw) >= 4 and sw in jw:
+                        return True
+                    if len(jw) >= 4 and jw in sw:
+                        return True
+            return False
+
+        # Calculate matches for each row
+        update_payload = []
+        for row in all_values[1:]:
+            available_jobs_str = ""
+            if available_jobs_col_idx < len(row):
+                available_jobs_str = str(row[available_jobs_col_idx]).strip()
+                
+            match_count = 0
+            if available_jobs_str:
+                jobBank_jobs = [j.strip() for j in available_jobs_str.split(",") if j.strip()]
+                
+                for seeker in seekers_records:
+                    seeker_job_type_str = str(seeker.get("Type of Job Needed", seeker.get("Desired Types", "")))
+                    if seeker_job_type_str:
+                        seeker_jobs = [s.strip() for s in seeker_job_type_str.split(",") if s.strip()]
+                        
+                        matched = False
+                        for s_job in seeker_jobs:
+                            for jb_job in jobBank_jobs:
+                                if is_loose_match(s_job, jb_job):
+                                    matched = True
+                                    break
+                            if matched:
+                                break
+                                
+                        if matched:
+                            match_count += 1
+                            
+            update_payload.append([str(match_count)])
+            
+        # Update the spreadsheet column using batch update starting from row 2
+        def col_idx_to_letter(col):
+            letter = ''
+            while col > 0:
+                col, remainder = divmod(col - 1, 26)
+                letter = chr(65 + remainder) + letter
+            return letter
+            
+        col_letter = col_idx_to_letter(col_idx)
+        range_str = f"{col_letter}2"
+        
+        wks.update_values(crange=range_str, values=update_payload)
+        
+        # Invalidate the cache to ensure the dashboard shows fresh data
+        invalidate_cache('master_jobs_records')
+        invalidate_cache('new_jobs_records')
+        
+        return jsonify({"success": True, "message": f"Successfully updated jobBank jobSeeker counts for {len(update_payload)} rows!"})
+        
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000, host="0.0.0.0")
+
