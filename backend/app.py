@@ -109,6 +109,54 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     except (ValueError, TypeError, ZeroDivisionError):
         return float('inf')
 
+# Helper functions for loose job type matching
+def clean_and_tokenize(s):
+    s = str(s).lower().strip()
+    # replace punctuation/separators
+    for char in ['/', '-', '&', '(', ')', '.', ',', '_']:
+        s = s.replace(char, ' ')
+    # normalize spelling
+    s = s.replace("warehouseing", "warehousing")
+    words = s.split()
+    
+    cleaned = []
+    for w in words:
+        # simple stemmer
+        if w.endswith('ies'):
+            w = w[:-3] + 'y'
+        elif w.endswith('ying'):
+            w = w[:-4] + 'y'
+        elif w.endswith('ing'):
+            w = w[:-3]
+        elif w.endswith('ers'):
+            w = w[:-3]
+        elif w.endswith('er'):
+            w = w[:-2]
+        elif w.endswith('es'):
+            w = w[:-2]
+        elif w.endswith('s') and not w.endswith('ss'):
+            w = w[:-1]
+        if len(w) > 1:
+            cleaned.append(w)
+    return cleaned
+
+def is_loose_match(seeker_job, bank_job):
+    seeker_words = clean_and_tokenize(seeker_job)
+    bank_words = clean_and_tokenize(bank_job)
+    
+    if not seeker_words or not bank_words:
+        return False
+        
+    for sw in seeker_words:
+        for jw in bank_words:
+            if sw == jw:
+                return True
+            if len(sw) >= 4 and sw in jw:
+                return True
+            if len(jw) >= 4 and jw in sw:
+                return True
+    return False
+
 # Cached Sheets Helpers
 def get_seekers_records():
     def fetch_seekers():
@@ -1774,12 +1822,14 @@ def search_seekers():
             seeker_job_types = str(seeker.get("Type of Job Needed", seeker.get("Desired Types", ""))).strip()
             
             # Filter by job type (if job_types provided and doesn't contain "Other")
-            if normalized_req_types and not has_other:
-                seeker_types_list = [normalize(t) for t in seeker_job_types.split(",") if t.strip()]
+            if job_types and not has_other:
+                seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
                 match = False
-                for req_type in normalized_req_types:
+                for req_type in job_types:
+                    if not req_type.strip():
+                        continue
                     for st in seeker_types_list:
-                        if req_type in st or st in req_type:
+                        if is_loose_match(st, req_type):
                             match = True
                             break
                     if match:
@@ -1817,6 +1867,7 @@ def search_seekers():
                 "skills_education": str(seeker.get("Skills/Education", "")).strip(),
                 "job_needed": str(seeker.get("Company Type", seeker.get("Job Needed", ""))).strip(),
                 "desired_job_types": seeker_job_types,
+                "job_types": seeker_job_types,
                 "general_notes": str(seeker.get("Notes", seeker.get("General Notes", ""))).strip(),
                 "resume_assistance": str(seeker.get("Resume Asst Needed", seeker.get("Resume Asst", seeker.get("Resume assistance", "")))).strip().lower() in ["yes", "true", "on"],
                 "interview_coaching": str(seeker.get("Interview Coach Needed", seeker.get("Interview Coach", seeker.get("Interview coaching", "")))).strip().lower() in ["yes", "true", "on"],
@@ -1895,54 +1946,6 @@ def update_jobseeker_info():
             seekers_records = get_seekers_records()
         except Exception as e:
             return jsonify({"success": False, "error": f"Error fetching seekers: {str(e)}"}), 500
-            
-        # Helper function for loose matching
-        def clean_and_tokenize(s):
-            s = str(s).lower().strip()
-            # replace punctuation/separators
-            for char in ['/', '-', '&', '(', ')', '.', ',', '_']:
-                s = s.replace(char, ' ')
-            # normalize spelling
-            s = s.replace("warehouseing", "warehousing")
-            words = s.split()
-            
-            cleaned = []
-            for w in words:
-                # simple stemmer
-                if w.endswith('ies'):
-                    w = w[:-3] + 'y'
-                elif w.endswith('ying'):
-                    w = w[:-4] + 'y'
-                elif w.endswith('ing'):
-                    w = w[:-3]
-                elif w.endswith('ers'):
-                    w = w[:-3]
-                elif w.endswith('er'):
-                    w = w[:-2]
-                elif w.endswith('es'):
-                    w = w[:-2]
-                elif w.endswith('s') and not w.endswith('ss'):
-                    w = w[:-1]
-                if len(w) > 1:
-                    cleaned.append(w)
-            return cleaned
-
-        def is_loose_match(seeker_job, bank_job):
-            seeker_words = clean_and_tokenize(seeker_job)
-            bank_words = clean_and_tokenize(bank_job)
-            
-            if not seeker_words or not bank_words:
-                return False
-                
-            for sw in seeker_words:
-                for jw in bank_words:
-                    if sw == jw:
-                        return True
-                    if len(sw) >= 4 and sw in jw:
-                        return True
-                    if len(jw) >= 4 and jw in sw:
-                        return True
-            return False
 
         # Calculate matches for each row
         update_payload = []
