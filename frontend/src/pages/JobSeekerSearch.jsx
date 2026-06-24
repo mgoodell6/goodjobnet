@@ -1,5 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+
+const JOB_OPTIONS = [
+  "HVAC Repair", "Accountant", "Airport (Baggage/customer service/ground ops)",
+  "Auto Parts", "Car Wash Attendant", "Cashier", "Catering", "CDL Driver",
+  "Cement Mason/finisher", "Computer / IT", "Computer Programmer", "Construction",
+  "Corrections", "Custodian", "Customer service", "Data Entry", "Day Care / Preschool",
+  "Delivery Driver", "Drywaller", "Educator", "Electrician", "Engineering",
+  "Event Staff", "Fast food", "Gas Station Attendant", "Grocery Store",
+  "Healthcare", "Hotel/Hospitality", "Housekeeper", "Information Technology (IT)",
+  "Landscaping", "Manager (Department/Project)", "Manager (Store/Crew)", "Mechanic",
+  "Manufacturing", "Nursing", "Painter", "Pest Control", "Plumbing",
+  "Restaurant (Cook/Waiter/Host)", "Retail", "Sales", "Security", "Stocking",
+  "Telephone/Call Center/Scheduling", "Theme Park", "Trucking/Transportation",
+  "Warehousing/Logistics"
+];
 
 function JobSeekerSearch() {
   const [loading, setLoading] = useState(false);
@@ -14,57 +29,32 @@ function JobSeekerSearch() {
   const [results, setResults] = useState(null);
   const [selectedJobTypes, setSelectedJobTypes] = useState(savedInputs.job_types || []);
 
-  useEffect(() => {
-    if (location.state?.keepResults) {
-      const savedRes = sessionStorage.getItem('seeker_search_results');
-      if (savedRes) {
-        setResults(JSON.parse(savedRes));
-      }
-      const savedInp = sessionStorage.getItem('seeker_search_inputs');
-      if (savedInp) {
-        const parsedInp = JSON.parse(savedInp);
-        setSavedInputs(parsedInp);
-        setSelectedJobTypes(parsedInp.job_types || []);
-      }
-    } else {
-      sessionStorage.removeItem('seeker_search_results');
-      sessionStorage.removeItem('seeker_search_inputs');
-      setSavedInputs({ name: '', job_types: [], address: '', radius: '20', other_job_type: '' });
-      setSelectedJobTypes([]);
-      setResults(null);
-    }
-  }, [location.state]);
-
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  const performSearch = useCallback(async (searchParams) => {
     setLoading(true);
-
-    const formData = new FormData(e.target);
-    const jobTypes = formData.getAll('job_type');
-    const otherJobType = formData.get('other_job_type');
-    const name = formData.get('name') || '';
     
     // Store inputs in state & session storage
     const inputs = {
-      name: name,
-      job_types: jobTypes,
-      address: formData.get('address') || '',
-      radius: formData.get('radius') || '20',
-      other_job_type: otherJobType || ''
+      name: searchParams.name || '',
+      job_types: searchParams.job_types || [],
+      address: searchParams.address || '',
+      radius: searchParams.radius || '20',
+      other_job_type: searchParams.other_job_type || ''
     };
     setSavedInputs(inputs);
+    setSelectedJobTypes(inputs.job_types);
     sessionStorage.setItem('seeker_search_inputs', JSON.stringify(inputs));
 
-    const combinedJobTypes = [...jobTypes];
-    if (otherJobType && otherJobType.trim() !== '') {
-      combinedJobTypes.push(otherJobType.trim());
+    const combinedJobTypes = [...inputs.job_types];
+    if (inputs.other_job_type && inputs.other_job_type.trim() !== '') {
+      const extraTypes = inputs.other_job_type.split(',').map(s => s.trim()).filter(Boolean);
+      combinedJobTypes.push(...extraTypes);
     }
 
     const data = {
-      name: name,
+      name: inputs.name,
       job_types: combinedJobTypes,
-      address: formData.get('address'),
-      radius: formData.get('radius')
+      address: inputs.address,
+      radius: inputs.radius
     };
 
     try {
@@ -87,6 +77,68 @@ function JobSeekerSearch() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (location.state?.autoSearch) {
+      sessionStorage.removeItem('seeker_search_results');
+      sessionStorage.removeItem('seeker_search_inputs');
+
+      const allJobTypes = location.state.jobTypes || [];
+      const matched = allJobTypes.filter(j => JOB_OPTIONS.includes(j));
+      const unmatched = allJobTypes.filter(j => !JOB_OPTIONS.includes(j));
+
+      const searchParams = {
+        name: '',
+        job_types: matched,
+        address: location.state.address || '',
+        radius: '20',
+        other_job_type: unmatched.join(', ')
+      };
+
+      setTimeout(() => {
+        performSearch(searchParams);
+      }, 0);
+    } else if (location.state?.keepResults) {
+      const savedRes = sessionStorage.getItem('seeker_search_results');
+      const savedInp = sessionStorage.getItem('seeker_search_inputs');
+      setTimeout(() => {
+        if (savedRes) {
+          setResults(JSON.parse(savedRes));
+        }
+        if (savedInp) {
+          const parsedInp = JSON.parse(savedInp);
+          setSavedInputs(parsedInp);
+          setSelectedJobTypes(parsedInp.job_types || []);
+        }
+      }, 0);
+    } else {
+      sessionStorage.removeItem('seeker_search_results');
+      sessionStorage.removeItem('seeker_search_inputs');
+      setTimeout(() => {
+        setSavedInputs({ name: '', job_types: [], address: '', radius: '20', other_job_type: '' });
+        setSelectedJobTypes([]);
+        setResults(null);
+      }, 0);
+    }
+  }, [location.state, performSearch]);
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const jobTypes = formData.getAll('job_type');
+    const otherJobType = formData.get('other_job_type') || '';
+    const name = formData.get('name') || '';
+    const address = formData.get('address') || '';
+    const radius = formData.get('radius') || '20';
+
+    await performSearch({
+      name,
+      job_types: jobTypes,
+      address,
+      radius,
+      other_job_type: otherJobType
+    });
   };
 
   return (
@@ -116,54 +168,9 @@ function JobSeekerSearch() {
                 value={selectedJobTypes}
                 onChange={e => setSelectedJobTypes(Array.from(e.target.selectedOptions, opt => opt.value))}
               >
-                <option value="HVAC Repair">HVAC Repair</option>
-                <option value="Accountant">Accountant</option>
-                <option value="Airport (Baggage/customer service/ground ops)">Airport (Baggage/customer service/ground ops)</option>
-                <option value="Auto Parts">Auto Parts</option>
-                <option value="Car Wash Attendant">Car Wash Attendant</option>
-                <option value="Cashier">Cashier</option>
-                <option value="Catering">Catering</option>
-                <option value="CDL Driver">CDL Driver</option>
-                <option value="Cement Mason/finisher">Cement Mason/finisher</option>
-                <option value="Computer / IT">Computer / IT</option>
-                <option value="Computer Programmer">Computer Programmer</option>
-                <option value="Construction">Construction</option>
-                <option value="Corrections">Corrections</option>
-                <option value="Custodian">Custodian</option>
-                <option value="Customer service">Customer service</option>
-                <option value="Data Entry">Data Entry</option>
-                <option value="Day Care / Preschool">Day Care/ Preschool</option>
-                <option value="Delivery Driver">Delivery Driver</option>
-                <option value="Drywaller">Drywaller</option>
-                <option value="Educator">Educator</option>
-                <option value="Electrician">Electrician</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Event Staff">Event Staff</option>
-                <option value="Fast food">Fast food</option>
-                <option value="Gas Station Attendant">Gas Station Attendant</option>
-                <option value="Grocery Store">Grocery Store</option>
-                <option value="Healthcare">Healthcare</option>
-                <option value="Hotel/Hospitality">Hotel/Hospitality</option>
-                <option value="Housekeeper">Housekeeper</option>
-                <option value="Information Technology (IT)">Information Technology (IT)</option>
-                <option value="Landscaping">Landscaping</option>
-                <option value="Manager (Department/Project)">Manager (Department/Project)</option>
-                <option value="Manager (Store/Crew)">Manager (Store/Crew)</option>
-                <option value="Mechanic">Mechanic</option>
-                <option value="Manufacturing">Manufacturing</option>
-                <option value="Nursing">Nursing</option>
-                <option value="Painter">Painter</option>
-                <option value="Pest Control">Pest Control</option>
-                <option value="Plumbing">Plumbing</option>
-                <option value="Restaurant (Cook/Waiter/Host)">Restaurant (Cook/Waiter/Host)</option>
-                <option value="Retail">Retail</option>
-                <option value="Sales">Sales</option>
-                <option value="Security">Security</option>
-                <option value="Stocking">Stocking</option>
-                <option value="Telephone/Call Center/Scheduling">Telephone/Call Center/Scheduling</option>
-                <option value="Theme Park">Theme Park</option>
-                <option value="Trucking/Transportation">Trucking/Transportation</option>
-                <option value="Warehousing/Logistics">Warehousing/Logistics</option>
+                {JOB_OPTIONS.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
               </select>
             </div>
 
