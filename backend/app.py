@@ -187,26 +187,42 @@ def matches_name_loose(query_name, seeker_name):
             break
     return all_matched
 
+def rows_to_dicts(headers, data_rows):
+    header_indices = {}
+    for idx, h in enumerate(headers):
+        if not h or not str(h).strip():
+            continue
+        h_clean = str(h).strip()
+        if h_clean not in header_indices:
+            header_indices[h_clean] = idx
+            
+    records = []
+    for row in data_rows:
+        record = {}
+        for h_name, col_idx in header_indices.items():
+            if col_idx < len(row):
+                val = str(row[col_idx]).strip()
+                if val.lower() == 'nan':
+                    val = ""
+                record[h_name] = val
+            else:
+                record[h_name] = ""
+        records.append(record)
+    return records
+
 # Cached Sheets Helpers
 def get_seekers_records():
     def fetch_seekers():
-        records = []
         # 1. Try opening via pygsheets and service account (preferred)
         try:
             gc = get_gsheets_client()
             sh = gc.open_by_key("1Ye9hgTVuqUtV8CQhFwLzZzCBz4E26otvJbjiVYRySJ0")
             wks = sh.sheet1
-            raw_records = wks.get_all_records()
-            for row in raw_records:
-                cleaned_row = {}
-                for k, v in row.items():
-                    if k is None or k == "":
-                        continue
-                    val = str(v).strip() if v is not None else ""
-                    if val.lower() == 'nan':
-                        val = ""
-                    cleaned_row[k] = val
-                records.append(cleaned_row)
+            all_values = wks.get_all_values(include_tailing_empty_rows=False, include_tailing_empty=False)
+            if not all_values:
+                return []
+            headers = all_values[0]
+            records = rows_to_dicts(headers, all_values[1:])
             print(f"Successfully fetched {len(records)} seekers via pygsheets")
             return records
         except Exception as e:
@@ -218,17 +234,12 @@ def get_seekers_records():
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=10) as response:
                 csv_data = response.read().decode('utf-8')
-            reader = csv.DictReader(io.StringIO(csv_data))
-            for row in reader:
-                cleaned_row = {}
-                for k, v in row.items():
-                    if k is None or k == "":
-                        continue
-                    val = str(v).strip() if v is not None else ""
-                    if val.lower() == 'nan':
-                        val = ""
-                    cleaned_row[k] = val
-                records.append(cleaned_row)
+            reader = csv.reader(io.StringIO(csv_data))
+            all_values = list(reader)
+            if not all_values:
+                return []
+            headers = all_values[0]
+            records = rows_to_dicts(headers, all_values[1:])
             print(f"Successfully fetched {len(records)} seekers via fallback CSV URL")
             return records
         except Exception as e2:

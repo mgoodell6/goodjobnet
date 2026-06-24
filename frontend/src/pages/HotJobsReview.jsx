@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { FaMicrophone, FaVolumeUp, FaPhone, FaArrowLeft, FaArrowRight, FaSave, FaExclamationTriangle } from 'react-icons/fa';
 
 const JOB_OPTIONS = [
@@ -1451,8 +1451,18 @@ function HotJobsReview({ user }) {
             <div style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>
               Age: {currentJob.age_days} days
             </div>
-            <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginTop: '2px' }}>
-              Interested Seekers: {currentJob.seekers_looking || '0'}
+            <div style={{ fontSize: '0.9rem', marginTop: '2px' }}>
+              <Link
+                to="/job-seeker-search"
+                state={{
+                  autoSearch: true,
+                  jobTypes: (currentJob.available_jobs || '').split(',').map(s => s.trim()).filter(Boolean),
+                  address: ''
+                }}
+                className="interested-seekers-link"
+              >
+                Interested Seekers: {currentJob.seekers_looking || '0'}
+              </Link>
             </div>
           </div>
         </header>

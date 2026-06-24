@@ -595,3 +595,20 @@ select[multiple]::-webkit-scrollbar-thumb:hover,
   color: var(--primary-color);
   transform: translateX(4px);
 }
+
+/* Interested Seekers Hyperlink */
+.interested-seekers-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: var(--transition);
+}
+
+.interested-seekers-link:hover {
+  text-decoration: underline;
+  opacity: 0.85;
+}
+
