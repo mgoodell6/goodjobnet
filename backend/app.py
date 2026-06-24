@@ -151,6 +151,9 @@ def is_loose_match(seeker_job, bank_job):
         for jw in bank_words:
             if sw == jw:
                 return True
+            # Refined check to avoid common false positives from generic words
+            if sw in ['care', 'house', 'part'] or jw in ['care', 'house', 'part']:
+                continue
             if len(sw) >= 4 and sw in jw:
                 return True
             if len(jw) >= 4 and jw in sw:
