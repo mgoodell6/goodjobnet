@@ -1768,11 +1768,13 @@ def analyze_resume():
     target_job = data.get("target_job", "")
 
     prompt = f"""
-    You are an expert career coach. Analyze the following resume:
+    You are an expert career coach. Analyze the following resume against this job description.
     ---
+    Resume:
     {resume_text}
     ---
-    Target Job/Industry: {target_job}
+    Job Description: 
+    {target_job}
     
     Provide structured feedback. Suggest actionable, high-impact bullet point rewrites.
     """
@@ -1798,10 +1800,60 @@ def analyze_resume():
             response_text = response_text[:-3]
         
         analysis_result = json.loads(response_text)
+        
+        # Override scores with deterministic ATS calculation
+        import re
+        stop_words = set(['and', 'or', 'the', 'is', 'in', 'to', 'of', 'for', 'a', 'an', 'with', 'on', 'as', 'by', 'that', 'this', 'are', 'be', 'at', 'it', 'from', 'your', 'you', 'will', 'have', 'we', 'our'])
+        jd_words = re.findall(r'\b[a-zA-Z]{3,}\b', target_job.lower())
+        keywords = set([w for w in jd_words if w not in stop_words])
+        
+        if keywords:
+            resume_lower = resume_text.lower()
+            matches = sum(1 for kw in keywords if kw in resume_lower)
+            score = int(40 + (matches / len(keywords)) * 60)
+            score = min(100, max(0, score))
+            analysis_result['overall_score'] = score
+            analysis_result['impact_score'] = score
+        else:
+            analysis_result['overall_score'] = 50
+            analysis_result['impact_score'] = 50
+            
         return jsonify({"success": True, "analysis": analysis_result})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/resume/create', methods=['POST'])
+def create_resume():
+    data = request.json or {}
+    education = data.get("education", "")
+    experience = data.get("experience", "")
+    skills = data.get("skills", "")
+    target_job = data.get("target_job", "")
+    
+    prompt = f"""
+    You are an expert resume writer. Generate a professional resume based on the following details.
+    Format the resume clearly using standard text/markdown formatting (not JSON).
+    
+    Education: {education}
+    Experience: {experience}
+    Skills: {skills}
+    Target Job Description: {target_job}
+    
+    Make it sound highly professional, tailored to the target job description, and use impactful bullet points.
+    """
+    
+    try:
+        completion = client.chat.completions.create(
+            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            messages=[
+                {"role": "system", "content": "You are a professional resume writer. Reply with ONLY the generated resume text."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        reply = completion.choices[0].message.content.strip()
+        return jsonify({"success": True, "resume": reply})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/resume/chat', methods=['POST'])
 def resume_chat():

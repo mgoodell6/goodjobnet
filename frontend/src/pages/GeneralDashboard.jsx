@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FaBriefcase, FaUserTie, FaMapMarkedAlt, FaSearch } from 'react-icons/fa';
+import { FaBriefcase, FaUserTie, FaMapMarkedAlt, FaSearch, FaFileAlt } from 'react-icons/fa';
 
 function GeneralDashboard() {
   return (
@@ -34,6 +34,10 @@ function GeneralDashboard() {
           <Link to="/job-seeker-entry" className="nav-card">
             <FaUserTie />
             <h3>Job Seeker Entry</h3>
+          </Link>
+          <Link to="/resume-coach" className="nav-card">
+            <FaFileAlt />
+            <h3>Virtual Resume Coach</h3>
           </Link>
         </div>
 

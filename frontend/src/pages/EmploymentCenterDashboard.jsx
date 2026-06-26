@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { FaBriefcase, FaUserTie, FaSearch } from 'react-icons/fa';
+import { FaBriefcase, FaUserTie, FaSearch, FaFileAlt } from 'react-icons/fa';
 import { useState, useEffect } from 'react';
 
 function EmploymentCenterDashboard() {
@@ -225,6 +225,10 @@ function EmploymentCenterDashboard() {
           <Link to="/job-seeker-entry" className="nav-card">
             <FaUserTie />
             <h3>Job Seeker Entry</h3>
+          </Link>
+          <Link to="/resume-coach" className="nav-card">
+            <FaFileAlt />
+            <h3>Virtual Resume Coach</h3>
           </Link>
         </div>
 

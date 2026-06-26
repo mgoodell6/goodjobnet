@@ -2,8 +2,12 @@ import { useState } from 'react';
 import { FaUpload, FaFileAlt, FaCheck, FaComments, FaChartPie, FaPaperPlane } from 'react-icons/fa';
 
 function ResumeCoach() {
+  const [mode, setMode] = useState("review"); // 'review' or 'create'
   const [resumeText, setResumeText] = useState("");
   const [targetJob, setTargetJob] = useState("");
+  const [education, setEducation] = useState("");
+  const [experience, setExperience] = useState("");
+  const [skills, setSkills] = useState("");
   const [analysis, setAnalysis] = useState(null);
   const [activeTab, setActiveTab] = useState("analysis"); // analysis, suggestions, chat
   const [chatMessages, setChatMessages] = useState([]);
@@ -58,6 +62,33 @@ function ResumeCoach() {
     } catch (error) {
       console.error(error);
       alert("Error running analysis.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateResume = async () => {
+    if (!targetJob.trim()) {
+      alert("Please enter a Job Description.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch('/api/resume/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ education, experience, skills, target_job: targetJob })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setResumeText(data.resume);
+        setMode("review");
+      } else {
+        alert("Failed to create resume: " + data.error);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error generating resume.");
     } finally {
       setLoading(false);
     }
@@ -121,34 +152,75 @@ function ResumeCoach() {
           
           {/* Left Side: Editor */}
           <div className="editor-section" style={{ display: 'flex', flexDirection: 'column' }}>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>Resume Editor</h2>
-            <div className="form-grid" style={{ gridTemplateColumns: '1fr', marginBottom: '1rem' }}>
-              <div className="input-group">
-                <label>Target Role / Industry (Optional)</label>
-                <input 
-                  type="text" 
-                  value={targetJob} 
-                  onChange={e => setTargetJob(e.target.value)} 
-                  placeholder="e.g. Warehouse Associate, Nurse, etc." 
-                />
-              </div>
-              <div className="input-group">
-                <label>Upload Resume</label>
-                <label className="btn secondary-btn" style={{ display: 'flex', gap: '0.5rem', cursor: 'pointer', justifyContent: 'center' }}>
-                  <FaUpload /> Choose File (.pdf, .txt, .docx)
-                  <input type="file" accept=".pdf,.txt,.docx" onChange={handleFileUpload} style={{ display: 'none' }} />
-                </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ fontSize: '1.5rem', color: 'var(--primary-color)', margin: 0 }}>Resume Editor</h2>
+              <div className="toggle-group" style={{ display: 'flex', gap: '0.5rem', background: '#f1f5f9', padding: '0.25rem', borderRadius: '8px' }}>
+                <button 
+                  className={`btn ${mode === 'review' ? 'primary-btn' : 'secondary-btn'}`}
+                  style={{ padding: '0.4rem 1rem', border: 'none', background: mode === 'review' ? 'white' : 'transparent', color: mode === 'review' ? 'var(--primary-color)' : '#64748b', boxShadow: mode === 'review' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer' }}
+                  onClick={() => setMode('review')}
+                >Review</button>
+                <button 
+                  className={`btn ${mode === 'create' ? 'primary-btn' : 'secondary-btn'}`}
+                  style={{ padding: '0.4rem 1rem', border: 'none', background: mode === 'create' ? 'white' : 'transparent', color: mode === 'create' ? 'var(--primary-color)' : '#64748b', boxShadow: mode === 'create' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer' }}
+                  onClick={() => setMode('create')}
+                >Create</button>
               </div>
             </div>
-            <textarea 
-              value={resumeText} 
-              onChange={e => setResumeText(e.target.value)} 
-              placeholder="Paste your resume text here, or upload a file above..." 
-              style={{ width: '100%', flexGrow: 1, minHeight: '400px', resize: 'vertical', padding: '1rem', fontFamily: 'monospace' }}
-            />
-            <button className="btn primary-btn mt-2" onClick={runAnalysis} disabled={loading}>
-              {loading ? "Processing..." : "Analyze Resume"}
-            </button>
+
+            {mode === 'review' ? (
+              <>
+                <div className="form-grid" style={{ gridTemplateColumns: '1fr', marginBottom: '1rem' }}>
+                  <div className="input-group">
+                    <label>Job Description</label>
+                    <textarea 
+                      value={targetJob} 
+                      onChange={e => setTargetJob(e.target.value)} 
+                      placeholder="Paste the target job description here..." 
+                      style={{ width: '100%', minHeight: '80px', resize: 'vertical', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label>Upload Resume</label>
+                    <label className="btn secondary-btn" style={{ display: 'flex', gap: '0.5rem', cursor: 'pointer', justifyContent: 'center' }}>
+                      <FaUpload /> Choose File (.pdf, .txt, .docx)
+                      <input type="file" accept=".pdf,.txt,.docx" onChange={handleFileUpload} style={{ display: 'none' }} />
+                    </label>
+                  </div>
+                </div>
+                <textarea 
+                  value={resumeText} 
+                  onChange={e => setResumeText(e.target.value)} 
+                  placeholder="Paste your resume text here, or upload a file above..." 
+                  style={{ width: '100%', flexGrow: 1, minHeight: '300px', resize: 'vertical', padding: '1rem', fontFamily: 'monospace', border: '1px solid #ccc', borderRadius: '6px' }}
+                />
+                <button className="btn primary-btn mt-2" onClick={runAnalysis} disabled={loading}>
+                  {loading ? "Processing..." : "Analyze Resume"}
+                </button>
+              </>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flexGrow: 1, overflowY: 'auto', paddingRight: '0.5rem' }}>
+                <div className="input-group">
+                  <label>Education</label>
+                  <textarea value={education} onChange={e => setEducation(e.target.value)} placeholder="E.g., B.S. Computer Science, XYZ University, 2020" style={{ width: '100%', minHeight: '60px', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }} />
+                </div>
+                <div className="input-group">
+                  <label>Experience</label>
+                  <textarea value={experience} onChange={e => setExperience(e.target.value)} placeholder="List your work history..." style={{ width: '100%', minHeight: '120px', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }} />
+                </div>
+                <div className="input-group">
+                  <label>Skills</label>
+                  <textarea value={skills} onChange={e => setSkills(e.target.value)} placeholder="E.g., JavaScript, React, Leadership..." style={{ width: '100%', minHeight: '60px', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }} />
+                </div>
+                <div className="input-group">
+                  <label>Job Description</label>
+                  <textarea value={targetJob} onChange={e => setTargetJob(e.target.value)} placeholder="Paste the target job description here..." style={{ width: '100%', minHeight: '100px', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }} />
+                </div>
+                <button className="btn primary-btn" onClick={generateResume} disabled={loading}>
+                  {loading ? "Generating..." : "Generate Resume"}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right Side: AI Assistant */}

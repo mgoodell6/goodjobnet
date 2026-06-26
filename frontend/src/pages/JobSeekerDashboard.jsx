@@ -23,10 +23,6 @@ function JobSeekerDashboard() {
             <FaSearch />
             <h3>Search for nearby jobs</h3>
           </Link>
-          <Link to="/resume-coach" className="nav-card">
-            <FaFileAlt />
-            <h3>Virtual Resume Coach</h3>
-          </Link>
         </div>
 
         <div className="form-footer">
