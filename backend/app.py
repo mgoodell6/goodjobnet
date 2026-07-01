@@ -293,6 +293,39 @@ def get_users_records():
     return get_cached_data('users_records', fetch_users)
 
 
+def get_row_field(row, field_name, default=""):
+    # Define mapping of logical fields to all possible spreadsheet column headers
+    field_mapping = {
+        "company_name": ["Name", "Company Name"],
+        "company_street": ["Address", "company_street", "Street"],
+        "company_city": ["City", "County", "company_city"],
+        "company_state": ["State", "company_state"],
+        "company_zip": ["Zip", "Zipcode", "Zip Code", "company_zip", "Zip code"],
+        "career_website": ["Career Page", "Company Career Website", "Career Website", "Website"],
+        "contact_name": ["Hiring Contact", "Hiring Contact Name", "Contact Name", "Contact", "Hiring Contract Name", "contact_name"],
+        "contact_phone": ["Hiring Contact Phone", "Contact Phone", "Phone", "contact_phone"],
+        "contact_email": ["Hiring Contact Email", "Contact Email", "Email Address", "contact_email"],
+        "available_jobs": ["Availible Jobs", "Available Jobs", "Job Title", "available_jobs"],
+        "notes": ["General Notes", "Any additional Notes", "Notes", "notes"],
+        "currently_hiring": ["Currently Hiring", "TRUE ", "currently_hiring"],
+        "date_verified": ["Date data verified", "Date last verified", "Date Entered", "Last Date Contacted", "Date"]
+    }
+    
+    possible_keys = field_mapping.get(field_name, [field_name])
+    for k in possible_keys:
+        if k in row:
+            return row[k]
+            
+    # Fallback to case-insensitive match
+    lower_possible = [k.lower().strip() for k in possible_keys]
+    for rk, rv in row.items():
+        rk_str = str(rk).lower().strip()
+        if rk_str in lower_possible:
+            return rv
+            
+    return default
+
+
 # Authentication helper
 def get_gsheets_client():
     global _gsheets_client
@@ -444,25 +477,29 @@ def search_jobs():
             all_records = get_master_jobs_records()
             results = []
             for row in all_records:
-                row_company = str(row.get("Name") or row.get("Company Name") or "").strip().lower()
+                company = get_row_field(row, "company_name")
+                row_company = str(company).strip().lower()
                 if company_name.lower() in row_company:
-                    address_val = row.get('Address', row.get('company_street', ''))
-                    city_val = row.get('City', '')
-                    state_val = row.get('State', 'FL')
+                    address_val = get_row_field(row, "company_street")
+                    city_val = get_row_field(row, "company_city")
+                    state_val = get_row_field(row, "company_state", "FL")
                     location = f"{address_val}, {city_val}, {state_val}".strip(", ")
                     
-                    is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
+                    is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
                     currently_hiring = "Yes" if is_hiring_val in ["TRUE", "YES", "1", "Y"] else "No"
                     
-                    date_verified_str = row.get("Date last verified", row.get("Date Entered", ""))
+                    date_verified_str = str(get_row_field(row, "date_verified")).strip()
+                    role_val = get_row_field(row, "available_jobs") or "Various"
+                    career_website = get_row_field(row, "career_website")
+                    notes_val = get_row_field(row, "notes")
                     
                     job_entry = {
-                        "company": row.get("Name") or row.get("Company Name") or "Unknown",
-                        "role": row.get("Available Jobs") or row.get("Job Title") or "Various",
+                        "company": company or "Unknown",
+                        "role": role_val,
                         "location": location,
                         "distance": "",
-                        "career_website": row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or "",
-                        "notes": row.get("General Notes") or row.get("Any additional Notes") or row.get("Notes") or row.get("notes", ""),
+                        "career_website": career_website,
+                        "notes": notes_val,
                         "currently_hiring": currently_hiring,
                         "date_verified": date_verified_str
                     }
@@ -500,23 +537,30 @@ def search_jobs():
         recent = []
         older = []
         
-        three_weeks_ago = datetime.datetime.now() - datetime.timedelta(days=21)
         two_years_ago = datetime.datetime.now() - datetime.timedelta(days=730)
         
         for row in all_records:
-            # Check if Currently Hiring is true (defaults to True if column doesn't exist)
-            is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
-            if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
-                continue
-                
+            company = get_row_field(row, "company_name")
+            role = get_row_field(row, "available_jobs")
+            address_val = get_row_field(row, "company_street")
+            city_val = get_row_field(row, "company_city")
+            state_val = get_row_field(row, "company_state", "FL")
+            zip_val = get_row_field(row, "company_zip")
+            career_website = get_row_field(row, "career_website")
+            notes_val = get_row_field(row, "notes")
+            is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
+            date_verified_str = str(get_row_field(row, "date_verified")).strip()
+            
+            is_currently_hiring = is_hiring_val in ["TRUE", "YES", "1", "Y"]
+            
             # Filter by company name if provided
             if company_name:
-                row_company = str(row.get("Name") or row.get("Company Name") or "").strip().lower()
+                row_company = str(company).strip().lower()
                 if company_name.lower() not in row_company:
                     continue
                 
             # Filter by job type
-            row_job_type = str(row.get("Available Jobs", row.get("Job Title", "")))
+            row_job_type = str(role)
             if job_types and row_job_type not in job_types and "Other" not in job_types:
                 match = False
                 for jt in job_types:
@@ -530,7 +574,7 @@ def search_jobs():
             dist_miles = float('inf')
             if origin_zip:
                 import re
-                job_zip_val = str(row.get("Zipcode") or row.get("Zip Code") or row.get("Zip") or row.get("company_zip") or row.get("Zip code") or "").strip()
+                job_zip_val = str(zip_val).strip()
                 # strip .0 if float conversion happened in spreadsheet
                 if job_zip_val.endswith('.0'):
                     job_zip_val = job_zip_val[:-2]
@@ -553,38 +597,31 @@ def search_jobs():
                 if dist_miles > radius:
                     continue
             
-            # Use appropriate column names, falling back to what exists in the fallback sheet
-            address_val = row.get('Address', row.get('company_street', ''))
-            city_val = row.get('City', '')
-            state_val = row.get('State', 'FL')
             location = f"{address_val}, {city_val}, {state_val}".strip(", ")
             
             job_entry = {
-                "company": row.get("Name") or row.get("Company Name") or "Unknown",
-                "role": row.get("Available Jobs") or row.get("Job Title") or "Various",
+                "company": company or "Unknown",
+                "role": role or "Various",
                 "location": location,
                 "distance": f"{round(dist_miles, 1)} miles" if dist_miles != float('inf') else ("" if not origin_zip else "N/A"),
-                "career_website": row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or "",
-                "notes": row.get("General Notes") or row.get("Any additional Notes") or row.get("Notes") or row.get("notes", "")
+                "career_website": career_website,
+                "notes": notes_val
             }
             
-            date_verified_str = str(row.get("Date last verified", row.get("Date Entered", ""))).strip()
-            if not date_verified_str:
-                continue
-                
-            try:
-                # Try parsing M/D/YYYY or YYYY-MM-DD
-                if "-" in date_verified_str:
-                    date_obj = datetime.datetime.strptime(date_verified_str.split(" ")[0], "%Y-%m-%d")
-                else:
-                    date_obj = datetime.datetime.strptime(date_verified_str.split(" ")[0], "%m/%d/%Y")
-            except Exception:
-                continue
-                
-            if date_obj < two_years_ago:
-                continue
-                
-            if date_obj >= three_weeks_ago:
+            # Check verification date
+            if date_verified_str:
+                try:
+                    # Try parsing M/D/YYYY or YYYY-MM-DD
+                    if "-" in date_verified_str:
+                        date_obj = datetime.datetime.strptime(date_verified_str.split(" ")[0], "%Y-%m-%d")
+                    else:
+                        date_obj = datetime.datetime.strptime(date_verified_str.split(" ")[0], "%m/%d/%Y")
+                    if date_obj < two_years_ago:
+                        continue
+                except Exception:
+                    pass
+                    
+            if is_currently_hiring:
                 recent.append(job_entry)
             else:
                 older.append(job_entry)
@@ -641,13 +678,14 @@ def dashboard_stats():
         total_hot_jobs_matched = 0
         
         for row in all_records:
-            company_name = str(row.get("Name") or row.get("Company Name") or "").strip()
+            company = get_row_field(row, "company_name")
+            company_name = str(company).strip()
             if not company_name:
                 continue
-            is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
+            is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
             is_currently_hiring = is_hiring_val in ["TRUE", "YES", "1", "Y"]
 
-            date_str = str(row.get("Date last verified", row.get("Date Entered", ""))).strip()
+            date_str = str(get_row_field(row, "date_verified")).strip()
             age_days = 9999
             has_date = False
             if date_str:
@@ -663,7 +701,7 @@ def dashboard_stats():
 
             if is_currently_hiring:
                 if has_date:
-                    career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
+                    career_page = get_row_field(row, "career_website")
                     has_career_page = bool(str(career_page).strip())
                     if 16 <= age_days <= 21 and has_career_page:
                         expiring_in_5_days_count += 1
@@ -676,7 +714,7 @@ def dashboard_stats():
                 is_hot = (0 <= age_days <= 21)
                 if is_hot:
                     total_hot_jobs_matched += 1
-                    job_title = str(row.get("Available Jobs", row.get("Job Title", ""))).lower()
+                    job_title = str(get_row_field(row, "available_jobs")).lower()
                     matched_type = "Other"
                     for st in STANDARD_TYPES:
                         if st.lower() in job_title:
@@ -685,7 +723,7 @@ def dashboard_stats():
                     job_type_counts[matched_type] = job_type_counts.get(matched_type, 0) + 1
                 
             if age_days > 21:
-                career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
+                career_page = get_row_field(row, "career_website")
                 if not str(career_page).strip():
                     unverified_no_career_count += 1
                 
@@ -757,10 +795,10 @@ def hot_jobs_review():
         jobs_to_review = []
         
         for idx, row in enumerate(all_records):
-            company_name = str(row.get("Name") or row.get("Company Name") or "").strip()
-            if not company_name:
+            company_name_val = str(get_row_field(row, "company_name")).strip()
+            if not company_name_val:
                 continue
-            date_str = str(row.get("Date last verified", row.get("Date Entered", ""))).strip()
+            date_str = str(get_row_field(row, "date_verified")).strip()
             age_days = 0
             has_valid_date = False
             
@@ -776,7 +814,7 @@ def hot_jobs_review():
                     pass
             
             if category == "type":
-                row_type = str(row.get("Available Jobs", row.get("Job Title", ""))).lower()
+                row_type = str(get_row_field(row, "available_jobs")).lower()
                 job_types_list = [t.strip().lower() for t in job_type.split(",") if t.strip()]
                 if not job_types_list or not any(t in row_type for t in job_types_list):
                     continue
@@ -785,7 +823,7 @@ def hot_jobs_review():
                 company_query = request.args.get("company", "").strip().lower()
                 if not company_query:
                     continue
-                row_company = str(row.get("Name") or row.get("Company Name") or "").strip().lower()
+                row_company = company_name_val.lower()
                 
                 match = False
                 if company_query in row_company:
@@ -838,11 +876,11 @@ def hot_jobs_review():
                     else:
                         continue
                 
-                is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
+                is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
                 if category != "unverified_no_career" and is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
                     continue
                     
-                career_page = row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website") or ""
+                career_page = get_row_field(row, "career_website")
                 has_career_page = bool(str(career_page).strip())
                 
                 if category == "5days":
@@ -857,19 +895,19 @@ def hot_jobs_review():
 
             job = {
                 "row_index": idx + 2,
-                "company_name": row.get("Name") or row.get("Company Name", ""),
-                "company_type": row.get("Company Type / Industry") or row.get("Company Type", ""),
-                "company_street": row.get("Address") or row.get("company_street", ""),
-                "company_city": row.get("City") or row.get("company_city", ""),
-                "company_state": row.get("State") or row.get("company_state", ""),
-                "company_zip": row.get("Zipcode") or row.get("Zip Code") or row.get("Zip") or row.get("company_zip") or str(row.get("Zip code", "")),
-                "career_website": row.get("Career Page") or row.get("Company Career Website") or row.get("Career Website", ""),
-                "contact_name": row.get("Hiring Contact") or row.get("Hiring Contact Name") or row.get("Contact Name") or row.get("Hiring Contract Name") or row.get("contact_name", ""),
-                "contact_phone": str(row.get("Hiring Contact Phone") or row.get("Contact Phone") or row.get("contact_phone", "")),
-                "contact_email": row.get("Hiring Contact Email") or row.get("Contact Email") or row.get("contact_email", ""),
-                "currently_hiring": str(row.get("Currently Hiring", "Yes")),
-                "available_jobs": row.get("Available Jobs") or row.get("Job Title", ""),
-                "notes": row.get("General Notes") or row.get("Any additional Notes") or row.get("Notes") or row.get("notes", ""),
+                "company_name": company_name_val,
+                "company_type": row.get("Company Type") or row.get("Company Type / Industry") or "",
+                "company_street": get_row_field(row, "company_street"),
+                "company_city": get_row_field(row, "company_city"),
+                "company_state": get_row_field(row, "company_state", "FL"),
+                "company_zip": get_row_field(row, "company_zip"),
+                "career_website": career_page,
+                "contact_name": get_row_field(row, "contact_name"),
+                "contact_phone": str(get_row_field(row, "contact_phone")),
+                "contact_email": get_row_field(row, "contact_email"),
+                "currently_hiring": "Yes" if is_hiring_val in ["TRUE", "YES", "1", "Y"] else "No",
+                "available_jobs": get_row_field(row, "available_jobs"),
+                "notes": get_row_field(row, "notes"),
                 "date_last_verified": date_str,
                 "age_days": age_days,
                 "seekers_looking": str(row.get("Number of Job Seekers looking for this type of employment") or "0")
@@ -903,18 +941,18 @@ def update_hot_job():
         # Mapping frontend fields to spreadsheet headers
         field_mapping = {
             "company_name": ["Name", "Company Name"],
-            "company_type": ["Company Type / Industry", "Company Type"],
+            "company_type": ["Company Type", "Company Type / Industry"],
             "company_street": ["Address", "company_street"],
-            "company_city": ["City", "company_city"],
+            "company_city": ["County", "City", "company_city"],
             "company_state": ["State", "company_state"],
-            "company_zip": ["Zipcode", "Zip Code", "Zip", "company_zip", "Zip code"],
-            "career_website": ["Career Page", "Company Career Website", "Career Website"],
-            "contact_name": ["Hiring Contact", "Hiring Contact Name", "Contact Name", "Hiring Contract Name", "contact_name"],
-            "contact_phone": ["Hiring Contact Phone", "Contact Phone", "contact_phone"],
-            "contact_email": ["Hiring Contact Email", "Contact Email", "contact_email"],
-            "available_jobs": ["Available Jobs", "Job Title"],
+            "company_zip": ["Zip", "Zipcode", "Zip Code", "company_zip", "Zip code"],
+            "career_website": ["Career Page", "Company Career Website", "Career Website", "Website"],
+            "contact_name": ["Contact", "Hiring Contact", "Hiring Contact Name", "Contact Name", "Hiring Contract Name", "contact_name"],
+            "contact_phone": ["Phone", "Hiring Contact Phone", "Contact Phone", "contact_phone"],
+            "contact_email": ["Email Address", "Hiring Contact Email", "Contact Email", "contact_email"],
+            "available_jobs": ["Availible Jobs", "Available Jobs", "Job Title", "available_jobs"],
             "notes": ["General Notes", "Any additional Notes", "Notes", "notes"],
-            "currently_hiring": ["Currently Hiring"]
+            "currently_hiring": ["TRUE ", "Currently Hiring", "currently_hiring"]
         }
         
         # Build update list
@@ -1558,11 +1596,11 @@ def update_snapshot():
         date_col_idx = -1
         hiring_col_idx = -1
         for i, h in enumerate(headers):
-            h_str = str(h).lower()
-            if h_str in ['date last verified', 'date entered', 'date']:
+            h_str = str(h).lower().strip()
+            if h_str in ['date last verified', 'date entered', 'date', 'date data verified']:
                 if date_col_idx == -1:
                     date_col_idx = i
-            if h_str in ['currently hiring', 'hiring']:
+            if h_str in ['currently hiring', 'hiring', 'true']:
                 hiring_col_idx = i
                 
         if date_col_idx == -1:
@@ -1577,17 +1615,17 @@ def update_snapshot():
         
         idx_map = {}
         for i, h in enumerate(headers):
-            h_str = str(h).lower()
+            h_str = str(h).lower().strip()
             if 'Name' not in idx_map and h_str in ['name', 'company name']: idx_map['Name'] = i
             elif 'Address' not in idx_map and h_str in ['street', 'address', 'company street']: idx_map['Address'] = i
-            elif 'City' not in idx_map and h_str in ['city', 'company city']: idx_map['City'] = i
+            elif 'City' not in idx_map and h_str in ['city', 'company city', 'county']: idx_map['City'] = i
             elif 'State' not in idx_map and h_str in ['state', 'company state']: idx_map['State'] = i
-            elif 'Zip' not in idx_map and h_str in ['zip', 'zipcode', 'company zip']: idx_map['Zip'] = i
+            elif 'Zip' not in idx_map and h_str in ['zip', 'zipcode', 'company zip', 'zip code']: idx_map['Zip'] = i
             elif 'Contact' not in idx_map and h_str in ['hiring contact', 'hiring contact name', 'contact', 'contact name']: idx_map['Contact'] = i
             elif 'Hiring Contact phone' not in idx_map and h_str in ['hiring contact phone', 'contact phone', 'phone']: idx_map['Hiring Contact phone'] = i
-            elif 'Available Jobs' not in idx_map and h_str in ['available jobs', 'job title']: idx_map['Available Jobs'] = i
+            elif 'Available Jobs' not in idx_map and h_str in ['available jobs', 'job title', 'availible jobs']: idx_map['Available Jobs'] = i
             elif 'Company Type' not in idx_map and h_str in ['company type / industry', 'company type', 'industry']: idx_map['Company Type'] = i
-            elif 'Career Page' not in idx_map and h_str in ['career page', 'career website', 'company career website']: idx_map['Career Page'] = i
+            elif 'Career Page' not in idx_map and h_str in ['career page', 'career website', 'company career website', 'website']: idx_map['Career Page'] = i
             elif 'General Notes' not in idx_map and h_str in ['notes', 'general notes', 'additional notes']: idx_map['General Notes'] = i
             
         snapshot_data = [target_columns]
@@ -1668,11 +1706,11 @@ def job_seeker_matches_report():
         hot_jobs = []
         
         for row in jobs_records:
-            is_hiring_val = str(row.get("Currently Hiring", "TRUE")).strip().upper()
+            is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
             if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
                 continue
                 
-            date_str = str(row.get("Date last verified", row.get("Date Entered", ""))).strip()
+            date_str = str(get_row_field(row, "date_verified")).strip()
             if not date_str:
                 continue
                 
@@ -1735,7 +1773,7 @@ def job_seeker_matches_report():
             # Find matching hot jobs within 20 miles
             matched_jobs_count = 0
             for job in hot_jobs:
-                job_type = str(job.get("Available Jobs", job.get("Job Title", ""))).lower()
+                job_type = str(get_row_field(job, "available_jobs")).lower()
                 job_type = job_type.replace(" / ", "/")
                 
                 # Check type match
@@ -1749,7 +1787,7 @@ def job_seeker_matches_report():
                     continue
                     
                 # Check distance
-                job_zip = str(job.get("Zipcode") or job.get("Zip Code") or job.get("Zip") or job.get("company_zip") or job.get("Zip code", "")).strip()
+                job_zip = str(get_row_field(job, "company_zip")).strip()
                 if job_zip:
                     try:
                         # Extract 5 digit zip just in case

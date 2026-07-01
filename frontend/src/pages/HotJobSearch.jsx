@@ -144,7 +144,7 @@ function HotJobSearch({ user }) {
           <div className="results-section mt-2">
             <h2>Search Results</h2>
 
-            <h3 style={{ marginTop: '1.5rem', color: '#2ecc71' }}>Current Jobs (Validated in last 3 weeks)</h3>
+            <h3 style={{ marginTop: '1.5rem', color: '#2ecc71' }}>Currently Hiring Jobs</h3>
             {results.recent && results.recent.length > 0 ? (
               <div className="table-container">
                 <table>
@@ -176,9 +176,9 @@ function HotJobSearch({ user }) {
                   </tbody>
                 </table>
               </div>
-            ) : <p>No recent jobs found.</p>}
+            ) : <p>No currently hiring jobs found.</p>}
 
-            <h3 style={{ marginTop: '2rem', color: '#f39c12' }}>Other Potential Jobs (Older than 3 weeks that were hiring previously)</h3>
+            <h3 style={{ marginTop: '2rem', color: '#f39c12' }}>Other Jobs Meeting Criteria (Not Currently Hiring)</h3>
             {results.older && results.older.length > 0 ? (
               <div className="table-container">
                 <table>
@@ -210,7 +210,7 @@ function HotJobSearch({ user }) {
                   </tbody>
                 </table>
               </div>
-            ) : <p>No older potential jobs found.</p>}
+            ) : <p>No other matching jobs found.</p>}
           </div>
         )}
       </div>
