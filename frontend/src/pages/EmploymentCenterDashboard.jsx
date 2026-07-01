@@ -118,8 +118,50 @@ function EmploymentCenterDashboard() {
 
   const sharedColorMap = getSharedColorMap();
 
-  const renderPieChart = (typeCounts, total, colorMap) => {
-    if (!typeCounts || Object.keys(typeCounts).length === 0) return null;
+  const renderPieChart = (typeCounts, total, colorMap, emptyMessage = "No active data") => {
+    if (total === '...') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '210px' }}>
+          <div style={{
+            width: '150px',
+            height: '150px',
+            borderRadius: '50%',
+            background: 'conic-gradient(#f6f8fb 0% 100%)',
+            margin: '0 auto 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '2px dashed var(--text-light)',
+            opacity: 0.5
+          }}>
+            <span style={{ color: 'var(--text-light)', fontSize: '0.85rem' }}>Loading...</span>
+          </div>
+        </div>
+      );
+    }
+
+    if (!typeCounts || Object.keys(typeCounts).length === 0 || total === 0) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '210px' }}>
+          <div style={{
+            width: '150px',
+            height: '150px',
+            borderRadius: '50%',
+            background: 'conic-gradient(#e5ebf1 0% 100%)',
+            margin: '0 auto 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '2px dashed #bdc3c7'
+          }}>
+            <span style={{ color: 'var(--text-light)', fontSize: '0.85rem', fontWeight: '500' }}>No Data</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', fontSize: '0.85rem', color: 'var(--text-light)', fontStyle: 'italic' }}>
+            {emptyMessage}
+          </div>
+        </div>
+      );
+    }
 
     let typesArr = Object.entries(typeCounts).map(([label, count]) => ({ label, count }));
     typesArr.sort((a, b) => b.count - a.count);
@@ -186,14 +228,14 @@ function EmploymentCenterDashboard() {
           <div className="stat-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
             <h3 style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>Hot Jobs by Industry</h3>
             <p style={{ fontWeight: 'bold', color: 'var(--text-color)', marginBottom: '1rem' }}>Total Hot Jobs: {stats.total_hot_jobs}</p>
-            {renderPieChart(stats.job_types, stats.total_hot_jobs, sharedColorMap)}
+            {renderPieChart(stats.job_types, stats.total_hot_jobs, sharedColorMap, "No hot jobs currently active")}
 
           </div>
 
           <div className="stat-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
             <h3 style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>Job Seekers by Desired Type</h3>
             <p style={{ fontWeight: 'bold', color: 'var(--text-color)', marginBottom: '1rem' }}>Total Job Seekers: {stats.total_job_seekers}</p>
-            {renderPieChart(stats.seeker_types, stats.total_job_seekers, sharedColorMap)}
+            {renderPieChart(stats.seeker_types, stats.total_job_seekers, sharedColorMap, "No job seekers currently active")}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
               <Link to="/job-seeker-matches-report" className="btn primary-btn" style={{ width: 'auto', background: '#8e44ad' }}>View Job Seeker Matches Report</Link>
             </div>

@@ -258,7 +258,11 @@ def get_master_jobs_records():
             sh = gc.open_by_key("1NxDQTta3xvch5jn_j-DpWvGg0zRfJhpGnLv9rFQxw6I")
         except Exception:
             sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
-        return sh.sheet1.get_all_records()
+        try:
+            wks = sh.worksheet_by_title("Destinations")
+        except Exception:
+            wks = sh.sheet1
+        return wks.get_all_records()
     return get_cached_data('master_jobs_records', fetch_master_jobs)
 
 def get_new_jobs_records():
@@ -934,7 +938,10 @@ def update_hot_job():
         except Exception:
             sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
             
-        wks = sh.sheet1
+        try:
+            wks = sh.worksheet_by_title("Destinations")
+        except Exception:
+            wks = sh.sheet1
         headers = wks.get_row(1)
         row_index = data.get("row_index")
         
@@ -1585,7 +1592,10 @@ def update_snapshot():
         except Exception:
             sh_master = gc.open_by_key("1YIGS6DRmnEH3be9TG59nFVhGee2DVcc4MaaXFhKgSic")
             
-        wks_master = sh_master.sheet1
+        try:
+            wks_master = sh_master.worksheet_by_title("Destinations")
+        except Exception:
+            wks_master = sh_master.sheet1
         all_values = wks_master.get_all_values(include_tailing_empty_rows=False, include_tailing_empty=False)
         
         if not all_values or len(all_values) < 1:
@@ -2014,7 +2024,10 @@ def update_jobseeker_info():
         except Exception:
             sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
             
-        wks = sh.sheet1
+        try:
+            wks = sh.worksheet_by_title("Destinations")
+        except Exception:
+            wks = sh.sheet1
         all_values = wks.get_all_values(include_tailing_empty_rows=False, include_tailing_empty=False)
         
         if not all_values or len(all_values) < 1:
