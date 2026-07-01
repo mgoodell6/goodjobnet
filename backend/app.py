@@ -479,7 +479,8 @@ def search_jobs():
     if search_type == "company":
         try:
             all_records = get_master_jobs_records()
-            results = []
+            recent = []
+            older = []
             for row in all_records:
                 company = get_row_field(row, "company_name")
                 row_company = str(company).strip().lower()
@@ -490,9 +491,8 @@ def search_jobs():
                     location = f"{address_val}, {city_val}, {state_val}".strip(", ")
                     
                     is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
-                    currently_hiring = "Yes" if is_hiring_val in ["TRUE", "YES", "1", "Y"] else "No"
+                    is_currently_hiring = is_hiring_val in ["TRUE", "YES", "1", "Y"]
                     
-                    date_verified_str = str(get_row_field(row, "date_verified")).strip()
                     role_val = get_row_field(row, "available_jobs") or "Various"
                     career_website = get_row_field(row, "career_website")
                     notes_val = get_row_field(row, "notes")
@@ -503,15 +503,18 @@ def search_jobs():
                         "location": location,
                         "distance": "",
                         "career_website": career_website,
-                        "notes": notes_val,
-                        "currently_hiring": currently_hiring,
-                        "date_verified": date_verified_str
+                        "notes": notes_val
                     }
-                    results.append(job_entry)
+                    if is_currently_hiring:
+                        recent.append(job_entry)
+                    else:
+                        older.append(job_entry)
             return jsonify({
                 "success": True,
-                "search_type": "company",
-                "results": results
+                "results": {
+                    "recent": recent,
+                    "older": older
+                }
             })
         except Exception as e:
             print(traceback.format_exc())
