@@ -2124,6 +2124,267 @@ def update_jobseeker_info():
         garbage_collector.collect()
 
 
+
+@app.route('/api/import-jobseekers', methods=['POST'])
+def import_jobseekers():
+    import zipfile
+    import xml.etree.ElementTree as ET
+    
+    if 'file' not in request.files:
+        return jsonify({"success": False, "error": "No file uploaded"}), 400
+        
+    file = request.files['file']
+    if not file.filename:
+        return jsonify({"success": False, "error": "Empty filename"}), 400
+        
+    try:
+        # 1. Parse xlsx file from memory
+        file_bytes = io.BytesIO(file.read())
+        
+        with zipfile.ZipFile(file_bytes) as z:
+            sheet_names = z.namelist()
+            sheet_file = None
+            for s in ['xl/worksheets/sheet2.xml', 'xl/worksheets/sheet1.xml', 'xl/worksheets/sheet.xml']:
+                if s in sheet_names:
+                    sheet_file = s
+                    break
+            if not sheet_file:
+                for name in sheet_names:
+                    if name.startswith('xl/worksheets/sheet') and name.endswith('.xml'):
+                        sheet_file = name
+                        break
+            if not sheet_file:
+                return jsonify({"success": False, "error": "Could not find any worksheet in the uploaded Excel file."}), 400
+                
+            # Read shared strings if it exists
+            shared_strings = []
+            try:
+                with z.open('xl/sharedStrings.xml') as sf:
+                    tree = ET.parse(sf)
+                    root = tree.getroot()
+                    ns = {'ns': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+                    for si in root.findall('.//ns:si', ns):
+                        t_text = []
+                        for t_el in si.findall('.//ns:t', ns):
+                            t_text.append(t_el.text or '')
+                        shared_strings.append(''.join(t_text))
+            except KeyError:
+                pass
+                
+            with z.open(sheet_file) as sf:
+                tree = ET.parse(sf)
+                root = tree.getroot()
+                ns = {'ns': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+                
+                rows = {}
+                for row in root.findall('.//ns:row', ns):
+                    r_idx = int(row.attrib.get('r', len(rows) + 1))
+                    row_data = {}
+                    for c in row.findall('ns:c', ns):
+                        r_ref = c.attrib.get('r', '')
+                        col_letter = ''.join([x for x in r_ref if x.isalpha()])
+                        t = c.attrib.get('t', '')
+                        v_el = c.find('ns:v', ns)
+                        is_el = c.find('ns:is', ns)
+                        
+                        val = ''
+                        if t == 'inlineStr' and is_el is not None:
+                            t_el = is_el.find('ns:t', ns)
+                            if t_el is not None:
+                                val = t_el.text or ''
+                        elif v_el is not None:
+                            val = v_el.text or ''
+                        row_data[col_letter] = val
+                    rows[r_idx] = row_data
+
+        if not rows:
+            return jsonify({"success": False, "error": "Uploaded Excel sheet is empty."}), 400
+            
+        col_letters = sorted(list(set(col for r in rows.values() for col in r.keys())), key=lambda x: (len(x), x))
+        max_row = max(rows.keys())
+        
+        raw_rows = []
+        for r in range(1, max_row + 1):
+            if r in rows:
+                raw_rows.append([rows[r].get(col, '') for col in col_letters])
+            else:
+                raw_rows.append(['' for col in col_letters])
+                
+        excel_headers = [str(h).strip() for h in raw_rows[0]]
+        
+        imported_seekers = []
+        for r in raw_rows[1:]:
+            if not any(r):
+                continue
+            record = {}
+            for h, val in zip(excel_headers, r):
+                if h:
+                    record[h] = val
+            imported_seekers.append(record)
+            
+        # Helper to convert Excel serial dates to string
+        def excel_date_to_string(excel_val):
+            if not excel_val:
+                return ""
+            try:
+                val_float = float(excel_val)
+                base_date = datetime.datetime(1899, 12, 30)
+                dt = base_date + datetime.timedelta(days=val_float)
+                return dt.strftime("%m/%d/%Y")
+            except Exception:
+                return str(excel_val).strip()
+
+        # Helper to format 10-digit phone numbers
+        def format_phone(phone_val):
+            phone_str = str(phone_val).strip()
+            digits = ''.join([c for c in phone_str if c.isdigit()])
+            if len(digits) == 10:
+                return f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
+            elif len(digits) == 11 and digits[0] == '1':
+                return f"{digits[1:4]}-{digits[4:7]}-{digits[7:]}"
+            return phone_str
+
+        # Helper to clean names for matching
+        def clean_name(name_val):
+            return ' '.join(str(name_val).strip().lower().replace(',', '').split())
+
+        # 2. Get current seekers from Google Sheets
+        gc_client = get_gsheets_client()
+        sh = gc_client.open_by_key("1Ye9hgTVuqUtV8CQhFwLzZzCBz4E26otvJbjiVYRySJ0")
+        wks = sh.sheet1
+        all_values = wks.get_all_values(include_tailing_empty_rows=False, include_tailing_empty=False)
+        
+        if not all_values:
+            return jsonify({"success": False, "error": "Target Job Seekers sheet is empty or has no headers."}), 400
+            
+        headers = all_values[0]
+        
+        # Locate indices of target fields in Google Sheet
+        name_col_idx = -1
+        phone_col_idx = -1
+        last_contact_col_idx = -1
+        coach_col_idx = -1
+        date_entered_idx = -1
+        
+        for idx, h in enumerate(headers):
+            h_clean = str(h).strip().lower()
+            if h_clean == "name":
+                name_col_idx = idx
+            elif h_clean.startswith("phone") and phone_col_idx == -1:
+                # Store first phone column
+                phone_col_idx = idx
+            elif h_clean == "last date contacted":
+                last_contact_col_idx = idx
+            elif h_clean in ["employment coach", "employment advisor"]:
+                coach_col_idx = idx
+            elif h_clean == "date entered":
+                date_entered_idx = idx
+                
+        if name_col_idx == -1:
+            return jsonify({"success": False, "error": "Could not find 'Name' column in Unemployed List spreadsheet headers."}), 400
+
+        # Build dict of existing records keyed by cleaned name
+        existing_records_by_name = {}
+        for row_data in all_values[1:]:
+            if len(row_data) > name_col_idx:
+                n_val = row_data[name_col_idx]
+                if n_val:
+                    existing_records_by_name[clean_name(n_val)] = row_data
+
+        # Merge process
+        new_rows = []
+        imported_clean_names = set()
+        
+        for seeker in imported_seekers:
+            full_name = str(seeker.get('Full Name', '')).strip()
+            if not full_name:
+                continue
+                
+            c_name = clean_name(full_name)
+            if c_name in imported_clean_names:
+                continue
+            imported_clean_names.add(c_name)
+            
+            raw_phone = seeker.get('Phone', '')
+            formatted_phone = format_phone(raw_phone)
+            advisor = str(seeker.get('Employment Advisor', '')).strip()
+            last_contact = excel_date_to_string(seeker.get('Last Contact', ''))
+            
+            if c_name in existing_records_by_name:
+                # Existing seeker: update ONLY Last Date Contacted, keep everything else
+                row_data = list(existing_records_by_name[c_name])
+                while len(row_data) < len(headers):
+                    row_data.append("")
+                if last_contact_col_idx != -1:
+                    row_data[last_contact_col_idx] = last_contact
+                new_rows.append(row_data)
+            else:
+                # New seeker: add them to the sheet and populate Name, Phone (first), Advisor, Last Date Contacted
+                row_data = [""] * len(headers)
+                row_data[name_col_idx] = full_name
+                if phone_col_idx != -1:
+                    row_data[phone_col_idx] = formatted_phone
+                if coach_col_idx != -1:
+                    row_data[coach_col_idx] = advisor
+                if last_contact_col_idx != -1:
+                    row_data[last_contact_col_idx] = last_contact
+                if date_entered_idx != -1:
+                    row_data[date_entered_idx] = datetime.datetime.now().strftime("%m/%d/%Y")
+                new_rows.append(row_data)
+                
+        # Now add existing seekers who are NOT in the imported list (outdated seekers), and highlight them
+        outdated_row_indices = []
+        outdated_count = 0
+        
+        for c_name, row_data in existing_records_by_name.items():
+            if c_name not in imported_clean_names:
+                row_data_list = list(row_data)
+                while len(row_data_list) < len(headers):
+                    row_data_list.append("")
+                new_rows.append(row_data_list)
+                outdated_row_indices.append(len(new_rows) + 1)
+                outdated_count += 1
+                
+        # Bulk update the sheet
+        final_grid = [headers] + new_rows
+        
+        # Clear sheet from row 2 onwards (clears both values and cell formatting)
+        wks.clear(start='A2', fields='*')
+        # Overwrite content starting at A1 (keeps header format but writes new values)
+        wks.update_values(crange='A1', values=final_grid)
+        
+        # Apply light red/coral highlight to the outdated rows
+        if outdated_row_indices:
+            def col_idx_to_letter(col):
+                letter = ''
+                while col > 0:
+                    col, remainder = divmod(col - 1, 26)
+                    letter = chr(65 + remainder) + letter
+                return letter
+            
+            last_col_letter = col_idx_to_letter(len(headers))
+            ranges_to_highlight = [f"A{r}:{last_col_letter}{r}" for r in outdated_row_indices]
+            wks.apply_format(ranges=ranges_to_highlight, format_info={'backgroundColor': {'red': 1.0, 'green': 0.85, 'blue': 0.85}})
+        
+        # Invalidate caches
+        invalidate_cache('seekers_records')
+        invalidate_cache('new_seekers_records')
+        
+        # Recalculate stats counts
+        added_count = len([x for x in imported_clean_names if x not in existing_records_by_name])
+        updated_count = len([x for x in imported_clean_names if x in existing_records_by_name])
+        
+        return jsonify({
+            "success": True, 
+            "message": f"Successfully synced Unemployed List! Added {added_count}, updated {updated_count}, and highlighted {outdated_count} outdated seekers for manual review."
+        })
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000, host="0.0.0.0")
 
