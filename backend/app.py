@@ -2248,6 +2248,68 @@ def import_jobseekers():
         def clean_name(name_val):
             return ' '.join(str(name_val).strip().lower().replace(',', '').split())
 
+        def clean_phone_10(phone_val):
+            if not phone_val:
+                return ""
+            digits = "".join(c for c in str(phone_val) if c.isdigit())
+            if digits.startswith("1") and len(digits) > 10:
+                digits = digits[1:]
+            return digits[:10]
+
+        def get_name_tokens(name_str):
+            import re
+            n = str(name_str).lower()
+            n = re.sub(r'\(.*?\)', ' ', n)
+            n = re.sub(r'[^a-z0-9\s]', ' ', n)
+            return [w.strip() for w in n.split() if w.strip()]
+
+        def get_significant_tokens(words):
+            sig_words = [w for w in words if len(w) >= 2]
+            if not sig_words:
+                return words
+            return sig_words
+
+        def words_match_loose(w1, w2):
+            if w1 == w2:
+                return True
+            if len(w1) >= 4 and len(w2) >= 4:
+                if w1 in w2 or w2 in w1:
+                    return True
+            import difflib
+            if difflib.SequenceMatcher(None, w1, w2).ratio() >= 0.81:
+                return True
+            return False
+
+        def names_match_loose(name1, name2):
+            tokens1 = get_significant_tokens(get_name_tokens(name1))
+            tokens2 = get_significant_tokens(get_name_tokens(name2))
+            
+            if not tokens1 or not tokens2:
+                return False
+                
+            matched_in_1 = set()
+            matched_in_2 = set()
+            
+            for idx1, t1 in enumerate(tokens1):
+                for idx2, t2 in enumerate(tokens2):
+                    if words_match_loose(t1, t2):
+                        matched_in_1.add(idx1)
+                        matched_in_2.add(idx2)
+                        
+            unmatched1 = set(range(len(tokens1))) - matched_in_1
+            unmatched2 = set(range(len(tokens2))) - matched_in_2
+            
+            if unmatched1 and unmatched2:
+                return False
+                
+            min_tokens = min(len(tokens1), len(tokens2))
+            match_count = min(len(matched_in_1), len(matched_in_2))
+            
+            if min_tokens == 1:
+                return match_count >= 1
+            else:
+                return match_count >= 2 and (match_count / min_tokens) >= 0.65
+
         # 2. Get current seekers from Google Sheets
         gc_client = get_gsheets_client()
         sh = gc_client.open_by_key("1Ye9hgTVuqUtV8CQhFwLzZzCBz4E26otvJbjiVYRySJ0")
@@ -2283,13 +2345,21 @@ def import_jobseekers():
         if name_col_idx == -1:
             return jsonify({"success": False, "error": "Could not find 'Name' column in Unemployed List spreadsheet headers."}), 400
 
-        # Build dict of existing records keyed by cleaned name
-        existing_records_by_name = {}
+        # Build list of existing records with details for robust matching
+        existing_seekers = []
         for row_data in all_values[1:]:
             if len(row_data) > name_col_idx:
                 n_val = row_data[name_col_idx]
                 if n_val:
-                    existing_records_by_name[clean_name(n_val)] = row_data
+                    p_val = ""
+                    if phone_col_idx != -1 and phone_col_idx < len(row_data):
+                        p_val = row_data[phone_col_idx]
+                    existing_seekers.append({
+                        "name": n_val,
+                        "phone": p_val,
+                        "row_data": row_data,
+                        "matched": False
+                    })
 
         # Merge process
         new_rows = []
@@ -2310,9 +2380,45 @@ def import_jobseekers():
             advisor = str(seeker.get('Employment Advisor', '')).strip()
             last_contact = excel_date_to_string(seeker.get('Last Contact', ''))
             
-            if c_name in existing_records_by_name:
+            # Find matching existing seeker using hybrid logic
+            matched_existing = None
+            for es in existing_seekers:
+                p_existing = clean_phone_10(es["phone"])
+                p_imported = clean_phone_10(raw_phone)
+                
+                # 1. Conflict Check: if both have phone numbers, and they don't match, reject
+                if p_existing and p_imported and p_existing != p_imported:
+                    continue
+                    
+                is_match = False
+                # 2. If phone matches exactly (and is not empty), we only require at least one shared significant name token
+                if p_existing and p_imported and p_existing == p_imported:
+                    tokens1 = get_significant_tokens(get_name_tokens(es["name"]))
+                    tokens2 = get_significant_tokens(get_name_tokens(full_name))
+                    for t1 in tokens1:
+                        for t2 in tokens2:
+                            if words_match_loose(t1, t2):
+                                is_match = True
+                                break
+                        if is_match:
+                            break
+                else:
+                    # 3. Otherwise (phone is missing or one is missing), we require name match (exact or loose names_match_loose)
+                    ec1 = " ".join(get_name_tokens(es["name"]))
+                    ec2 = " ".join(get_name_tokens(full_name))
+                    if ec1 == ec2:
+                        is_match = True
+                    else:
+                        is_match = names_match_loose(es["name"], full_name)
+                        
+                if is_match:
+                    matched_existing = es
+                    break
+                    
+            if matched_existing:
                 # Existing seeker: update ONLY Last Date Contacted, keep everything else
-                row_data = list(existing_records_by_name[c_name])
+                matched_existing["matched"] = True
+                row_data = list(matched_existing["row_data"])
                 while len(row_data) < len(headers):
                     row_data.append("")
                 if last_contact_col_idx != -1:
@@ -2336,9 +2442,9 @@ def import_jobseekers():
         outdated_row_indices = []
         outdated_count = 0
         
-        for c_name, row_data in existing_records_by_name.items():
-            if c_name not in imported_clean_names:
-                row_data_list = list(row_data)
+        for es in existing_seekers:
+            if not es["matched"]:
+                row_data_list = list(es["row_data"])
                 while len(row_data_list) < len(headers):
                     row_data_list.append("")
                 new_rows.append(row_data_list)
@@ -2371,8 +2477,8 @@ def import_jobseekers():
         invalidate_cache('new_seekers_records')
         
         # Recalculate stats counts
-        added_count = len([x for x in imported_clean_names if x not in existing_records_by_name])
-        updated_count = len([x for x in imported_clean_names if x in existing_records_by_name])
+        updated_count = len([es for es in existing_seekers if es["matched"]])
+        added_count = len(new_rows) - len(existing_seekers)
         
         return jsonify({
             "success": True, 
