@@ -2312,9 +2312,12 @@ def import_jobseekers():
 
         # 2. Get current seekers from Google Sheets
         gc_client = get_gsheets_client()
-        sh = gc_client.open_by_key("1Ye9hgTVuqUtV8CQhFwLzZzCBz4E26otvJbjiVYRySJ0")
-        wks = sh.sheet1
-        all_values = wks.get_all_values(include_tailing_empty_rows=False, include_tailing_empty=False)
+        sh_orig = gc_client.open_by_key("1Ye9hgTVuqUtV8CQhFwLzZzCBz4E26otvJbjiVYRySJ0")
+        wks_orig = sh_orig.sheet1
+        all_values = wks_orig.get_all_values(include_tailing_empty_rows=False, include_tailing_empty=False)
+        
+        # Target Spreadsheet ID for safe isolated imports (shared with job-form-bot@jobentrysystem.iam.gserviceaccount.com)
+        IMPORT_SPREADSHEET_ID = "1Ye9hgTVuqUtV8CQhFwLzZzCBz4E26otvJbjiVYRySJ0"
         
         if not all_values:
             return jsonify({"success": False, "error": "Target Job Seekers sheet is empty or has no headers."}), 400
@@ -2451,13 +2454,16 @@ def import_jobseekers():
                 outdated_row_indices.append(len(new_rows) + 1)
                 outdated_count += 1
                 
-        # Bulk update the sheet
+        # Bulk update the sheet (writes to the separate spreadsheet copy)
+        sh_target = gc_client.open_by_key(IMPORT_SPREADSHEET_ID)
+        wks_target = sh_target.sheet1
+        
         final_grid = [headers] + new_rows
         
         # Clear sheet from row 2 onwards (clears both values and cell formatting)
-        wks.clear(start='A2', fields='*')
+        wks_target.clear(start='A2', fields='*')
         # Overwrite content starting at A1 (keeps header format but writes new values)
-        wks.update_values(crange='A1', values=final_grid)
+        wks_target.update_values(crange='A1', values=final_grid)
         
         # Apply light red/coral highlight to the outdated rows
         if outdated_row_indices:
@@ -2470,11 +2476,12 @@ def import_jobseekers():
             
             last_col_letter = col_idx_to_letter(len(headers))
             ranges_to_highlight = [f"A{r}:{last_col_letter}{r}" for r in outdated_row_indices]
-            wks.apply_format(ranges=ranges_to_highlight, format_info={'backgroundColor': {'red': 1.0, 'green': 0.85, 'blue': 0.85}})
+            wks_target.apply_format(ranges=ranges_to_highlight, format_info={'backgroundColor': {'red': 1.0, 'green': 0.85, 'blue': 0.85}})
         
-        # Invalidate caches
-        invalidate_cache('seekers_records')
-        invalidate_cache('new_seekers_records')
+        # Invalidate caches only if we wrote back to the original sheet
+        if IMPORT_SPREADSHEET_ID == "1Ye9hgTVuqUtV8CQhFwLzZzCBz4E26otvJbjiVYRySJ0":
+            invalidate_cache('seekers_records')
+            invalidate_cache('new_seekers_records')
         
         # Recalculate stats counts
         updated_count = len([es for es in existing_seekers if es["matched"]])
@@ -2482,7 +2489,8 @@ def import_jobseekers():
         
         return jsonify({
             "success": True, 
-            "message": f"Successfully synced Unemployed List! Added {added_count}, updated {updated_count}, and highlighted {outdated_count} outdated seekers for manual review."
+            "message": f"Successfully synced Unemployed List! Added {added_count}, updated {updated_count}, and highlighted {outdated_count} outdated seekers for manual review.",
+            "url": sh_target.url
         })
     except Exception as e:
         print(traceback.format_exc())

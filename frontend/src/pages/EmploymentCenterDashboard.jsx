@@ -90,7 +90,7 @@ function EmploymentCenterDashboard() {
         setImporting(false);
         e.target.value = '';
         if (data.success) {
-          setImportStatus({ success: true, message: data.message });
+          setImportStatus({ success: true, message: data.message, url: data.url });
           fetch('/api/dashboard-stats')
             .then(res => res.json())
             .then(statsData => {
@@ -422,15 +422,39 @@ function EmploymentCenterDashboard() {
           </div>
 
           {(updateStatus || importStatus) && (
-            <p style={{ 
-              fontSize: '0.95rem', 
-              fontWeight: 500, 
-              color: (updateStatus?.success || importStatus?.success) ? 'var(--success)' : 'var(--error)',
-              marginTop: '0.25rem',
-              textAlign: 'center'
-            }}>
-              {updateStatus ? updateStatus.message : importStatus.message}
-            </p>
+            <div style={{ marginTop: '0.5rem', textAlign: 'center' }}>
+              <p style={{ 
+                fontSize: '0.95rem', 
+                fontWeight: 500, 
+                color: (updateStatus?.success || importStatus?.success) ? 'var(--success)' : 'var(--error)',
+                margin: 0
+              }}>
+                {updateStatus ? updateStatus.message : importStatus.message}
+              </p>
+              {importStatus?.success && importStatus?.url && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <a 
+                    href={importStatus.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="btn secondary-btn" 
+                    style={{ 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: '0.5rem', 
+                      width: 'auto', 
+                      padding: '0.5rem 1.25rem', 
+                      fontSize: '0.85rem',
+                      background: 'rgba(255,255,255,0.8)',
+                      borderColor: 'var(--primary-color)',
+                      color: 'var(--primary-color)'
+                    }}
+                  >
+                    Open Merged Seeker Spreadsheet
+                  </a>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
