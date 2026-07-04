@@ -2317,7 +2317,7 @@ def import_jobseekers():
         all_values = wks_orig.get_all_values(include_tailing_empty_rows=False, include_tailing_empty=False)
         
         # Target Spreadsheet ID for safe isolated imports (shared with job-form-bot@jobentrysystem.iam.gserviceaccount.com)
-        IMPORT_SPREADSHEET_ID = "1Ye9hgTVuqUtV8CQhFwLzZzCBz4E26otvJbjiVYRySJ0"
+        IMPORT_SPREADSHEET_ID = "10oSm0DQmqg6GgZKsUxwmmuMzqOnFZihfOIuqcpgkW6M"
         
         if not all_values:
             return jsonify({"success": False, "error": "Target Job Seekers sheet is empty or has no headers."}), 400
