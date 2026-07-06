@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const standardOptions = [
@@ -30,6 +30,31 @@ function JobSeekerEntry({ user }) {
   const customSelected = seekerTypes.filter(t => !standardOptions.includes(t)).join(', ');
 
   const [selectedJobTypes, setSelectedJobTypes] = useState(standardSelected);
+
+  const [matchingJobs, setMatchingJobs] = useState({ recent: [], older: [] });
+  const [matchingJobsLoading, setMatchingJobsLoading] = useState(false);
+
+  useEffect(() => {
+    const loadMatchingJobs = async () => {
+      if (!seeker) return;
+      setMatchingJobsLoading(true);
+      try {
+        const response = await fetch(`/api/seeker-matching-jobs?row_index=${seeker.row_index}&job_types=${encodeURIComponent(seeker.desired_job_types || seeker.job_types || '')}&zipcode=${encodeURIComponent(seeker.zipcode || '')}`);
+        const data = await response.json();
+        if (data.success) {
+          setMatchingJobs(data.results);
+        } else {
+          console.error("Failed to load matching jobs:", data.error);
+        }
+      } catch (err) {
+        console.error("Error loading matching jobs:", err);
+      } finally {
+        setMatchingJobsLoading(false);
+      }
+    };
+
+    loadMatchingJobs();
+  }, [seeker]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -322,6 +347,96 @@ function JobSeekerEntry({ user }) {
             </button>
           </div>
         </form>
+
+        {seeker && (
+          <div className="matching-jobs-section mt-3" style={{ borderTop: '2px solid rgba(0,0,0,0.1)', paddingTop: '2rem', marginTop: '2rem' }}>
+            <h2 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>Matching Jobs for {seeker.name}</h2>
+            <p style={{ fontStyle: 'italic', color: 'var(--text-light)', marginBottom: '1.5rem' }}>
+              Based on desired job types: <strong>{seeker.desired_job_types || seeker.job_types}</strong>
+            </p>
+            {matchingJobsLoading ? (
+              <p className="text-center">Loading matching jobs from JobBank...</p>
+            ) : (
+              <>
+                <h3 style={{ marginTop: '1.5rem', color: '#2ecc71', borderBottom: '2px solid #2ecc71', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
+                  Currently Hiring Jobs ({matchingJobs.recent.length})
+                </h3>
+                {matchingJobs.recent.length > 0 ? (
+                  <div className="table-container mb-2">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Company</th>
+                          <th>Role</th>
+                          <th>Location</th>
+                          <th>Distance</th>
+                          <th>Career Website</th>
+                          <th>Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {matchingJobs.recent.map((job, idx) => (
+                          <tr key={idx}>
+                            <td>{job.company}</td>
+                            <td>{job.role}</td>
+                            <td>{job.location}</td>
+                            <td>{job.distance || 'N/A'}</td>
+                            <td>
+                              {job.career_website ? (
+                                <a href={job.career_website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}>
+                                  View Posting
+                                </a>
+                              ) : 'N/A'}
+                            </td>
+                            <td>{job.notes || 'N/A'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <p style={{ fontStyle: 'italic', color: 'var(--text-light)', marginBottom: '1.5rem' }}>No currently hiring jobs found matching criteria.</p>}
+
+                <h3 style={{ marginTop: '2rem', color: '#f39c12', borderBottom: '2px solid #f39c12', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
+                  Other Jobs Meeting Criteria (Not Currently Hiring) ({matchingJobs.older.length})
+                </h3>
+                {matchingJobs.older.length > 0 ? (
+                  <div className="table-container mb-2">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Company</th>
+                          <th>Role</th>
+                          <th>Location</th>
+                          <th>Distance</th>
+                          <th>Career Website</th>
+                          <th>Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {matchingJobs.older.map((job, idx) => (
+                          <tr key={idx}>
+                            <td>{job.company}</td>
+                            <td>{job.role}</td>
+                            <td>{job.location}</td>
+                            <td>{job.distance || 'N/A'}</td>
+                            <td>
+                              {job.career_website ? (
+                                <a href={job.career_website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}>
+                                  View Posting
+                                </a>
+                              ) : 'N/A'}
+                            </td>
+                            <td>{job.notes || 'N/A'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <p style={{ fontStyle: 'italic', color: 'var(--text-light)' }}>No other matching jobs found.</p>}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
