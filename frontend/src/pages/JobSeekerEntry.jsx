@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 const standardOptions = [
   "HVAC Repair", "Accountant", "Airport (Baggage/customer service/ground ops)",
@@ -380,7 +380,15 @@ function JobSeekerEntry({ user }) {
                       <tbody>
                         {matchingJobs.recent.map((job, idx) => (
                           <tr key={idx}>
-                            <td>{job.company}</td>
+                            <td>
+                              <Link 
+                                to={`/hot-jobs-review?category=company&company=${encodeURIComponent(job.company)}`} 
+                                state={{ seeker, fromEntry: true, fromAssigned, fromSearch }}
+                                style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}
+                              >
+                                {job.company}
+                              </Link>
+                            </td>
                             <td>{job.role}</td>
                             <td>{job.location}</td>
                             <td>{job.distance || 'N/A'}</td>
@@ -418,7 +426,15 @@ function JobSeekerEntry({ user }) {
                       <tbody>
                         {matchingJobs.older.map((job, idx) => (
                           <tr key={idx}>
-                            <td>{job.company}</td>
+                            <td>
+                              <Link 
+                                to={`/hot-jobs-review?category=company&company=${encodeURIComponent(job.company)}`} 
+                                state={{ seeker, fromEntry: true, fromAssigned, fromSearch }}
+                                style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}
+                              >
+                                {job.company}
+                              </Link>
+                            </td>
                             <td>{job.role}</td>
                             <td>{job.location}</td>
                             <td>{job.distance || 'N/A'}</td>

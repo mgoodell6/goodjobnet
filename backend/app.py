@@ -805,6 +805,11 @@ def hot_jobs_review():
             company_name_val = str(get_row_field(row, "company_name")).strip()
             if not company_name_val:
                 continue
+            
+            career_page = get_row_field(row, "career_website")
+            has_career_page = bool(str(career_page).strip())
+            is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
+            
             date_str = str(get_row_field(row, "date_verified")).strip()
             age_days = 0
             has_valid_date = False
