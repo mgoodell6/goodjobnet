@@ -2127,9 +2127,9 @@ def update_jobseeker_info():
 def matches_coach_loose(coach_name, user_name):
     if not coach_name or not user_name:
         return False
-    
+        
     import re
-    # Clean strings: lowercase, remove non-alphanumeric (keep spaces)
+    # Clean strings: lowercase, remove non-alphanumeric, strip
     c_clean = re.sub(r'[^a-z0-9\s]', ' ', str(coach_name).lower())
     u_clean = re.sub(r'[^a-z0-9\s]', ' ', str(user_name).lower())
     
@@ -2139,37 +2139,49 @@ def matches_coach_loose(coach_name, user_name):
     if not c_words or not u_words:
         return False
         
-    # Check if sets of words overlap significantly
-    c_set = set(c_words)
-    u_set = set(u_words)
+    titles = {"e", "elder", "sis", "sister", "s", "br", "brother", "pres", "president"}
     
-    # Common stop words in coach names (e.g. coach, advisor, etc.)
-    stop_words = {"coach", "advisor", "employment"}
-    c_set_filtered = c_set - stop_words
-    u_set_filtered = u_set - stop_words
-    
-    if not c_set_filtered or not u_set_filtered:
+    # Strip leading title/initial from coach
+    if c_words[0] in titles:
+        c_words_stripped = c_words[1:]
+    else:
+        c_words_stripped = c_words
+        
+    # Strip leading title/initial from user
+    if u_words[0] in titles:
+        u_words_stripped = u_words[1:]
+    else:
+        u_words_stripped = u_words
+        
+    if not c_words_stripped or not u_words_stripped:
         return False
         
-    # Exact set match or subset match
-    if u_set_filtered.issubset(c_set_filtered) or c_set_filtered.issubset(u_set_filtered):
+    c_remaining = " ".join(c_words_stripped)
+    u_remaining = " ".join(u_words_stripped)
+    
+    # Extract user last name (last word after stripping title)
+    u_lastname = u_words_stripped[-1]
+    
+    # 1. Exact match of remaining names
+    if c_remaining == u_remaining:
         return True
         
-    # Check token overlap
-    import difflib
-    matched_count = 0
-    for uw in u_set_filtered:
-        for cw in c_set_filtered:
-            if uw == cw or uw in cw or cw in uw:
-                matched_count += 1
-                break
-            elif len(uw) >= 3 and len(cw) >= 3:
-                if difflib.SequenceMatcher(None, uw, cw).ratio() >= 0.8:
-                    matched_count += 1
-                    break
-                    
-    min_required = min(len(u_set_filtered), 2)
-    return matched_count >= min_required
+    # 2. Coach name matches user's last name
+    if c_remaining == u_lastname:
+        return True
+        
+    # 3. User's last name is in coach's remaining name (handles compound last names or full names in coach column)
+    if u_lastname in c_remaining.split():
+        return True
+        
+    # 4. Fallback: check if the word sets overlap
+    c_set = set(c_words_stripped)
+    u_set = set(u_words_stripped)
+    if u_set.issubset(c_set) or c_set.issubset(u_set):
+        return True
+        
+    return False
+
 
 
 @app.route('/api/assigned-seekers', methods=['GET'])
