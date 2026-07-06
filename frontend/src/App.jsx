@@ -10,7 +10,7 @@ import EmploymentCenterDashboard from './pages/EmploymentCenterDashboard';
 import InformationAndHelp from './pages/InformationAndHelp';
 import HotJobsReview from './pages/HotJobsReview';
 import JobSeekerDashboard from './pages/JobSeekerDashboard';
-import JobSeekerMatchesReport from './pages/JobSeekerMatchesReport';
+import AssignedJobSeekersList from './pages/AssignedJobSeekersList';
 
 // Manual Version Configuration - Update this string to change the application version displayed in the header
 
@@ -68,15 +68,15 @@ function App() {
         {user ? (
           <>
             <Route path="/dashboard" element={<GeneralDashboard />} />
-            <Route path="/admin-dashboard" element={<EmploymentCenterDashboard />} />
+            <Route path="/admin-dashboard" element={<EmploymentCenterDashboard user={user} />} />
             <Route path="/help" element={<InformationAndHelp />} />
             <Route path="/job-entry" element={<JobEntry user={user} />} />
             <Route path="/job-seeker-entry" element={<JobSeekerEntry user={user} />} />
             <Route path="/hot-jobs-review" element={<HotJobsReview user={user} />} />
             <Route path="/hot-jobs-5review" element={<HotJobsReview user={user} />} />
             <Route path="/hot-jobs-46review" element={<HotJobsReview user={user} />} />
-            <Route path="/job-seeker-matches-report" element={<JobSeekerMatchesReport />} />
-            <Route path="/job-seeker-search" element={<JobSeekerSearch />} />
+            <Route path="/assigned-job-seekers" element={<AssignedJobSeekersList user={user} />} />
+            <Route path="/job-seeker-search" element={<JobSeekerSearch user={user} />} />
           </>
         ) : (
           <Route path="*" element={<Login onLogin={handleLogin} />} />
