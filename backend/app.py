@@ -902,7 +902,7 @@ def hot_jobs_review():
                     if not (28 <= age_days <= 42) or not has_career_page:
                         continue
                 elif category == "unverified_no_career":
-                    if age_days <= 21 or has_career_page:
+                    if age_days <= 60 or has_career_page:
                         continue
 
             job = {

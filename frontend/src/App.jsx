@@ -17,6 +17,7 @@ import AssignedJobSeekersList from './pages/AssignedJobSeekersList';
 const APP_VERSION = "Beta v0.19";
 
 
+
 function TopBar({ user, handleLogout }) {
   const location = useLocation();
   const isJobSeekerDashboard = location.pathname === '/' || location.pathname === '/job-seeker-dashboard';

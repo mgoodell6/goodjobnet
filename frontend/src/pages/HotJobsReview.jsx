@@ -213,7 +213,9 @@ function HotJobsReview({ user }) {
     const companyType = (job.company_type && job.company_type.trim()) ? job.company_type : "Nothing entered";
     const currentlyHiring = (job.currently_hiring === 'TRUE' || job.currently_hiring === 'Yes' || job.currently_hiring === true || String(job.currently_hiring).toUpperCase() === 'TRUE') ? 'Yes' : 'No';
     const notesText = `. Additional Notes: ${(job.notes && job.notes.trim()) ? job.notes : "None"}`;
-    const text = `Company: ${job.company_name || 'unknown'}. Company Type: ${companyType}. Currently Hiring: ${currentlyHiring}. Available Jobs: ${available}. Contact Phone: ${contactPhoneFormatted}${notesText}.`;
+    const ageVal = job.age_days !== undefined ? job.age_days : 0;
+    const ageText = `. Age: ${ageVal} days`;
+    const text = `Company: ${job.company_name || 'unknown'}. Company Type: ${companyType}. Currently Hiring: ${currentlyHiring}. Available Jobs: ${available}. Contact Phone: ${contactPhoneFormatted}${notesText}${ageText}.`;
     speak(text);
   };
 
