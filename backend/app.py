@@ -805,6 +805,11 @@ def hot_jobs_review():
             company_name_val = str(get_row_field(row, "company_name")).strip()
             if not company_name_val:
                 continue
+            
+            career_page = get_row_field(row, "career_website")
+            has_career_page = bool(str(career_page).strip())
+            is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
+            
             date_str = str(get_row_field(row, "date_verified")).strip()
             age_days = 0
             has_valid_date = False
@@ -1885,6 +1890,7 @@ def search_seekers():
     try:
         # Load seekers from Unemployed List spreadsheet
         seekers_records = get_seekers_records()
+        all_jobs = get_master_jobs_records()
         
         nearby = []
         other = []
@@ -1969,6 +1975,23 @@ def search_seekers():
                     except Exception:
                         pass
             
+            # Count matching jobs
+            seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
+            match_count = 0
+            for row in all_jobs:
+                role = get_row_field(row, "available_jobs")
+                job_types_list = [t.strip() for t in str(role).split(",") if t.strip()]
+                match = False
+                for s_job in seeker_types_list:
+                    for jb_job in job_types_list:
+                        if is_loose_match(s_job, jb_job):
+                            match = True
+                            break
+                    if match:
+                        break
+                if match:
+                    match_count += 1
+
             seeker_entry = {
                 "row_index": idx + 2,
                 "name": name,
@@ -1988,7 +2011,8 @@ def search_seekers():
                 "interview_coaching": str(seeker.get("Interview Coach Needed", seeker.get("Interview Coach", seeker.get("Interview coaching", "")))).strip().lower() in ["yes", "true", "on"],
                 "job_search_assistance": str(seeker.get("Job Search Asst Needed", seeker.get("Job Search Asst", seeker.get("Job Search assistance", "")))).strip().lower() in ["yes", "true", "on"],
                 "address": seeker_address,
-                "distance": round(dist_miles, 1) if dist_miles != float('inf') else "N/A"
+                "distance": round(dist_miles, 1) if dist_miles != float('inf') else "N/A",
+                "matching_jobs_count": match_count
             }
             
             if origin_zip and dist_miles <= radius:
@@ -2117,6 +2141,259 @@ def update_jobseeker_info():
         
         return jsonify({"success": True, "message": f"Successfully updated jobBank jobSeeker counts for {len(update_payload)} rows!"})
         
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
+
+def matches_coach_loose(coach_name, user_name):
+    if not coach_name or not user_name:
+        return False
+        
+    import re
+    # Clean strings: lowercase, remove non-alphanumeric, strip
+    c_clean = re.sub(r'[^a-z0-9\s]', ' ', str(coach_name).lower())
+    u_clean = re.sub(r'[^a-z0-9\s]', ' ', str(user_name).lower())
+    
+    c_words = [w.strip() for w in c_clean.split() if w.strip()]
+    u_words = [w.strip() for w in u_clean.split() if w.strip()]
+    
+    if not c_words or not u_words:
+        return False
+        
+    titles = {"e", "elder", "sis", "sister", "s", "br", "brother", "pres", "president"}
+    
+    # Strip leading title/initial from coach
+    if c_words[0] in titles:
+        c_words_stripped = c_words[1:]
+    else:
+        c_words_stripped = c_words
+        
+    # Strip leading title/initial from user
+    if u_words[0] in titles:
+        u_words_stripped = u_words[1:]
+    else:
+        u_words_stripped = u_words
+        
+    if not c_words_stripped or not u_words_stripped:
+        return False
+        
+    c_remaining = " ".join(c_words_stripped)
+    u_remaining = " ".join(u_words_stripped)
+    
+    # Extract user last name (last word after stripping title)
+    u_lastname = u_words_stripped[-1]
+    
+    # 1. Exact match of remaining names
+    if c_remaining == u_remaining:
+        return True
+        
+    # 2. Coach name matches user's last name
+    if c_remaining == u_lastname:
+        return True
+        
+    # 3. User's last name is in coach's remaining name (handles compound last names or full names in coach column)
+    if u_lastname in c_remaining.split():
+        return True
+        
+    # 4. Fallback: check if the word sets overlap
+    c_set = set(c_words_stripped)
+    u_set = set(u_words_stripped)
+    if u_set.issubset(c_set) or c_set.issubset(u_set):
+        return True
+        
+    return False
+
+
+
+@app.route('/api/assigned-seekers', methods=['GET'])
+def assigned_seekers():
+    coach = request.args.get("coach", "").strip()
+    if not coach:
+        return jsonify({"success": False, "error": "Coach name is required"}), 400
+        
+    try:
+        seekers_records = get_seekers_records()
+        all_jobs = get_master_jobs_records()
+        assigned = []
+        
+        for idx, seeker in enumerate(seekers_records):
+            coach_val = str(seeker.get("Employment Coach", "")).strip()
+            if not coach_val:
+                continue
+                
+            if matches_coach_loose(coach_val, coach):
+                name = seeker.get(" Name", seeker.get("Name", "Unknown")).strip()
+                street = str(seeker.get("Street", "")).strip()
+                city = str(seeker.get("City", "")).strip()
+                zip_val = str(seeker.get("Zip", seeker.get("Zipcode", ""))).strip()
+                
+                if zip_val.endswith('.0'):
+                    zip_val = zip_val[:-2]
+                seeker_zip = zip_val.strip()
+                
+                addr_parts = [p for p in [street, city, seeker_zip] if p]
+                seeker_address = ", ".join(addr_parts)
+                
+                phone = str(seeker.get("Phone ") or seeker.get("Phone") or seeker.get("phone", "")).strip()
+                email = str(seeker.get("email") or seeker.get("Email") or seeker.get("Email Address", "")).strip()
+                seeker_job_types = str(seeker.get("Type of Job Needed", seeker.get("Desired Types", ""))).strip()
+                
+                # Count matching jobs
+                seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
+                match_count = 0
+                for row in all_jobs:
+                    role = get_row_field(row, "available_jobs")
+                    job_types_list = [t.strip() for t in str(role).split(",") if t.strip()]
+                    match = False
+                    for s_job in seeker_types_list:
+                        for jb_job in job_types_list:
+                            if is_loose_match(s_job, jb_job):
+                                match = True
+                                break
+                        if match:
+                            break
+                    if match:
+                        match_count += 1
+
+                seeker_entry = {
+                    "row_index": idx + 2,
+                    "name": name,
+                    "street": street,
+                    "city": city,
+                    "zipcode": seeker_zip,
+                    "ward": str(seeker.get("Ward", "")).strip(),
+                    "stake": str(seeker.get("Stake", "")).strip(),
+                    "phone": phone,
+                    "email": email,
+                    "skills_education": str(seeker.get("Skills/Education", "")).strip(),
+                    "job_needed": str(seeker.get("Company Type", seeker.get("Job Needed", ""))).strip(),
+                    "desired_job_types": seeker_job_types,
+                    "job_types": seeker_job_types,
+                    "general_notes": str(seeker.get("Notes", seeker.get("General Notes", ""))).strip(),
+                    "resume_assistance": str(seeker.get("Resume Asst Needed", seeker.get("Resume Asst", seeker.get("Resume assistance", "")))).strip().lower() in ["yes", "true", "on"],
+                    "interview_coaching": str(seeker.get("Interview Coach Needed", seeker.get("Interview Coach", seeker.get("Interview coaching", "")))).strip().lower() in ["yes", "true", "on"],
+                    "job_search_assistance": str(seeker.get("Job Search Asst Needed", seeker.get("Job Search Asst", seeker.get("Job Search assistance", "")))).strip().lower() in ["yes", "true", "on"],
+                    "address": seeker_address,
+                    "matching_jobs_count": match_count
+                }
+                assigned.append(seeker_entry)
+                
+        return jsonify({"success": True, "results": assigned})
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
+
+@app.route('/api/seeker-matching-jobs', methods=['GET'])
+def seeker_matching_jobs():
+    row_index = request.args.get("row_index")
+    seeker_job_types = request.args.get("job_types", "")
+    seeker_zip = request.args.get("zipcode", "").strip()
+    
+    try:
+        # If row_index is provided, try to fetch the seeker from sheet records first
+        if row_index:
+            try:
+                idx = int(row_index) - 2
+                seekers = get_seekers_records()
+                if 0 <= idx < len(seekers):
+                    seeker = seekers[idx]
+                    if not seeker_job_types:
+                        seeker_job_types = seeker.get("Type of Job Needed", seeker.get("Desired Types", ""))
+                    if not seeker_zip:
+                        zip_val = str(seeker.get("Zip", seeker.get("Zipcode", ""))).strip()
+                        if zip_val.endswith('.0'):
+                            zip_val = zip_val[:-2]
+                        seeker_zip = zip_val
+            except Exception as e:
+                print(f"Error fetching seeker by row_index: {e}")
+                
+        seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
+        
+        all_jobs = get_master_jobs_records()
+        
+        recent = []
+        older = []
+        
+        seeker_zip_5 = seeker_zip[:5] if seeker_zip else ""
+        
+        for row in all_jobs:
+            company = get_row_field(row, "company_name")
+            role = get_row_field(row, "available_jobs")
+            
+            # Check job type match
+            match = False
+            job_types_list = [t.strip() for t in str(role).split(",") if t.strip()]
+            for s_job in seeker_types_list:
+                for jb_job in job_types_list:
+                    if is_loose_match(s_job, jb_job):
+                        match = True
+                        break
+                if match:
+                    break
+                    
+            if not match:
+                continue
+                
+            address_val = get_row_field(row, "company_street")
+            city_val = get_row_field(row, "company_city")
+            state_val = get_row_field(row, "company_state", "FL")
+            location = f"{address_val}, {city_val}, {state_val}".strip(", ")
+            
+            job_zip_val = str(get_row_field(row, "company_zip")).strip()
+            if job_zip_val.endswith('.0'):
+                job_zip_val = job_zip_val[:-2]
+            job_zip_5 = job_zip_val[:5] if job_zip_val else ""
+            
+            dist_miles = float('inf')
+            if seeker_zip_5 and job_zip_5:
+                if seeker_zip_5 == job_zip_5:
+                    dist_miles = 0.0
+                else:
+                    try:
+                        coords1 = get_zip_coordinates(seeker_zip_5)
+                        coords2 = get_zip_coordinates(job_zip_5)
+                        if coords1 and coords2:
+                            dist_miles = calculate_distance(coords1[0], coords1[1], coords2[0], coords2[1])
+                    except Exception:
+                        pass
+                        
+            is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
+            is_currently_hiring = is_hiring_val in ["TRUE", "YES", "1", "Y"]
+            
+            career_website = get_row_field(row, "career_website")
+            notes_val = get_row_field(row, "notes")
+            
+            job_entry = {
+                "company": company or "Unknown",
+                "role": role or "Various",
+                "location": location,
+                "distance": f"{round(dist_miles, 1)} miles" if dist_miles != float('inf') else "N/A",
+                "career_website": career_website,
+                "notes": notes_val
+            }
+            
+            if is_currently_hiring:
+                recent.append(job_entry)
+            else:
+                older.append(job_entry)
+                
+        # Sort by distance
+        recent.sort(key=lambda x: float(x["distance"].split()[0]) if x["distance"] != "N/A" else float('inf'))
+        older.sort(key=lambda x: float(x["distance"].split()[0]) if x["distance"] != "N/A" else float('inf'))
+        
+        return jsonify({
+            "success": True,
+            "results": {
+                "recent": recent,
+                "older": older
+            }
+        })
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500

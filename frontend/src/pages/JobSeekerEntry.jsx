@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 const standardOptions = [
   "HVAC Repair", "Accountant", "Airport (Baggage/customer service/ground ops)",
@@ -24,12 +24,38 @@ function JobSeekerEntry({ user }) {
   const location = useLocation();
   const seeker = location.state?.seeker;
   const fromSearch = location.state?.fromSearch;
+  const fromAssigned = location.state?.fromAssigned;
 
   const seekerTypes = seeker?.desired_job_types ? seeker.desired_job_types.split(',').map(t => t.trim()) : [];
   const standardSelected = seekerTypes.filter(t => standardOptions.includes(t));
   const customSelected = seekerTypes.filter(t => !standardOptions.includes(t)).join(', ');
 
   const [selectedJobTypes, setSelectedJobTypes] = useState(standardSelected);
+
+  const [matchingJobs, setMatchingJobs] = useState({ recent: [], older: [] });
+  const [matchingJobsLoading, setMatchingJobsLoading] = useState(false);
+
+  useEffect(() => {
+    const loadMatchingJobs = async () => {
+      if (!seeker) return;
+      setMatchingJobsLoading(true);
+      try {
+        const response = await fetch(`/api/seeker-matching-jobs?row_index=${seeker.row_index}&job_types=${encodeURIComponent(seeker.desired_job_types || seeker.job_types || '')}&zipcode=${encodeURIComponent(seeker.zipcode || '')}`);
+        const data = await response.json();
+        if (data.success) {
+          setMatchingJobs(data.results);
+        } else {
+          console.error("Failed to load matching jobs:", data.error);
+        }
+      } catch (err) {
+        console.error("Error loading matching jobs:", err);
+      } finally {
+        setMatchingJobsLoading(false);
+      }
+    };
+
+    loadMatchingJobs();
+  }, [seeker]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -61,8 +87,8 @@ function JobSeekerEntry({ user }) {
     }
 
     try {
-      const endpoint = fromSearch ? '/api/update-seeker' : '/api/submit-seeker';
-      if (fromSearch && seeker?.row_index) {
+      const endpoint = (fromSearch || fromAssigned) ? '/api/update-seeker' : '/api/submit-seeker';
+      if ((fromSearch || fromAssigned) && seeker?.row_index) {
         data.row_index = seeker.row_index;
       }
 
@@ -74,7 +100,7 @@ function JobSeekerEntry({ user }) {
       const result = await response.json();
       if (result.success) {
         setSuccess(true);
-        setMessage(fromSearch ? 'Job Seeker successfully updated!' : 'Job Seeker successfully added!');
+        setMessage((fromSearch || fromAssigned) ? 'Job Seeker successfully updated!' : 'Job Seeker successfully added!');
         
         if (fromSearch) {
           // Update the sessionStorage cache so the report has the updated seeker data
@@ -132,7 +158,7 @@ function JobSeekerEntry({ user }) {
 
   return (
     <div className="app-container">
-      <div className="glass-panel main-form">
+      <div className="glass-panel main-form" style={{ maxWidth: seeker ? '1000px' : '700px' }}>
         <header>
           <h1>Job Seeker Entry</h1>
           <p className="subtitle">Enter information for an individual seeking employment</p>
@@ -302,7 +328,9 @@ function JobSeekerEntry({ user }) {
               type="button" 
               className="btn secondary-btn" 
               onClick={() => {
-                if (fromSearch) {
+                if (fromAssigned) {
+                  navigate('/assigned-job-seekers');
+                } else if (fromSearch) {
                   navigate('/job-seeker-search', { state: { keepResults: true } });
                 } else if (seeker) {
                   navigate('/job-seeker-search', { state: { keepResults: true } });
@@ -311,17 +339,123 @@ function JobSeekerEntry({ user }) {
                 }
               }}
             >
-              {fromSearch ? 'Return to report' : 'Cancel'}
+              {(fromSearch || fromAssigned) ? 'Return to report' : 'Cancel'}
             </button>
             <button 
               type="submit" 
               className="btn primary-btn" 
-              disabled={loading || (!!seeker && !fromSearch)}
+              disabled={loading || (!!seeker && !(fromSearch || fromAssigned))}
             >
-              {loading ? 'Submitting...' : (fromSearch ? 'Submit changes' : 'Submit Job Seeker')}
+              {loading ? 'Submitting...' : ((fromSearch || fromAssigned) ? 'Submit changes' : 'Submit Job Seeker')}
             </button>
           </div>
         </form>
+
+        {seeker && (
+          <div className="matching-jobs-section mt-3" style={{ borderTop: '2px solid rgba(0,0,0,0.1)', paddingTop: '2rem', marginTop: '2rem' }}>
+            <h2 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>Matching Jobs for {seeker.name}</h2>
+            <p style={{ fontStyle: 'italic', color: 'var(--text-light)', marginBottom: '1.5rem' }}>
+              Based on desired job types: <strong>{seeker.desired_job_types || seeker.job_types}</strong>
+            </p>
+            {matchingJobsLoading ? (
+              <p className="text-center">Loading matching jobs from JobBank...</p>
+            ) : (
+              <>
+                <h3 style={{ marginTop: '1.5rem', color: '#2ecc71', borderBottom: '2px solid #2ecc71', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
+                  Currently Hiring Jobs ({matchingJobs.recent.length})
+                </h3>
+                {matchingJobs.recent.length > 0 ? (
+                  <div className="table-container mb-2">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Company</th>
+                          <th>Role</th>
+                          <th>Location</th>
+                          <th>Distance</th>
+                          <th>Career Website</th>
+                          <th>Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {matchingJobs.recent.map((job, idx) => (
+                          <tr key={idx}>
+                            <td>
+                              <Link 
+                                to={`/hot-jobs-review?category=company&company=${encodeURIComponent(job.company)}`} 
+                                state={{ seeker, fromEntry: true, fromAssigned, fromSearch }}
+                                style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}
+                              >
+                                {job.company}
+                              </Link>
+                            </td>
+                            <td>{job.role}</td>
+                            <td>{job.location}</td>
+                            <td>{job.distance || 'N/A'}</td>
+                            <td>
+                              {job.career_website ? (
+                                <a href={job.career_website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}>
+                                  View Posting
+                                </a>
+                              ) : 'N/A'}
+                            </td>
+                            <td>{job.notes || 'N/A'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <p style={{ fontStyle: 'italic', color: 'var(--text-light)', marginBottom: '1.5rem' }}>No currently hiring jobs found matching criteria.</p>}
+
+                <h3 style={{ marginTop: '2rem', color: '#f39c12', borderBottom: '2px solid #f39c12', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
+                  Other Jobs Meeting Criteria (Not Currently Hiring) ({matchingJobs.older.length})
+                </h3>
+                {matchingJobs.older.length > 0 ? (
+                  <div className="table-container mb-2">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Company</th>
+                          <th>Role</th>
+                          <th>Location</th>
+                          <th>Distance</th>
+                          <th>Career Website</th>
+                          <th>Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {matchingJobs.older.map((job, idx) => (
+                          <tr key={idx}>
+                            <td>
+                              <Link 
+                                to={`/hot-jobs-review?category=company&company=${encodeURIComponent(job.company)}`} 
+                                state={{ seeker, fromEntry: true, fromAssigned, fromSearch }}
+                                style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}
+                              >
+                                {job.company}
+                              </Link>
+                            </td>
+                            <td>{job.role}</td>
+                            <td>{job.location}</td>
+                            <td>{job.distance || 'N/A'}</td>
+                            <td>
+                              {job.career_website ? (
+                                <a href={job.career_website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}>
+                                  View Posting
+                                </a>
+                              ) : 'N/A'}
+                            </td>
+                            <td>{job.notes || 'N/A'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <p style={{ fontStyle: 'italic', color: 'var(--text-light)' }}>No other matching jobs found.</p>}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
