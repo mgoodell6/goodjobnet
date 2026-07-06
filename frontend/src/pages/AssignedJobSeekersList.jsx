@@ -62,6 +62,7 @@ function AssignedJobSeekersList({ user }) {
                   <th>Phone</th>
                   <th>Email</th>
                   <th>Job Types</th>
+                  <th>Matching Jobs</th>
                 </tr>
               </thead>
               <tbody>
@@ -81,6 +82,7 @@ function AssignedJobSeekersList({ user }) {
                     <td>{seeker.phone ? <a href={`tel:${seeker.phone}`}>{seeker.phone}</a> : 'N/A'}</td>
                     <td>{seeker.email ? <a href={`mailto:${seeker.email}`}>{seeker.email}</a> : 'N/A'}</td>
                     <td>{seeker.job_types || 'N/A'}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{seeker.matching_jobs_count ?? 0}</td>
                   </tr>
                 ))}
               </tbody>

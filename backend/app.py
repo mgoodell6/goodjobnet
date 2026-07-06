@@ -2192,6 +2192,7 @@ def assigned_seekers():
         
     try:
         seekers_records = get_seekers_records()
+        all_jobs = get_master_jobs_records()
         assigned = []
         
         for idx, seeker in enumerate(seekers_records):
@@ -2216,6 +2217,23 @@ def assigned_seekers():
                 email = str(seeker.get("email") or seeker.get("Email") or seeker.get("Email Address", "")).strip()
                 seeker_job_types = str(seeker.get("Type of Job Needed", seeker.get("Desired Types", ""))).strip()
                 
+                # Count matching jobs
+                seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
+                match_count = 0
+                for row in all_jobs:
+                    role = get_row_field(row, "available_jobs")
+                    job_types_list = [t.strip() for t in str(role).split(",") if t.strip()]
+                    match = False
+                    for s_job in seeker_types_list:
+                        for jb_job in job_types_list:
+                            if is_loose_match(s_job, jb_job):
+                                match = True
+                                break
+                        if match:
+                            break
+                    if match:
+                        match_count += 1
+
                 seeker_entry = {
                     "row_index": idx + 2,
                     "name": name,
@@ -2234,7 +2252,8 @@ def assigned_seekers():
                     "resume_assistance": str(seeker.get("Resume Asst Needed", seeker.get("Resume Asst", seeker.get("Resume assistance", "")))).strip().lower() in ["yes", "true", "on"],
                     "interview_coaching": str(seeker.get("Interview Coach Needed", seeker.get("Interview Coach", seeker.get("Interview coaching", "")))).strip().lower() in ["yes", "true", "on"],
                     "job_search_assistance": str(seeker.get("Job Search Asst Needed", seeker.get("Job Search Asst", seeker.get("Job Search assistance", "")))).strip().lower() in ["yes", "true", "on"],
-                    "address": seeker_address
+                    "address": seeker_address,
+                    "matching_jobs_count": match_count
                 }
                 assigned.append(seeker_entry)
                 
