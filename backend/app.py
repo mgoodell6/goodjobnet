@@ -1885,6 +1885,7 @@ def search_seekers():
     try:
         # Load seekers from Unemployed List spreadsheet
         seekers_records = get_seekers_records()
+        all_jobs = get_master_jobs_records()
         
         nearby = []
         other = []
@@ -1969,6 +1970,23 @@ def search_seekers():
                     except Exception:
                         pass
             
+            # Count matching jobs
+            seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
+            match_count = 0
+            for row in all_jobs:
+                role = get_row_field(row, "available_jobs")
+                job_types_list = [t.strip() for t in str(role).split(",") if t.strip()]
+                match = False
+                for s_job in seeker_types_list:
+                    for jb_job in job_types_list:
+                        if is_loose_match(s_job, jb_job):
+                            match = True
+                            break
+                    if match:
+                        break
+                if match:
+                    match_count += 1
+
             seeker_entry = {
                 "row_index": idx + 2,
                 "name": name,
@@ -1988,7 +2006,8 @@ def search_seekers():
                 "interview_coaching": str(seeker.get("Interview Coach Needed", seeker.get("Interview Coach", seeker.get("Interview coaching", "")))).strip().lower() in ["yes", "true", "on"],
                 "job_search_assistance": str(seeker.get("Job Search Asst Needed", seeker.get("Job Search Asst", seeker.get("Job Search assistance", "")))).strip().lower() in ["yes", "true", "on"],
                 "address": seeker_address,
-                "distance": round(dist_miles, 1) if dist_miles != float('inf') else "N/A"
+                "distance": round(dist_miles, 1) if dist_miles != float('inf') else "N/A",
+                "matching_jobs_count": match_count
             }
             
             if origin_zip and dist_miles <= radius:

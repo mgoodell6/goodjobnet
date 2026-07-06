@@ -268,7 +268,6 @@ function JobSeekerSearch({ user }) {
                           <th>Email</th>
                           <th>Job Types</th>
                           <th>Distance</th>
-                          <th style={{ width: '120px' }}>Matching Jobs</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -287,16 +286,6 @@ function JobSeekerSearch({ user }) {
                               {typeof seeker.distance === 'number'
                                 ? `${seeker.distance} mile${seeker.distance === 1 ? '' : 's'}`
                                 : seeker.distance}
-                            </td>
-                            <td>
-                              <button 
-                                type="button" 
-                                className="btn primary-btn" 
-                                style={{ padding: '4px 8px', fontSize: '0.8rem', width: 'auto', background: '#3498db', border: 'none' }}
-                                onClick={() => loadMatchingJobs(seeker)}
-                              >
-                                Match Jobs
-                              </button>
                             </td>
                           </tr>
                         ))}
@@ -327,7 +316,6 @@ function JobSeekerSearch({ user }) {
                           <th>Email</th>
                           <th>Job Types</th>
                           <th>Distance</th>
-                          <th style={{ width: '120px' }}>Matching Jobs</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -346,16 +334,6 @@ function JobSeekerSearch({ user }) {
                               {typeof seeker.distance === 'number'
                                 ? `${seeker.distance} mile${seeker.distance === 1 ? '' : 's'}`
                                 : seeker.distance}
-                            </td>
-                            <td>
-                              <button 
-                                type="button" 
-                                className="btn primary-btn" 
-                                style={{ padding: '4px 8px', fontSize: '0.8rem', width: 'auto', background: '#3498db', border: 'none' }}
-                                onClick={() => loadMatchingJobs(seeker)}
-                              >
-                                Match Jobs
-                              </button>
                             </td>
                           </tr>
                         ))}

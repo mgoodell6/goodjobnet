@@ -71,7 +71,7 @@ function AssignedJobSeekersList({ user }) {
                     <td style={{ fontWeight: 'bold' }}>
                       <Link 
                         to="/job-seeker-entry" 
-                        state={{ seeker, fromSearch: true }} 
+                        state={{ seeker, fromAssigned: true }} 
                         style={{ color: 'var(--primary-color)', textDecoration: 'none' }} 
                         className="seeker-name-link"
                       >

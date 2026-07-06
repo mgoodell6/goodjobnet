@@ -24,6 +24,7 @@ function JobSeekerEntry({ user }) {
   const location = useLocation();
   const seeker = location.state?.seeker;
   const fromSearch = location.state?.fromSearch;
+  const fromAssigned = location.state?.fromAssigned;
 
   const seekerTypes = seeker?.desired_job_types ? seeker.desired_job_types.split(',').map(t => t.trim()) : [];
   const standardSelected = seekerTypes.filter(t => standardOptions.includes(t));
@@ -86,8 +87,8 @@ function JobSeekerEntry({ user }) {
     }
 
     try {
-      const endpoint = fromSearch ? '/api/update-seeker' : '/api/submit-seeker';
-      if (fromSearch && seeker?.row_index) {
+      const endpoint = (fromSearch || fromAssigned) ? '/api/update-seeker' : '/api/submit-seeker';
+      if ((fromSearch || fromAssigned) && seeker?.row_index) {
         data.row_index = seeker.row_index;
       }
 
@@ -99,7 +100,7 @@ function JobSeekerEntry({ user }) {
       const result = await response.json();
       if (result.success) {
         setSuccess(true);
-        setMessage(fromSearch ? 'Job Seeker successfully updated!' : 'Job Seeker successfully added!');
+        setMessage((fromSearch || fromAssigned) ? 'Job Seeker successfully updated!' : 'Job Seeker successfully added!');
         
         if (fromSearch) {
           // Update the sessionStorage cache so the report has the updated seeker data
@@ -327,7 +328,9 @@ function JobSeekerEntry({ user }) {
               type="button" 
               className="btn secondary-btn" 
               onClick={() => {
-                if (fromSearch) {
+                if (fromAssigned) {
+                  navigate('/assigned-job-seekers');
+                } else if (fromSearch) {
                   navigate('/job-seeker-search', { state: { keepResults: true } });
                 } else if (seeker) {
                   navigate('/job-seeker-search', { state: { keepResults: true } });
@@ -336,14 +339,14 @@ function JobSeekerEntry({ user }) {
                 }
               }}
             >
-              {fromSearch ? 'Return to report' : 'Cancel'}
+              {(fromSearch || fromAssigned) ? 'Return to report' : 'Cancel'}
             </button>
             <button 
               type="submit" 
               className="btn primary-btn" 
-              disabled={loading || (!!seeker && !fromSearch)}
+              disabled={loading || (!!seeker && !(fromSearch || fromAssigned))}
             >
-              {loading ? 'Submitting...' : (fromSearch ? 'Submit changes' : 'Submit Job Seeker')}
+              {loading ? 'Submitting...' : ((fromSearch || fromAssigned) ? 'Submit changes' : 'Submit Job Seeker')}
             </button>
           </div>
         </form>
