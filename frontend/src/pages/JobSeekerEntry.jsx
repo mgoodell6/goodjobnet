@@ -157,7 +157,7 @@ function JobSeekerEntry({ user }) {
 
   return (
     <div className="app-container">
-      <div className="glass-panel main-form">
+      <div className="glass-panel main-form" style={{ maxWidth: seeker ? '1000px' : '700px' }}>
         <header>
           <h1>Job Seeker Entry</h1>
           <p className="subtitle">Enter information for an individual seeking employment</p>
