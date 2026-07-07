@@ -213,8 +213,7 @@ function HotJobsReview({ user }) {
     const companyType = (job.company_type && job.company_type.trim()) ? job.company_type : "Nothing entered";
     const currentlyHiring = (job.currently_hiring === 'TRUE' || job.currently_hiring === 'Yes' || job.currently_hiring === true || String(job.currently_hiring).toUpperCase() === 'TRUE') ? 'Yes' : 'No';
     const notesText = `. Additional Notes: ${(job.notes && job.notes.trim()) ? job.notes : "None"}`;
-    const ageVal = job.age_days !== undefined ? job.age_days : 0;
-    const ageText = `. Age: ${ageVal} days`;
+    const ageText = job.age_days === 9999 ? '. Never verified' : `. Age: ${job.age_days} days`;
     const text = `Company: ${job.company_name || 'unknown'}. Company Type: ${companyType}. Currently Hiring: ${currentlyHiring}. Available Jobs: ${available}. Contact Phone: ${contactPhoneFormatted}${notesText}${ageText}.`;
     speak(text);
   };
@@ -1305,7 +1304,13 @@ function HotJobsReview({ user }) {
 
         // Update local state to reflect changes
         const updatedJobs = [...jobs];
-        updatedJobs[currentIndex] = { ...currentJob, ...data };
+        const todayStr = new Date().toISOString().split('T')[0];
+        updatedJobs[currentIndex] = { 
+          ...currentJob, 
+          ...data, 
+          age_days: 0, 
+          date_last_verified: todayStr 
+        };
         setJobs(updatedJobs);
 
         if (voiceActiveRef.current) {
@@ -1461,7 +1466,7 @@ function HotJobsReview({ user }) {
           <div style={{ textAlign: 'right' }}>
             <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Job {currentIndex + 1} of {jobs.length}</span>
             <div style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>
-              Age: {currentJob.age_days} days
+              Last Verified: {currentJob.date_last_verified || 'Never'} ({currentJob.age_days === 9999 ? 'Never Verified' : `${currentJob.age_days} days ago`})
             </div>
             <div style={{ fontSize: '0.9rem', marginTop: '2px' }}>
               <Link
