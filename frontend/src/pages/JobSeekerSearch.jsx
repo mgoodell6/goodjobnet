@@ -16,7 +16,7 @@ const JOB_OPTIONS = [
   "Warehousing/Logistics"
 ];
 
-function JobSeekerSearch() {
+function JobSeekerSearch({ user }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,6 +28,50 @@ function JobSeekerSearch() {
 
   const [results, setResults] = useState(null);
   const [selectedJobTypes, setSelectedJobTypes] = useState(savedInputs.job_types || []);
+
+  const [selectedSeeker, setSelectedSeeker] = useState(null);
+  const [matchingJobs, setMatchingJobs] = useState({ recent: [], older: [] });
+  const [matchingJobsLoading, setMatchingJobsLoading] = useState(false);
+
+  const loadMatchingJobs = useCallback(async (seeker) => {
+    setSelectedSeeker(seeker);
+    setMatchingJobsLoading(true);
+    try {
+      const response = await fetch(`/api/seeker-matching-jobs?row_index=${seeker.row_index}&job_types=${encodeURIComponent(seeker.job_types || seeker.desired_job_types || '')}&zipcode=${encodeURIComponent(seeker.zipcode || '')}`);
+      const data = await response.json();
+      if (data.success) {
+        setMatchingJobs(data.results);
+      } else {
+        alert("Failed to load matching jobs: " + (data.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Network error while fetching matching jobs.");
+    } finally {
+      setMatchingJobsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (results) {
+        const nearbyList = results.nearby || [];
+        const otherList = results.other || [];
+        const totalCount = nearbyList.length + otherList.length;
+        if (totalCount === 1) {
+          const singleSeeker = nearbyList.length === 1 ? nearbyList[0] : otherList[0];
+          loadMatchingJobs(singleSeeker);
+        } else {
+          setSelectedSeeker(null);
+          setMatchingJobs({ recent: [], older: [] });
+        }
+      } else {
+        setSelectedSeeker(null);
+        setMatchingJobs({ recent: [], older: [] });
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [results, loadMatchingJobs]);
 
   const performSearch = useCallback(async (searchParams) => {
     setLoading(true);
@@ -194,7 +238,7 @@ function JobSeekerSearch() {
             <button type="submit" className="btn primary-btn" style={{ maxWidth: '300px' }} disabled={loading}>
               {loading ? 'Searching...' : 'Look for potential job seekers'}
             </button>
-            <button type="button" className="btn secondary-btn" style={{ maxWidth: '300px', marginLeft: '1rem' }} onClick={() => navigate('/admin-dashboard')}>
+            <button type="button" className="btn secondary-btn" style={{ maxWidth: '300px', marginLeft: '1rem' }} onClick={() => navigate(user?.role === 'admin' ? '/admin-dashboard' : '/dashboard')}>
               Back to Dashboard
             </button>
           </div>
@@ -299,6 +343,96 @@ function JobSeekerSearch() {
                 );
               })()}
             </div>
+
+            {selectedSeeker && (
+              <div className="matching-jobs-section mt-3" style={{ borderTop: '2px solid rgba(0,0,0,0.1)', paddingTop: '2rem', marginTop: '2rem' }}>
+                <h2 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>Matching Jobs for {selectedSeeker.name}</h2>
+                <p style={{ fontStyle: 'italic', color: 'var(--text-light)', marginBottom: '1.5rem' }}>
+                  Based on desired job types: <strong>{selectedSeeker.job_types || selectedSeeker.desired_job_types}</strong>
+                </p>
+                {matchingJobsLoading ? (
+                  <p className="text-center">Loading matching jobs from JobBank...</p>
+                ) : (
+                  <>
+                    <h3 style={{ marginTop: '1.5rem', color: '#2ecc71', borderBottom: '2px solid #2ecc71', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
+                      Currently Hiring Jobs ({matchingJobs.recent.length})
+                    </h3>
+                    {matchingJobs.recent.length > 0 ? (
+                      <div className="table-container mb-2">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Company</th>
+                              <th>Role</th>
+                              <th>Location</th>
+                              <th>Distance</th>
+                              <th>Career Website</th>
+                              <th>Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {matchingJobs.recent.map((job, idx) => (
+                              <tr key={idx}>
+                                <td>{job.company}</td>
+                                <td>{job.role}</td>
+                                <td>{job.location}</td>
+                                <td>{job.distance || 'N/A'}</td>
+                                <td>
+                                  {job.career_website ? (
+                                    <a href={job.career_website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}>
+                                      View Posting
+                                    </a>
+                                  ) : 'N/A'}
+                                </td>
+                                <td>{job.notes || 'N/A'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : <p style={{ fontStyle: 'italic', color: 'var(--text-light)', marginBottom: '1.5rem' }}>No currently hiring jobs found matching criteria.</p>}
+
+                    <h3 style={{ marginTop: '2rem', color: '#f39c12', borderBottom: '2px solid #f39c12', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
+                      Other Jobs Meeting Criteria (Not Currently Hiring) ({matchingJobs.older.length})
+                    </h3>
+                    {matchingJobs.older.length > 0 ? (
+                      <div className="table-container mb-2">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Company</th>
+                              <th>Role</th>
+                              <th>Location</th>
+                              <th>Distance</th>
+                              <th>Career Website</th>
+                              <th>Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {matchingJobs.older.map((job, idx) => (
+                              <tr key={idx}>
+                                <td>{job.company}</td>
+                                <td>{job.role}</td>
+                                <td>{job.location}</td>
+                                <td>{job.distance || 'N/A'}</td>
+                                <td>
+                                  {job.career_website ? (
+                                    <a href={job.career_website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}>
+                                      View Posting
+                                    </a>
+                                  ) : 'N/A'}
+                                </td>
+                                <td>{job.notes || 'N/A'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : <p style={{ fontStyle: 'italic', color: 'var(--text-light)' }}>No other matching jobs found.</p>}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

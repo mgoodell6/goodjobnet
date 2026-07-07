@@ -805,6 +805,11 @@ def hot_jobs_review():
             company_name_val = str(get_row_field(row, "company_name")).strip()
             if not company_name_val:
                 continue
+            
+            career_page = get_row_field(row, "career_website")
+            has_career_page = bool(str(career_page).strip())
+            is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
+            
             date_str = str(get_row_field(row, "date_verified")).strip()
             age_days = 0
             has_valid_date = False
@@ -897,7 +902,7 @@ def hot_jobs_review():
                     if not (28 <= age_days <= 42) or not has_career_page:
                         continue
                 elif category == "unverified_no_career":
-                    if age_days <= 21 or has_career_page:
+                    if age_days <= 60 or has_career_page:
                         continue
 
             job = {
@@ -1885,6 +1890,7 @@ def search_seekers():
     try:
         # Load seekers from Unemployed List spreadsheet
         seekers_records = get_seekers_records()
+        all_jobs = get_master_jobs_records()
         
         nearby = []
         other = []
@@ -1969,6 +1975,23 @@ def search_seekers():
                     except Exception:
                         pass
             
+            # Count matching jobs
+            seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
+            match_count = 0
+            for row in all_jobs:
+                role = get_row_field(row, "available_jobs")
+                job_types_list = [t.strip() for t in str(role).split(",") if t.strip()]
+                match = False
+                for s_job in seeker_types_list:
+                    for jb_job in job_types_list:
+                        if is_loose_match(s_job, jb_job):
+                            match = True
+                            break
+                    if match:
+                        break
+                if match:
+                    match_count += 1
+
             seeker_entry = {
                 "row_index": idx + 2,
                 "name": name,
@@ -1988,7 +2011,8 @@ def search_seekers():
                 "interview_coaching": str(seeker.get("Interview Coach Needed", seeker.get("Interview Coach", seeker.get("Interview coaching", "")))).strip().lower() in ["yes", "true", "on"],
                 "job_search_assistance": str(seeker.get("Job Search Asst Needed", seeker.get("Job Search Asst", seeker.get("Job Search assistance", "")))).strip().lower() in ["yes", "true", "on"],
                 "address": seeker_address,
-                "distance": round(dist_miles, 1) if dist_miles != float('inf') else "N/A"
+                "distance": round(dist_miles, 1) if dist_miles != float('inf') else "N/A",
+                "matching_jobs_count": match_count
             }
             
             if origin_zip and dist_miles <= radius:
@@ -2124,373 +2148,251 @@ def update_jobseeker_info():
         garbage_collector.collect()
 
 
-
-@app.route('/api/import-jobseekers', methods=['POST'])
-def import_jobseekers():
-    import zipfile
-    import xml.etree.ElementTree as ET
-    
-    if 'file' not in request.files:
-        return jsonify({"success": False, "error": "No file uploaded"}), 400
+def matches_coach_loose(coach_name, user_name):
+    if not coach_name or not user_name:
+        return False
         
-    file = request.files['file']
-    if not file.filename:
-        return jsonify({"success": False, "error": "Empty filename"}), 400
+    import re
+    # Clean strings: lowercase, remove non-alphanumeric, strip
+    c_clean = re.sub(r'[^a-z0-9\s]', ' ', str(coach_name).lower())
+    u_clean = re.sub(r'[^a-z0-9\s]', ' ', str(user_name).lower())
+    
+    c_words = [w.strip() for w in c_clean.split() if w.strip()]
+    u_words = [w.strip() for w in u_clean.split() if w.strip()]
+    
+    if not c_words or not u_words:
+        return False
+        
+    titles = {"e", "elder", "sis", "sister", "s", "br", "brother", "pres", "president"}
+    
+    # Strip leading title/initial from coach
+    if c_words[0] in titles:
+        c_words_stripped = c_words[1:]
+    else:
+        c_words_stripped = c_words
+        
+    # Strip leading title/initial from user
+    if u_words[0] in titles:
+        u_words_stripped = u_words[1:]
+    else:
+        u_words_stripped = u_words
+        
+    if not c_words_stripped or not u_words_stripped:
+        return False
+        
+    c_remaining = " ".join(c_words_stripped)
+    u_remaining = " ".join(u_words_stripped)
+    
+    # Extract user last name (last word after stripping title)
+    u_lastname = u_words_stripped[-1]
+    
+    # 1. Exact match of remaining names
+    if c_remaining == u_remaining:
+        return True
+        
+    # 2. Coach name matches user's last name
+    if c_remaining == u_lastname:
+        return True
+        
+    # 3. User's last name is in coach's remaining name (handles compound last names or full names in coach column)
+    if u_lastname in c_remaining.split():
+        return True
+        
+    # 4. Fallback: check if the word sets overlap
+    c_set = set(c_words_stripped)
+    u_set = set(u_words_stripped)
+    if u_set.issubset(c_set) or c_set.issubset(u_set):
+        return True
+        
+    return False
+
+
+
+@app.route('/api/assigned-seekers', methods=['GET'])
+def assigned_seekers():
+    coach = request.args.get("coach", "").strip()
+    if not coach:
+        return jsonify({"success": False, "error": "Coach name is required"}), 400
         
     try:
-        # 1. Parse xlsx file from memory
-        file_bytes = io.BytesIO(file.read())
+        seekers_records = get_seekers_records()
+        all_jobs = get_master_jobs_records()
+        assigned = []
         
-        with zipfile.ZipFile(file_bytes) as z:
-            sheet_names = z.namelist()
-            sheet_file = None
-            for s in ['xl/worksheets/sheet2.xml', 'xl/worksheets/sheet1.xml', 'xl/worksheets/sheet.xml']:
-                if s in sheet_names:
-                    sheet_file = s
-                    break
-            if not sheet_file:
-                for name in sheet_names:
-                    if name.startswith('xl/worksheets/sheet') and name.endswith('.xml'):
-                        sheet_file = name
-                        break
-            if not sheet_file:
-                return jsonify({"success": False, "error": "Could not find any worksheet in the uploaded Excel file."}), 400
-                
-            # Read shared strings if it exists
-            shared_strings = []
-            try:
-                with z.open('xl/sharedStrings.xml') as sf:
-                    tree = ET.parse(sf)
-                    root = tree.getroot()
-                    ns = {'ns': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
-                    for si in root.findall('.//ns:si', ns):
-                        t_text = []
-                        for t_el in si.findall('.//ns:t', ns):
-                            t_text.append(t_el.text or '')
-                        shared_strings.append(''.join(t_text))
-            except KeyError:
-                pass
-                
-            with z.open(sheet_file) as sf:
-                tree = ET.parse(sf)
-                root = tree.getroot()
-                ns = {'ns': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
-                
-                rows = {}
-                for row in root.findall('.//ns:row', ns):
-                    r_idx = int(row.attrib.get('r', len(rows) + 1))
-                    row_data = {}
-                    for c in row.findall('ns:c', ns):
-                        r_ref = c.attrib.get('r', '')
-                        col_letter = ''.join([x for x in r_ref if x.isalpha()])
-                        t = c.attrib.get('t', '')
-                        v_el = c.find('ns:v', ns)
-                        is_el = c.find('ns:is', ns)
-                        
-                        val = ''
-                        if t == 'inlineStr' and is_el is not None:
-                            t_el = is_el.find('ns:t', ns)
-                            if t_el is not None:
-                                val = t_el.text or ''
-                        elif v_el is not None:
-                            val = v_el.text or ''
-                        row_data[col_letter] = val
-                    rows[r_idx] = row_data
-
-        if not rows:
-            return jsonify({"success": False, "error": "Uploaded Excel sheet is empty."}), 400
-            
-        col_letters = sorted(list(set(col for r in rows.values() for col in r.keys())), key=lambda x: (len(x), x))
-        max_row = max(rows.keys())
-        
-        raw_rows = []
-        for r in range(1, max_row + 1):
-            if r in rows:
-                raw_rows.append([rows[r].get(col, '') for col in col_letters])
-            else:
-                raw_rows.append(['' for col in col_letters])
-                
-        excel_headers = [str(h).strip() for h in raw_rows[0]]
-        
-        imported_seekers = []
-        for r in raw_rows[1:]:
-            if not any(r):
-                continue
-            record = {}
-            for h, val in zip(excel_headers, r):
-                if h:
-                    record[h] = val
-            imported_seekers.append(record)
-            
-        # Helper to convert Excel serial dates to string
-        def excel_date_to_string(excel_val):
-            if not excel_val:
-                return ""
-            try:
-                val_float = float(excel_val)
-                base_date = datetime.datetime(1899, 12, 30)
-                dt = base_date + datetime.timedelta(days=val_float)
-                return dt.strftime("%m/%d/%Y")
-            except Exception:
-                return str(excel_val).strip()
-
-        # Helper to format 10-digit phone numbers
-        def format_phone(phone_val):
-            phone_str = str(phone_val).strip()
-            digits = ''.join([c for c in phone_str if c.isdigit()])
-            if len(digits) == 10:
-                return f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
-            elif len(digits) == 11 and digits[0] == '1':
-                return f"{digits[1:4]}-{digits[4:7]}-{digits[7:]}"
-            return phone_str
-
-        # Helper to clean names for matching
-        def clean_name(name_val):
-            return ' '.join(str(name_val).strip().lower().replace(',', '').split())
-
-        def clean_phone_10(phone_val):
-            if not phone_val:
-                return ""
-            digits = "".join(c for c in str(phone_val) if c.isdigit())
-            if digits.startswith("1") and len(digits) > 10:
-                digits = digits[1:]
-            return digits[:10]
-
-        def get_name_tokens(name_str):
-            import re
-            n = str(name_str).lower()
-            n = re.sub(r'\(.*?\)', ' ', n)
-            n = re.sub(r'[^a-z0-9\s]', ' ', n)
-            return [w.strip() for w in n.split() if w.strip()]
-
-        def get_significant_tokens(words):
-            sig_words = [w for w in words if len(w) >= 2]
-            if not sig_words:
-                return words
-            return sig_words
-
-        def words_match_loose(w1, w2):
-            if w1 == w2:
-                return True
-            if len(w1) >= 4 and len(w2) >= 4:
-                if w1 in w2 or w2 in w1:
-                    return True
-            import difflib
-            if difflib.SequenceMatcher(None, w1, w2).ratio() >= 0.81:
-                return True
-            return False
-
-        def names_match_loose(name1, name2):
-            tokens1 = get_significant_tokens(get_name_tokens(name1))
-            tokens2 = get_significant_tokens(get_name_tokens(name2))
-            
-            if not tokens1 or not tokens2:
-                return False
-                
-            matched_in_1 = set()
-            matched_in_2 = set()
-            
-            for idx1, t1 in enumerate(tokens1):
-                for idx2, t2 in enumerate(tokens2):
-                    if words_match_loose(t1, t2):
-                        matched_in_1.add(idx1)
-                        matched_in_2.add(idx2)
-                        
-            unmatched1 = set(range(len(tokens1))) - matched_in_1
-            unmatched2 = set(range(len(tokens2))) - matched_in_2
-            
-            if unmatched1 and unmatched2:
-                return False
-                
-            min_tokens = min(len(tokens1), len(tokens2))
-            match_count = min(len(matched_in_1), len(matched_in_2))
-            
-            if min_tokens == 1:
-                return match_count >= 1
-            else:
-                return match_count >= 2 and (match_count / min_tokens) >= 0.65
-
-        # 2. Get current seekers from Google Sheets
-        gc_client = get_gsheets_client()
-        sh_orig = gc_client.open_by_key("1Ye9hgTVuqUtV8CQhFwLzZzCBz4E26otvJbjiVYRySJ0")
-        wks_orig = sh_orig.sheet1
-        all_values = wks_orig.get_all_values(include_tailing_empty_rows=False, include_tailing_empty=False)
-        
-        # Target Spreadsheet ID for safe isolated imports (shared with job-form-bot@jobentrysystem.iam.gserviceaccount.com)
-        IMPORT_SPREADSHEET_ID = "10oSm0DQmqg6GgZKsUxwmmuMzqOnFZihfOIuqcpgkW6M"
-        
-        if not all_values:
-            return jsonify({"success": False, "error": "Target Job Seekers sheet is empty or has no headers."}), 400
-            
-        headers = all_values[0]
-        
-        # Locate indices of target fields in Google Sheet
-        name_col_idx = -1
-        phone_col_idx = -1
-        last_contact_col_idx = -1
-        coach_col_idx = -1
-        date_entered_idx = -1
-        
-        for idx, h in enumerate(headers):
-            h_clean = str(h).strip().lower()
-            if h_clean == "name":
-                name_col_idx = idx
-            elif h_clean.startswith("phone") and phone_col_idx == -1:
-                # Store first phone column
-                phone_col_idx = idx
-            elif h_clean == "last date contacted":
-                last_contact_col_idx = idx
-            elif h_clean in ["employment coach", "employment advisor"]:
-                coach_col_idx = idx
-            elif h_clean == "date entered":
-                date_entered_idx = idx
-                
-        if name_col_idx == -1:
-            return jsonify({"success": False, "error": "Could not find 'Name' column in Unemployed List spreadsheet headers."}), 400
-
-        # Build list of existing records with details for robust matching
-        existing_seekers = []
-        for row_data in all_values[1:]:
-            if len(row_data) > name_col_idx:
-                n_val = row_data[name_col_idx]
-                if n_val:
-                    p_val = ""
-                    if phone_col_idx != -1 and phone_col_idx < len(row_data):
-                        p_val = row_data[phone_col_idx]
-                    existing_seekers.append({
-                        "name": n_val,
-                        "phone": p_val,
-                        "row_data": row_data,
-                        "matched": False
-                    })
-
-        # Merge process
-        new_rows = []
-        imported_clean_names = set()
-        
-        for seeker in imported_seekers:
-            full_name = str(seeker.get('Full Name', '')).strip()
-            if not full_name:
+        for idx, seeker in enumerate(seekers_records):
+            coach_val = str(seeker.get("Employment Coach", "")).strip()
+            if not coach_val:
                 continue
                 
-            c_name = clean_name(full_name)
-            if c_name in imported_clean_names:
-                continue
-            imported_clean_names.add(c_name)
-            
-            raw_phone = seeker.get('Phone', '')
-            formatted_phone = format_phone(raw_phone)
-            advisor = str(seeker.get('Employment Advisor', '')).strip()
-            last_contact = excel_date_to_string(seeker.get('Last Contact', ''))
-            
-            # Find matching existing seeker using hybrid logic
-            matched_existing = None
-            for es in existing_seekers:
-                p_existing = clean_phone_10(es["phone"])
-                p_imported = clean_phone_10(raw_phone)
+            if matches_coach_loose(coach_val, coach):
+                name = seeker.get(" Name", seeker.get("Name", "Unknown")).strip()
+                street = str(seeker.get("Street", "")).strip()
+                city = str(seeker.get("City", "")).strip()
+                zip_val = str(seeker.get("Zip", seeker.get("Zipcode", ""))).strip()
                 
-                # 1. Conflict Check: if both have phone numbers, and they don't match, reject
-                if p_existing and p_imported and p_existing != p_imported:
-                    continue
-                    
-                is_match = False
-                # 2. If phone matches exactly (and is not empty), we only require at least one shared significant name token
-                if p_existing and p_imported and p_existing == p_imported:
-                    tokens1 = get_significant_tokens(get_name_tokens(es["name"]))
-                    tokens2 = get_significant_tokens(get_name_tokens(full_name))
-                    for t1 in tokens1:
-                        for t2 in tokens2:
-                            if words_match_loose(t1, t2):
-                                is_match = True
+                if zip_val.endswith('.0'):
+                    zip_val = zip_val[:-2]
+                seeker_zip = zip_val.strip()
+                
+                addr_parts = [p for p in [street, city, seeker_zip] if p]
+                seeker_address = ", ".join(addr_parts)
+                
+                phone = str(seeker.get("Phone ") or seeker.get("Phone") or seeker.get("phone", "")).strip()
+                email = str(seeker.get("email") or seeker.get("Email") or seeker.get("Email Address", "")).strip()
+                seeker_job_types = str(seeker.get("Type of Job Needed", seeker.get("Desired Types", ""))).strip()
+                
+                # Count matching jobs
+                seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
+                match_count = 0
+                for row in all_jobs:
+                    role = get_row_field(row, "available_jobs")
+                    job_types_list = [t.strip() for t in str(role).split(",") if t.strip()]
+                    match = False
+                    for s_job in seeker_types_list:
+                        for jb_job in job_types_list:
+                            if is_loose_match(s_job, jb_job):
+                                match = True
                                 break
-                        if is_match:
+                        if match:
                             break
-                else:
-                    # 3. Otherwise (phone is missing or one is missing), we require name match (exact or loose names_match_loose)
-                    ec1 = " ".join(get_name_tokens(es["name"]))
-                    ec2 = " ".join(get_name_tokens(full_name))
-                    if ec1 == ec2:
-                        is_match = True
-                    else:
-                        is_match = names_match_loose(es["name"], full_name)
-                        
-                if is_match:
-                    matched_existing = es
+                    if match:
+                        match_count += 1
+
+                seeker_entry = {
+                    "row_index": idx + 2,
+                    "name": name,
+                    "street": street,
+                    "city": city,
+                    "zipcode": seeker_zip,
+                    "ward": str(seeker.get("Ward", "")).strip(),
+                    "stake": str(seeker.get("Stake", "")).strip(),
+                    "phone": phone,
+                    "email": email,
+                    "skills_education": str(seeker.get("Skills/Education", "")).strip(),
+                    "job_needed": str(seeker.get("Company Type", seeker.get("Job Needed", ""))).strip(),
+                    "desired_job_types": seeker_job_types,
+                    "job_types": seeker_job_types,
+                    "general_notes": str(seeker.get("Notes", seeker.get("General Notes", ""))).strip(),
+                    "resume_assistance": str(seeker.get("Resume Asst Needed", seeker.get("Resume Asst", seeker.get("Resume assistance", "")))).strip().lower() in ["yes", "true", "on"],
+                    "interview_coaching": str(seeker.get("Interview Coach Needed", seeker.get("Interview Coach", seeker.get("Interview coaching", "")))).strip().lower() in ["yes", "true", "on"],
+                    "job_search_assistance": str(seeker.get("Job Search Asst Needed", seeker.get("Job Search Asst", seeker.get("Job Search assistance", "")))).strip().lower() in ["yes", "true", "on"],
+                    "address": seeker_address,
+                    "matching_jobs_count": match_count
+                }
+                assigned.append(seeker_entry)
+                
+        return jsonify({"success": True, "results": assigned})
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
+
+@app.route('/api/seeker-matching-jobs', methods=['GET'])
+def seeker_matching_jobs():
+    row_index = request.args.get("row_index")
+    seeker_job_types = request.args.get("job_types", "")
+    seeker_zip = request.args.get("zipcode", "").strip()
+    
+    try:
+        # If row_index is provided, try to fetch the seeker from sheet records first
+        if row_index:
+            try:
+                idx = int(row_index) - 2
+                seekers = get_seekers_records()
+                if 0 <= idx < len(seekers):
+                    seeker = seekers[idx]
+                    if not seeker_job_types:
+                        seeker_job_types = seeker.get("Type of Job Needed", seeker.get("Desired Types", ""))
+                    if not seeker_zip:
+                        zip_val = str(seeker.get("Zip", seeker.get("Zipcode", ""))).strip()
+                        if zip_val.endswith('.0'):
+                            zip_val = zip_val[:-2]
+                        seeker_zip = zip_val
+            except Exception as e:
+                print(f"Error fetching seeker by row_index: {e}")
+                
+        seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
+        
+        all_jobs = get_master_jobs_records()
+        
+        recent = []
+        older = []
+        
+        seeker_zip_5 = seeker_zip[:5] if seeker_zip else ""
+        
+        for row in all_jobs:
+            company = get_row_field(row, "company_name")
+            role = get_row_field(row, "available_jobs")
+            
+            # Check job type match
+            match = False
+            job_types_list = [t.strip() for t in str(role).split(",") if t.strip()]
+            for s_job in seeker_types_list:
+                for jb_job in job_types_list:
+                    if is_loose_match(s_job, jb_job):
+                        match = True
+                        break
+                if match:
                     break
                     
-            if matched_existing:
-                # Existing seeker: update ONLY Last Date Contacted, keep everything else
-                matched_existing["matched"] = True
-                row_data = list(matched_existing["row_data"])
-                while len(row_data) < len(headers):
-                    row_data.append("")
-                if last_contact_col_idx != -1:
-                    row_data[last_contact_col_idx] = last_contact
-                new_rows.append(row_data)
-            else:
-                # New seeker: add them to the sheet and populate Name, Phone (first), Advisor, Last Date Contacted
-                row_data = [""] * len(headers)
-                row_data[name_col_idx] = full_name
-                if phone_col_idx != -1:
-                    row_data[phone_col_idx] = formatted_phone
-                if coach_col_idx != -1:
-                    row_data[coach_col_idx] = advisor
-                if last_contact_col_idx != -1:
-                    row_data[last_contact_col_idx] = last_contact
-                if date_entered_idx != -1:
-                    row_data[date_entered_idx] = datetime.datetime.now().strftime("%m/%d/%Y")
-                new_rows.append(row_data)
+            if not match:
+                continue
                 
-        # Now add existing seekers who are NOT in the imported list (outdated seekers), and highlight them
-        outdated_row_indices = []
-        outdated_count = 0
-        
-        for es in existing_seekers:
-            if not es["matched"]:
-                row_data_list = list(es["row_data"])
-                while len(row_data_list) < len(headers):
-                    row_data_list.append("")
-                new_rows.append(row_data_list)
-                outdated_row_indices.append(len(new_rows) + 1)
-                outdated_count += 1
-                
-        # Bulk update the sheet (writes to the separate spreadsheet copy)
-        sh_target = gc_client.open_by_key(IMPORT_SPREADSHEET_ID)
-        wks_target = sh_target.sheet1
-        
-        final_grid = [headers] + new_rows
-        
-        # Clear sheet from row 2 onwards (clears both values and cell formatting)
-        wks_target.clear(start='A2', fields='*')
-        # Overwrite content starting at A1 (keeps header format but writes new values)
-        wks_target.update_values(crange='A1', values=final_grid)
-        
-        # Apply light red/coral highlight to the outdated rows
-        if outdated_row_indices:
-            def col_idx_to_letter(col):
-                letter = ''
-                while col > 0:
-                    col, remainder = divmod(col - 1, 26)
-                    letter = chr(65 + remainder) + letter
-                return letter
+            address_val = get_row_field(row, "company_street")
+            city_val = get_row_field(row, "company_city")
+            state_val = get_row_field(row, "company_state", "FL")
+            location = f"{address_val}, {city_val}, {state_val}".strip(", ")
             
-            last_col_letter = col_idx_to_letter(len(headers))
-            ranges_to_highlight = [f"A{r}:{last_col_letter}{r}" for r in outdated_row_indices]
-            wks_target.apply_format(ranges=ranges_to_highlight, format_info={'backgroundColor': {'red': 1.0, 'green': 0.85, 'blue': 0.85}})
-        
-        # Invalidate caches only if we wrote back to the original sheet
-        if IMPORT_SPREADSHEET_ID == "1Ye9hgTVuqUtV8CQhFwLzZzCBz4E26otvJbjiVYRySJ0":
-            invalidate_cache('seekers_records')
-            invalidate_cache('new_seekers_records')
-        
-        # Recalculate stats counts
-        updated_count = len([es for es in existing_seekers if es["matched"]])
-        added_count = len(new_rows) - len(existing_seekers)
+            job_zip_val = str(get_row_field(row, "company_zip")).strip()
+            if job_zip_val.endswith('.0'):
+                job_zip_val = job_zip_val[:-2]
+            job_zip_5 = job_zip_val[:5] if job_zip_val else ""
+            
+            dist_miles = float('inf')
+            if seeker_zip_5 and job_zip_5:
+                if seeker_zip_5 == job_zip_5:
+                    dist_miles = 0.0
+                else:
+                    try:
+                        coords1 = get_zip_coordinates(seeker_zip_5)
+                        coords2 = get_zip_coordinates(job_zip_5)
+                        if coords1 and coords2:
+                            dist_miles = calculate_distance(coords1[0], coords1[1], coords2[0], coords2[1])
+                    except Exception:
+                        pass
+                        
+            is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
+            is_currently_hiring = is_hiring_val in ["TRUE", "YES", "1", "Y"]
+            
+            career_website = get_row_field(row, "career_website")
+            notes_val = get_row_field(row, "notes")
+            
+            job_entry = {
+                "company": company or "Unknown",
+                "role": role or "Various",
+                "location": location,
+                "distance": f"{round(dist_miles, 1)} miles" if dist_miles != float('inf') else "N/A",
+                "career_website": career_website,
+                "notes": notes_val
+            }
+            
+            if is_currently_hiring:
+                recent.append(job_entry)
+            else:
+                older.append(job_entry)
+                
+        # Sort by distance
+        recent.sort(key=lambda x: float(x["distance"].split()[0]) if x["distance"] != "N/A" else float('inf'))
+        older.sort(key=lambda x: float(x["distance"].split()[0]) if x["distance"] != "N/A" else float('inf'))
         
         return jsonify({
-            "success": True, 
-            "message": f"Successfully synced Unemployed List! Added {added_count}, updated {updated_count}, and highlighted {outdated_count} outdated seekers for manual review.",
-            "url": sh_target.url
+            "success": True,
+            "results": {
+                "recent": recent,
+                "older": older
+            }
         })
     except Exception as e:
         print(traceback.format_exc())

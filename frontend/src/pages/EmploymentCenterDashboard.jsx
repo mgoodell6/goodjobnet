@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { FaBriefcase, FaUserTie, FaSearch } from 'react-icons/fa';
 import { useState, useEffect } from 'react';
 
-function EmploymentCenterDashboard() {
+function EmploymentCenterDashboard({ user }) {
   const navigate = useNavigate();
 
   const [stats, setStats] = useState({
@@ -293,7 +293,7 @@ function EmploymentCenterDashboard() {
             <p style={{ fontWeight: 'bold', color: 'var(--text-color)', marginBottom: '1rem' }}>Total Job Seekers: {stats.total_job_seekers}</p>
             {renderPieChart(stats.seeker_types, stats.total_job_seekers, sharedColorMap, "No job seekers currently active")}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
-              <Link to="/job-seeker-matches-report" className="btn primary-btn" style={{ width: 'auto', background: '#8e44ad' }}>View Job Seeker Matches Report</Link>
+              <Link to="/assigned-job-seekers" className="btn primary-btn" style={{ width: 'auto', background: '#8e44ad' }}>Show my assigned Job Seekers list</Link>
             </div>
           </div>
         </div>
