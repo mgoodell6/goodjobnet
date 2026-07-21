@@ -219,6 +219,7 @@ function HotJobSearch({ user }) {
                       <th>Role</th>
                       <th>Location</th>
                       <th>Distance</th>
+                      <th>Date Verified</th>
                       <th>Career Website</th>
                       <th>Notes</th>
                     </tr>
@@ -230,6 +231,7 @@ function HotJobSearch({ user }) {
                         <td>{job.role}</td>
                         <td>{job.location}</td>
                         <td>{job.distance || 'N/A'}</td>
+                        <td>{job.date_verified || 'N/A'}</td>
                         <td>
                           {job.career_website ? (
                             <a href={job.career_website} target="_blank" rel="noopener noreferrer">View Posting</a>
@@ -253,6 +255,7 @@ function HotJobSearch({ user }) {
                       <th>Role</th>
                       <th>Location</th>
                       <th>Distance</th>
+                      <th>Date Verified</th>
                       <th>Career Website</th>
                       <th>Notes</th>
                     </tr>
@@ -264,6 +267,7 @@ function HotJobSearch({ user }) {
                         <td>{job.role}</td>
                         <td>{job.location}</td>
                         <td>{job.distance || 'N/A'}</td>
+                        <td>{job.date_verified || 'N/A'}</td>
                         <td>
                           {job.career_website ? (
                             <a href={job.career_website} target="_blank" rel="noopener noreferrer">View Posting</a>
