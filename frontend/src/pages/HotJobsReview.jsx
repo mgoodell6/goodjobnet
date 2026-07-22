@@ -1,6 +1,9 @@
+/* eslint-disable react-hooks/set-state-in-effect, no-empty, no-unused-vars */
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { FaMicrophone, FaVolumeUp, FaPhone, FaArrowLeft, FaArrowRight, FaSave, FaExclamationTriangle } from 'react-icons/fa';
+import { FaMicrophone } from 'react-icons/fa';
+import { Card } from 'react-bootstrap';
+import MultiSelect from '../components/MultiSelect';
 
 const JOB_OPTIONS = [
   "HVAC Repair", "Accountant", "Airport (Baggage/customer service/ground ops)",
@@ -36,11 +39,10 @@ function HotJobsReview({ user }) {
     return localStorage.getItem('goodjobnet_call_method') || 'google-voice';
   });
   const [pendingCallPhone, setPendingCallPhone] = useState(null);
-  const [pendingCallCompany, setPendingCallCompany] = useState('');
+  const [, setPendingCallCompany] = useState('');
   const [isCallActive, setIsCallActive] = useState(false);
-  const [isHookActive, setIsHookActive] = useState(false);
+  const [, setIsHookActive] = useState(false);
   const pendingCallPhoneRef = useRef(null);
-  const gvWindowRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem('goodjobnet_call_method', callMethod);
@@ -263,8 +265,8 @@ function HotJobsReview({ user }) {
           console.error("Hangup error:", data.error);
         }
       })
-      .catch(err => {
-        console.error("Hangup fetch error from local helper:", err);
+      .catch(() => {
+        console.error("Hangup fetch error from local helper.");
       });
   };
 
@@ -536,7 +538,7 @@ function HotJobsReview({ user }) {
         }
         setLoading(false);
       })
-      .catch(err => {
+      .catch(() => {
         setMessage('Error connecting to server.');
         setLoading(false);
       });
@@ -604,7 +606,7 @@ function HotJobsReview({ user }) {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
-        } catch (e) { }
+        } catch { /* The browser may reject stopping an already-idle recognizer. */ }
       }
     }
     window.speechSynthesis.cancel();
@@ -702,7 +704,7 @@ function HotJobsReview({ user }) {
         audioStreamRef.current.getTracks().forEach(track => {
           try {
             track.stop();
-          } catch (e) { }
+          } catch { /* Recognition may already be idle. */ }
         });
         audioStreamRef.current = null;
       }
@@ -710,7 +712,7 @@ function HotJobsReview({ user }) {
         if (audioContextRef.current.state !== 'closed') {
           try {
             audioContextRef.current.close();
-          } catch (e) { }
+          } catch { /* Recognition may already be idle. */ }
         }
         audioContextRef.current = null;
       }
@@ -1361,17 +1363,15 @@ function HotJobsReview({ user }) {
             </button>
 
             <div className="input-group full-width mt-2" style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '1.5rem' }}>
-              <label style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Or search by specific Job Type (Hold Ctrl/Cmd to select multiple from list, and/or enter custom text)</label>
+              <label style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Or search by specific Job Type (click to select multiple from the list, and/or enter custom text)</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                <select
-                  multiple
+                <MultiSelect
                   size="5"
+                  options={JOB_OPTIONS}
                   value={selectedJobTypes}
-                  onChange={e => setSelectedJobTypes(Array.from(e.target.selectedOptions, option => option.value))}
+                  onChange={setSelectedJobTypes}
                   style={{ width: '100%', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '0.5rem' }}
-                >
-                  {JOB_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
+                />
 
                 <div style={{ display: 'flex', gap: '1rem' }}>
                   <input
@@ -1457,7 +1457,7 @@ function HotJobsReview({ user }) {
 
   return (
     <div className="app-container fade-in">
-      <div className="glass-panel main-form">
+      <Card className="glass-panel main-form border-0 shadow-sm">
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1>{reviewTitle}</h1>
@@ -1701,10 +1701,8 @@ function HotJobsReview({ user }) {
                 </div>
 
                 <div className="input-group full-width">
-                  <label>Available Jobs (Select multiple with Ctrl/Cmd, and/or enter manually)</label>
-                  <select name="available_jobs_select" multiple size="6" defaultValue={matchedJobs}>
-                    {JOB_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
+                  <label>Available Jobs (click to select multiple, and/or enter manually)</label>
+                  <MultiSelect name="available_jobs_select" options={JOB_OPTIONS} defaultValue={matchedJobs} size="6" />
                   <input type="text" name="available_jobs_manual" defaultValue={unmatchedJobs.join(', ')} placeholder="Other available jobs (comma separated)" style={{ marginTop: '0.5rem' }} />
                 </div>
 
@@ -1729,7 +1727,7 @@ function HotJobsReview({ user }) {
             </button>
           </div>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }

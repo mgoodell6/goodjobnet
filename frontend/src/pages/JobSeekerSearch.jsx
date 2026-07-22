@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Card, Form, Row, Col, Stack, Button, Badge, Alert, Table } from 'react-bootstrap';
+import MultiSelect from '../components/MultiSelect';
 
 const JOB_OPTIONS = [
   "HVAC Repair", "Accountant", "Airport (Baggage/customer service/ground ops)",
@@ -46,7 +48,6 @@ function JobSeekerSearch({ user }) {
       }
     } catch (err) {
       console.error(err);
-      alert("Network error while fetching matching jobs.");
     } finally {
       setMatchingJobsLoading(false);
     }
@@ -117,7 +118,6 @@ function JobSeekerSearch({ user }) {
       }
     } catch (err) {
       console.error(err);
-      alert('Network error - Is your backend server running?');
     } finally {
       setLoading(false);
     }
@@ -186,257 +186,250 @@ function JobSeekerSearch({ user }) {
   };
 
   return (
-    <div className="app-container" style={{ flexDirection: 'column' }}>
-      <div className="glass-panel main-form" style={{ maxWidth: '1000px' }}>
-        <header>
-          <h1>Job Seeker Search</h1>
-          <p className="subtitle">Find unemployed individuals interested in a job type within a certain radius of an address</p>
-        </header>
+    <main className="app-container search-page">
+      <Card className={`glass-panel main-form border-0 shadow-sm search-shell${results ? ' has-results' : ''}`}>
+        <div className="search-hero">
+          <div><div className="portal-eyebrow">Employment Center search</div><h1 className="mb-2">Find job seekers</h1><p className="subtitle">Find unemployed individuals by name, job type, and distance from an address.</p></div>
+          <div className="search-hero-icon"><i className="bi bi-people" aria-hidden="true" /></div>
+        </div>
 
-        <form onSubmit={handleSearch}>
-          <div className="form-grid">
-            <div className="input-group full-width">
-              <label>Search by Name (Optional - Bypasses job types and location filters)</label>
-              <input type="text" name="name" placeholder="Enter seeker name..." defaultValue={savedInputs.name || ''} />
-              <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginTop: '0.6rem', fontWeight: '500' }}>
-                OR, search by job type(s) and radius from given location
-              </div>
-            </div>
+        <Form onSubmit={handleSearch}>
+          <Form.Group className="search-primary-field mb-4" controlId="seeker-name">
+            <Form.Label>Search by Name <span className="fw-normal text-muted">(optional - bypasses job types and location)</span></Form.Label>
+            <Form.Control type="text" name="name" placeholder="Enter seeker name..." defaultValue={savedInputs.name || ''} />
+            <Form.Text>OR, search by job type(s) and radius from given location</Form.Text>
+          </Form.Group>
 
-            <div className="input-group">
-              <label>Job Type (Hold Ctrl/Cmd to select multiple)</label>
-              <select 
-                name="job_type" 
-                multiple 
-                size="4"
-                value={selectedJobTypes}
-                onChange={e => setSelectedJobTypes(Array.from(e.target.selectedOptions, opt => opt.value))}
-              >
-                {JOB_OPTIONS.map(opt => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-            </div>
+          <Row className="g-4">
+            <Col lg={5}>
+              <Form.Group controlId="job-type">
+                <Form.Label>Job types</Form.Label>
+                <MultiSelect name="job_type" options={JOB_OPTIONS} value={selectedJobTypes} onChange={setSelectedJobTypes} size={4} />
+                <Form.Text>Click roles to select or clear them.</Form.Text>
+              </Form.Group>
+            </Col>
+            <Col lg={7}>
+              <Form.Group controlId="address" className="mb-3">
+                <Form.Label>Find individuals near this location</Form.Label>
+                <Form.Control as="textarea" name="address" rows={3} placeholder="Street, city, or ZIP code (e.g. 32801)" defaultValue={savedInputs.address} />
+              </Form.Group>
+              <Row className="g-3">
+                <Col sm={8}>
+                  <Form.Group controlId="other-job-type">
+                    <Form.Label>Other job type <span className="fw-normal text-muted">(optional)</span></Form.Label>
+                    <Form.Control type="text" name="other_job_type" placeholder="Add a job type not listed" defaultValue={savedInputs.other_job_type} />
+                  </Form.Group>
+                </Col>
+                <Col sm={4}>
+                  <Form.Group controlId="radius">
+                    <Form.Label>Radius <span className="fw-normal text-muted">(miles)</span></Form.Label>
+                    <Form.Control type="number" name="radius" defaultValue={savedInputs.radius || '20'} min="1" />
+                  </Form.Group>
+                </Col>
+              </Row>
+            </Col>
+          </Row>
 
-            <div className="input-group">
-              <label>Find individuals near this location (Street, City, Zipcode)</label>
-              <textarea name="address" rows="4" placeholder="Enter full address including zip code... (e.g. 32801)" defaultValue={savedInputs.address}></textarea>
-            </div>
-
-            <div className="input-group">
-              <label>Other Job Type (Not in list)</label>
-              <input type="text" name="other_job_type" placeholder="Enter other job type..." defaultValue={savedInputs.other_job_type} />
-            </div>
-
-            <div className="input-group">
-              <label>List individuals within radius of (miles)</label>
-              <input type="number" name="radius" defaultValue={savedInputs.radius || '20'} min="1" required />
-            </div>
-          </div>
-
-          <div className="actions mt-2 text-center">
-            <button type="submit" className="btn primary-btn" style={{ maxWidth: '300px' }} disabled={loading}>
-              {loading ? 'Searching...' : 'Look for potential job seekers'}
-            </button>
-            <button type="button" className="btn secondary-btn" style={{ maxWidth: '300px', marginLeft: '1rem' }} onClick={() => navigate(user?.role === 'admin' ? '/admin-dashboard' : '/dashboard')}>
-              Back to Dashboard
-            </button>
-          </div>
-        </form>
+          <Stack direction="horizontal" gap={2} className="justify-content-end mt-4 search-actions">
+            <Button type="button" variant="outline-secondary" onClick={() => navigate(user?.role === 'admin' ? '/admin-dashboard' : '/dashboard')}>Back</Button>
+            <Button type="submit" className="primary-btn px-4" disabled={loading}>
+              <i className={`bi ${loading ? 'bi-arrow-repeat spin' : 'bi-search'} me-2`} aria-hidden="true" />
+              {loading ? 'Searching...' : 'Find job seekers'}
+            </Button>
+          </Stack>
+        </Form>
 
         {results && (
-          <div className="results-section mt-2">
-            <h2>Search Results</h2>
-            
-            <div style={{ marginTop: '1.5rem' }}>
-              <h3 style={{ borderBottom: '2px solid var(--primary-color)', paddingBottom: '0.4rem', marginBottom: '0.8rem', color: 'var(--primary-color)' }}>
-                Job Seekers Within Radius ({results.nearby ? results.nearby.length : 0})
-              </h3>
-              {(() => {
-                const list = results.nearby;
-                if (!list || list.length === 0) {
-                  return <p style={{ fontStyle: 'italic', color: 'var(--text-light)', marginTop: '0.5rem', marginBottom: '1.5rem' }}>No job seekers found matching the criteria within the specified radius.</p>;
-                }
-                return (
-                  <div className="table-container mb-2">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>Address</th>
-                          <th>Phone</th>
-                          <th>Email</th>
-                          <th>Job Types</th>
-                          <th>Distance</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {list.map((seeker, idx) => (
-                          <tr key={idx}>
-                            <td style={{ fontWeight: 'bold' }}>
-                              <Link to="/job-seeker-entry" state={{ seeker, fromSearch: true }} style={{ color: 'var(--primary-color)', textDecoration: 'none' }} className="seeker-name-link">
-                                {seeker.name}
-                              </Link>
-                            </td>
-                            <td>{seeker.address || 'N/A'}</td>
-                            <td>{seeker.phone ? <a href={`tel:${seeker.phone}`}>{seeker.phone}</a> : 'N/A'}</td>
-                            <td>{seeker.email ? <a href={`mailto:${seeker.email}`}>{seeker.email}</a> : 'N/A'}</td>
-                            <td>{seeker.job_types}</td>
-                            <td>
-                              {typeof seeker.distance === 'number'
-                                ? `${seeker.distance} mile${seeker.distance === 1 ? '' : 's'}`
-                                : seeker.distance}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div style={{ marginTop: '2rem' }}>
-              <h3 style={{ borderBottom: '2px solid var(--secondary-color)', paddingBottom: '0.4rem', marginBottom: '0.8rem', color: 'var(--secondary-color)' }}>
-                Other Matching Job Seekers (Outside Radius or Address Not Provided) ({results.other ? results.other.length : 0})
-              </h3>
-              {(() => {
-                const list = results.other;
-                if (!list || list.length === 0) {
-                  return <p style={{ fontStyle: 'italic', color: 'var(--text-light)', marginTop: '0.5rem', marginBottom: '1.5rem' }}>No other matching job seekers found.</p>;
-                }
-                return (
-                  <div className="table-container mb-2">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>Address</th>
-                          <th>Phone</th>
-                          <th>Email</th>
-                          <th>Job Types</th>
-                          <th>Distance</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {list.map((seeker, idx) => (
-                          <tr key={idx}>
-                            <td style={{ fontWeight: 'bold' }}>
-                              <Link to="/job-seeker-entry" state={{ seeker, fromSearch: true }} style={{ color: 'var(--primary-color)', textDecoration: 'none' }} className="seeker-name-link">
-                                {seeker.name}
-                              </Link>
-                            </td>
-                            <td>{seeker.address || 'N/A'}</td>
-                            <td>{seeker.phone ? <a href={`tel:${seeker.phone}`}>{seeker.phone}</a> : 'N/A'}</td>
-                            <td>{seeker.email ? <a href={`mailto:${seeker.email}`}>{seeker.email}</a> : 'N/A'}</td>
-                            <td>{seeker.job_types}</td>
-                            <td>
-                              {typeof seeker.distance === 'number'
-                                ? `${seeker.distance} mile${seeker.distance === 1 ? '' : 's'}`
-                                : seeker.distance}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {selectedSeeker && (
-              <div className="matching-jobs-section mt-3" style={{ borderTop: '2px solid rgba(0,0,0,0.1)', paddingTop: '2rem', marginTop: '2rem' }}>
-                <h2 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>Matching Jobs for {selectedSeeker.name}</h2>
-                <p style={{ fontStyle: 'italic', color: 'var(--text-light)', marginBottom: '1.5rem' }}>
-                  Based on desired job types: <strong>{selectedSeeker.job_types || selectedSeeker.desired_job_types}</strong>
-                </p>
-                {matchingJobsLoading ? (
-                  <p className="text-center">Loading matching jobs from JobBank...</p>
-                ) : (
-                  <>
-                    <h3 style={{ marginTop: '1.5rem', color: '#2ecc71', borderBottom: '2px solid #2ecc71', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
-                      Currently Hiring Jobs ({matchingJobs.recent.length})
-                    </h3>
-                    {matchingJobs.recent.length > 0 ? (
-                      <div className="table-container mb-2">
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>Company</th>
-                              <th>Role</th>
-                              <th>Location</th>
-                              <th>Distance</th>
-                              <th>Career Website</th>
-                              <th>Notes</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {matchingJobs.recent.map((job, idx) => (
-                              <tr key={idx}>
-                                <td>{job.company}</td>
-                                <td>{job.role}</td>
-                                <td>{job.location}</td>
-                                <td>{job.distance || 'N/A'}</td>
-                                <td>
-                                  {job.career_website ? (
-                                    <a href={job.career_website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}>
-                                      View Posting
-                                    </a>
-                                  ) : 'N/A'}
-                                </td>
-                                <td>{job.notes || 'N/A'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : <p style={{ fontStyle: 'italic', color: 'var(--text-light)', marginBottom: '1.5rem' }}>No currently hiring jobs found matching criteria.</p>}
-
-                    <h3 style={{ marginTop: '2rem', color: '#f39c12', borderBottom: '2px solid #f39c12', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
-                      Other Jobs Meeting Criteria (Not Currently Hiring) ({matchingJobs.older.length})
-                    </h3>
-                    {matchingJobs.older.length > 0 ? (
-                      <div className="table-container mb-2">
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>Company</th>
-                              <th>Role</th>
-                              <th>Location</th>
-                              <th>Distance</th>
-                              <th>Career Website</th>
-                              <th>Notes</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {matchingJobs.older.map((job, idx) => (
-                              <tr key={idx}>
-                                <td>{job.company}</td>
-                                <td>{job.role}</td>
-                                <td>{job.location}</td>
-                                <td>{job.distance || 'N/A'}</td>
-                                <td>
-                                  {job.career_website ? (
-                                    <a href={job.career_website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}>
-                                      View Posting
-                                    </a>
-                                  ) : 'N/A'}
-                                </td>
-                                <td>{job.notes || 'N/A'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : <p style={{ fontStyle: 'italic', color: 'var(--text-light)' }}>No other matching jobs found.</p>}
-                  </>
-                )}
+          <section className="search-results" aria-label="Search results" tabIndex="-1">
+            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+              <div>
+                <div className="portal-eyebrow">Results</div>
+                <h2 className="h3 mb-0">Job Seekers Found</h2>
               </div>
+              <Badge bg="success" pill>{(results.nearby?.length || 0) + (results.other?.length || 0)} matches</Badge>
+            </div>
+
+            <Card className="result-group border-0 mb-4">
+              <Card.Header className="bg-transparent border-0 pt-3">
+                <h3 className="h5 mb-1 text-success">Within Radius</h3>
+                <p className="small mb-0">Job seekers near your specified location.</p>
+              </Card.Header>
+              <Card.Body className="pt-1">
+                {results.nearby?.length ? (
+                  <div className="table-container">
+                    <Table responsive hover className="mb-0 align-middle">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Address</th>
+                          <th>Phone</th>
+                          <th>Email</th>
+                          <th>Job Types</th>
+                          <th>Distance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.nearby.map((seeker, idx) => (
+                          <tr key={idx}>
+                            <td className="fw-semibold">
+                              <Link to="/job-seeker-entry" state={{ seeker, fromSearch: true }} style={{ textDecoration: 'none' }}>
+                                {seeker.name}
+                              </Link>
+                            </td>
+                            <td>{seeker.address || 'N/A'}</td>
+                            <td>{seeker.phone ? <a href={`tel:${seeker.phone}`}>{seeker.phone}</a> : 'N/A'}</td>
+                            <td>{seeker.email ? <a href={`mailto:${seeker.email}`}>{seeker.email}</a> : 'N/A'}</td>
+                            <td>{seeker.job_types}</td>
+                            <td>{typeof seeker.distance === 'number' ? `${seeker.distance} mile${seeker.distance === 1 ? '' : 's'}` : seeker.distance}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </div>
+                ) : (
+                  <Alert variant="light" className="mb-0">No job seekers found within the radius.</Alert>
+                )}
+              </Card.Body>
+            </Card>
+
+            <Card className="result-group border-0">
+              <Card.Header className="bg-transparent border-0 pt-3">
+                <h3 className="h5 mb-1 text-warning-emphasis">Other Matches</h3>
+                <p className="small mb-0">Job seekers outside the radius or with no location provided.</p>
+              </Card.Header>
+              <Card.Body className="pt-1">
+                {results.other?.length ? (
+                  <div className="table-container">
+                    <Table responsive hover className="mb-0 align-middle">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Address</th>
+                          <th>Phone</th>
+                          <th>Email</th>
+                          <th>Job Types</th>
+                          <th>Distance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.other.map((seeker, idx) => (
+                          <tr key={idx}>
+                            <td className="fw-semibold">
+                              <Link to="/job-seeker-entry" state={{ seeker, fromSearch: true }} style={{ textDecoration: 'none' }}>
+                                {seeker.name}
+                              </Link>
+                            </td>
+                            <td>{seeker.address || 'N/A'}</td>
+                            <td>{seeker.phone ? <a href={`tel:${seeker.phone}`}>{seeker.phone}</a> : 'N/A'}</td>
+                            <td>{seeker.email ? <a href={`mailto:${seeker.email}`}>{seeker.email}</a> : 'N/A'}</td>
+                            <td>{seeker.job_types}</td>
+                            <td>{typeof seeker.distance === 'number' ? `${seeker.distance} mile${seeker.distance === 1 ? '' : 's'}` : seeker.distance}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </div>
+                ) : (
+                  <Alert variant="light" className="mb-0">No other matching job seekers found.</Alert>
+                )}
+              </Card.Body>
+            </Card>
+
+            {selectedSeeker && matchingJobs && (
+              <Card className="result-group border-0 mt-4">
+                <Card.Header className="bg-transparent border-0 pt-3">
+                  <h3 className="h5 mb-1">Matching Jobs for {selectedSeeker.name}</h3>
+                  <p className="small mb-0">Based on desired job types: <strong>{selectedSeeker.job_types || selectedSeeker.desired_job_types}</strong></p>
+                </Card.Header>
+                <Card.Body className="pt-1">
+                  {matchingJobsLoading ? (
+                    <p className="text-center">Loading matching jobs...</p>
+                  ) : (
+                    <>
+                      <Card className="result-group border-0 mb-3">
+                        <Card.Header className="bg-transparent border-0 pt-2 pb-2">
+                          <h4 className="h6 mb-0 text-success">Currently Hiring ({matchingJobs.recent?.length || 0})</h4>
+                        </Card.Header>
+                        <Card.Body className="pt-1 pb-2">
+                          {matchingJobs.recent?.length ? (
+                            <div className="table-container">
+                              <Table responsive hover className="mb-0 align-middle">
+                                <thead>
+                                  <tr>
+                                    <th>Company</th>
+                                    <th>Role</th>
+                                    <th>Location</th>
+                                    <th>Distance</th>
+                                    <th>Posting</th>
+                                    <th>Notes</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {matchingJobs.recent.map((job, idx) => (
+                                    <tr key={idx}>
+                                      <td className="fw-semibold">{job.company}</td>
+                                      <td>{job.role}</td>
+                                      <td>{job.location}</td>
+                                      <td>{job.distance || 'N/A'}</td>
+                                      <td>{job.career_website ? <a href={job.career_website} target="_blank" rel="noopener noreferrer">View posting</a> : 'N/A'}</td>
+                                      <td>{job.notes || 'N/A'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </Table>
+                            </div>
+                          ) : (
+                            <Alert variant="light" className="mb-0">No currently hiring jobs found.</Alert>
+                          )}
+                        </Card.Body>
+                      </Card>
+
+                      <Card className="result-group border-0">
+                        <Card.Header className="bg-transparent border-0 pt-2 pb-2">
+                          <h4 className="h6 mb-0 text-warning-emphasis">Other Matching Jobs ({matchingJobs.older?.length || 0})</h4>
+                        </Card.Header>
+                        <Card.Body className="pt-1">
+                          {matchingJobs.older?.length ? (
+                            <div className="table-container">
+                              <Table responsive hover className="mb-0 align-middle">
+                                <thead>
+                                  <tr>
+                                    <th>Company</th>
+                                    <th>Role</th>
+                                    <th>Location</th>
+                                    <th>Distance</th>
+                                    <th>Posting</th>
+                                    <th>Notes</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {matchingJobs.older.map((job, idx) => (
+                                    <tr key={idx}>
+                                      <td className="fw-semibold">{job.company}</td>
+                                      <td>{job.role}</td>
+                                      <td>{job.location}</td>
+                                      <td>{job.distance || 'N/A'}</td>
+                                      <td>{job.career_website ? <a href={job.career_website} target="_blank" rel="noopener noreferrer">View posting</a> : 'N/A'}</td>
+                                      <td>{job.notes || 'N/A'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </Table>
+                            </div>
+                          ) : (
+                            <Alert variant="light" className="mb-0">No other matching jobs found.</Alert>
+                          )}
+                        </Card.Body>
+                      </Card>
+                    </>
+                  )}
+                </Card.Body>
+              </Card>
             )}
-          </div>
+          </section>
         )}
-      </div>
-    </div>
+      </Card>
+    </main>
   );
 }
 

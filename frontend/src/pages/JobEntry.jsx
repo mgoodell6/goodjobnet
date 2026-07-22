@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Card } from 'react-bootstrap';
+import MultiSelect from '../components/MultiSelect';
 
 function JobEntry({ user }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [success, setSuccess] = useState(false);
+  const [selectedAvailableJobs, setSelectedAvailableJobs] = useState([]);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -58,7 +61,7 @@ function JobEntry({ user }) {
         setSuccess(false);
         setMessage(result.error || 'Failed to submit Job.');
       }
-    } catch (err) {
+    } catch {
       setSuccess(false);
       setMessage('Error connecting to server.');
     }
@@ -67,11 +70,11 @@ function JobEntry({ user }) {
 
   return (
     <div className="app-container">
-      <div className="glass-panel main-form">
-        <header>
-          <h1>Job Entry Form</h1>
-          <p className="subtitle">Submit new potential jobs to the Orlando Employment Center</p>
-        </header>
+      <Card className="glass-panel main-form border-0 shadow-sm">
+        <div className="search-hero page-hero">
+          <div><div className="portal-eyebrow">GoodJobNet job bank</div><h1 className="mb-2">Add a job opportunity</h1><p className="subtitle">Submit a potential job to the Orlando Employment Center for review.</p></div>
+          <div className="search-hero-icon"><i className="bi bi-briefcase" aria-hidden="true" /></div>
+        </div>
 
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
@@ -166,8 +169,13 @@ function JobEntry({ user }) {
             </div>
 
             <div className="input-group full-width">
-              <label>Available Jobs (Select multiple with Ctrl/Cmd, and/or enter manually)</label>
-              <select name="available_jobs_select" multiple size="6">
+              <label>Available Jobs (click to select multiple, and/or enter manually)</label>
+              <MultiSelect
+                name="available_jobs_select"
+                value={selectedAvailableJobs}
+                onChange={setSelectedAvailableJobs}
+                size="6"
+              >
                 <option value="HVAC Repair">HVAC Repair</option>
                 <option value="Accountant">Accountant</option>
                 <option value="Airport (Baggage/customer service/ground ops)">Airport (Baggage/customer service/ground ops)</option>
@@ -216,7 +224,7 @@ function JobEntry({ user }) {
                 <option value="Theme Park">Theme Park</option>
                 <option value="Trucking/Transportation">Trucking/Transportation</option>
                 <option value="Warehousing/Logistics">Warehousing/Logistics</option>
-              </select>
+              </MultiSelect>
               <input type="text" name="available_jobs_manual" placeholder="Other available jobs (comma separated)" style={{ marginTop: '0.5rem' }} />
             </div>
 
@@ -240,7 +248,7 @@ function JobEntry({ user }) {
             </button>
           </div>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }

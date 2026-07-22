@@ -1,9 +1,9 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { FaBriefcase, FaUserTie, FaSearch } from 'react-icons/fa';
 import { useState, useEffect } from 'react';
+import { Card } from 'react-bootstrap';
 
-function EmploymentCenterDashboard({ user }) {
-  const navigate = useNavigate();
+function EmploymentCenterDashboard() {
 
   const [stats, setStats] = useState({
     expiring_soon: '...',
@@ -240,7 +240,7 @@ function EmploymentCenterDashboard({ user }) {
 
     const validTotal = Math.max(1, typesArr.reduce((sum, item) => sum + item.count, 0));
 
-    const legendItems = topTypes.map((t, idx) => {
+    const legendItems = topTypes.map((t) => {
       const percentage = Math.round((t.count / validTotal) * 100);
       const nextPercent = currentPercent + percentage;
       const color = colorMap.get(t.label) || '#333';
@@ -273,7 +273,7 @@ function EmploymentCenterDashboard({ user }) {
 
   return (
     <div className="app-container" style={{ flexDirection: 'column' }}>
-      <div className="glass-panel main-form" style={{ maxWidth: '1000px' }}>
+      <Card className="glass-panel main-form border-0 shadow-sm" style={{ maxWidth: '1000px' }}>
         <header>
           <h1>Employment Center Dashboard</h1>
           <p className="subtitle">Metrics and Management for Orlando Employment Center</p>
@@ -281,14 +281,14 @@ function EmploymentCenterDashboard({ user }) {
 
         {/* Top Section: Metrics */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
-          <div className="stat-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
+          <div className="stat-card" style={{ background: 'var(--portal-surface)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
             <h3 style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>Hot Jobs by Industry</h3>
             <p style={{ fontWeight: 'bold', color: 'var(--text-color)', marginBottom: '1rem' }}>Total Hot Jobs: {stats.total_hot_jobs}</p>
             {renderPieChart(stats.job_types, stats.total_hot_jobs, sharedColorMap, "No hot jobs currently active")}
 
           </div>
 
-          <div className="stat-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
+          <div className="stat-card" style={{ background: 'var(--portal-surface)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
             <h3 style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>Job Seekers by Desired Type</h3>
             <p style={{ fontWeight: 'bold', color: 'var(--text-color)', marginBottom: '1rem' }}>Total Job Seekers: {stats.total_job_seekers}</p>
             {renderPieChart(stats.seeker_types, stats.total_job_seekers, sharedColorMap, "No job seekers currently active")}
@@ -361,10 +361,6 @@ function EmploymentCenterDashboard({ user }) {
 
         {/* Bottom Section: Actions */}
         <div className="nav-grid">
-          <Link to="/job-entry" className="nav-card">
-            <FaBriefcase />
-            <h3>Job Entry Form</h3>
-          </Link>
           <Link to="/hot-job-search" className="nav-card">
             <FaSearch />
             <h3>Search for nearby jobs</h3>
@@ -372,10 +368,6 @@ function EmploymentCenterDashboard({ user }) {
           <Link to="/job-seeker-search" className="nav-card">
             <FaUserTie />
             <h3>Search for nearby job seekers</h3>
-          </Link>
-          <Link to="/job-seeker-entry" className="nav-card">
-            <FaUserTie />
-            <h3>Job Seeker Entry</h3>
           </Link>
         </div>
 
@@ -458,7 +450,7 @@ function EmploymentCenterDashboard({ user }) {
           )}
         </div>
 
-      </div>
+      </Card>
     </div>
   );
 }

@@ -1,51 +1,17 @@
 import { Link } from 'react-router-dom';
-import { FaBriefcase, FaUserTie, FaMapMarkedAlt, FaSearch } from 'react-icons/fa';
+import { FaMapMarkedAlt, FaSearch } from 'react-icons/fa';
+import { Button, Card, Col, Row } from 'react-bootstrap';
 
 function GeneralDashboard() {
   return (
-    <div className="app-container">
-      <div className="glass-panel main-form">
-        <header>
-          <h1>General User Dashboard</h1>
-          <p className="subtitle">Coordinate with the Orlando Employment Center</p>
-        </header>
-
-        <div className="instructions mb-2 text-center">
-          <p><strong>Potential Job Opportunities:</strong> We encourage church members to share employment opportunities that they are aware of. These opportunities will be shared with those who are actively seeking jobs through the Orlando Employment Center.</p>
-          <p><strong>Job Seekers:</strong> Information entered in this website is sent to the Orlando Employment Center where we can help leverage resources and tools to help individuals find stable employment.</p>
-        </div>
-
-        <div className="nav-grid">
-          <a href="https://www.google.com/maps/d/u/0/edit?mid=1YnckZ2k4jyCu6Agxg4VX0EyWK49puuo&ll=28.284392717060463%2C-82.04171770869505&z=9" target="_blank" rel="noopener noreferrer" className="nav-card">
-            <FaMapMarkedAlt />
-            <h3>Job Location Map</h3>
-          </a>
-          <Link to="/hot-job-search" className="nav-card">
-            <FaSearch />
-            <h3>Search for nearby jobs</h3>
-          </Link>
-        </div>
-
-        <div className="nav-grid" style={{ marginTop: '1rem' }}>
-          <Link to="/job-entry" className="nav-card">
-            <FaBriefcase />
-            <h3>Job Opportunity Entry</h3>
-          </Link>
-          <Link to="/job-seeker-entry" className="nav-card">
-            <FaUserTie />
-            <h3>Job Seeker Entry</h3>
-          </Link>
-        </div>
-
-        <div className="form-footer">
-          <p className="footer-text">No one should go through a job search alone. We offer a team of experts, support groups, webinars, workshops, and other resources.</p>
-          <div className="footer-quote-container">
-            <p className="footer-quote">"We can accomplish so much more together than we can alone."</p>
-            <p className="footer-author">- President Russell M. Nelson</p>
-          </div>
-        </div>
+    <main className="app-container dashboard-page">
+      <div className="dashboard-shell">
+        <section className="dashboard-intro"><div><div className="portal-eyebrow">Orlando Employment Center</div><h1 className="mb-2">Your employment workspace</h1><p className="lead mb-0">Find screened opportunities, share local resources, and connect job seekers with practical support.</p></div><div className="dashboard-intro-mark"><i className="bi bi-compass" aria-hidden="true" /></div></section>
+        <section aria-labelledby="start-here" className="mb-4"><div className="mb-3"><div className="portal-eyebrow">Start here</div><h2 id="start-here" className="h3 mb-1">What do you need today?</h2><p className="mb-0">Choose a starting point. You can add a new opportunity or job seeker from the Add menu above.</p></div><Row className="g-3"><Col md={6}><Card as={Link} to="/hot-job-search" className="dashboard-action-card h-100 text-decoration-none"><Card.Body><div className="dashboard-action-icon"><FaSearch /></div><div className="d-flex align-items-center justify-content-between gap-3"><div><h3 className="h5">Find nearby jobs</h3><p className="mb-0">Search screened listings by job type, location, or company.</p></div><i className="bi bi-arrow-up-right-circle" aria-hidden="true" /></div></Card.Body></Card></Col><Col md={6}><Card as="a" href="https://www.google.com/maps/d/u/0/edit?mid=1YnckZ2k4jyCu6Agxg4VX0EyWK49puuo&ll=28.284392717060463%2C-82.04171770869505&z=9" target="_blank" rel="noopener noreferrer" className="dashboard-action-card h-100 text-decoration-none"><Card.Body><div className="dashboard-action-icon map"><FaMapMarkedAlt /></div><div className="d-flex align-items-center justify-content-between gap-3"><div><h3 className="h5">Open the job map</h3><p className="mb-0">Explore active job opportunities by location.</p></div><i className="bi bi-box-arrow-up-right" aria-hidden="true" /></div></Card.Body></Card></Col></Row></section>
+        <section className="dashboard-guide" aria-labelledby="how-it-works"><div className="d-flex align-items-center gap-3 mb-3"><div className="guide-icon"><i className="bi bi-people" aria-hidden="true" /></div><div><div className="portal-eyebrow">How GoodJobNet helps</div><h2 id="how-it-works" className="h4 mb-0">Small steps, shared support</h2></div></div><Row className="g-3"><Col md={4}><div className="guide-step"><span>01</span><h3 className="h6">Share an opportunity</h3><p className="mb-0">Use Add when you know of a job that could help someone nearby.</p></div></Col><Col md={4}><div className="guide-step"><span>02</span><h3 className="h6">Tell us about a seeker</h3><p className="mb-0">Capture the information coaches need to offer focused assistance.</p></div></Col><Col md={4}><div className="guide-step"><span>03</span><h3 className="h6">Keep moving together</h3><p className="mb-0">Employment coaches, workshops, and local resources make the search less solitary.</p></div></Col></Row></section>
+        <footer className="dashboard-footer"><p className="mb-1">“We can accomplish so much more together than we can alone.”</p><small>President Russell M. Nelson</small><div className="mt-3"><Button as={Link} to="/help" variant="link" className="p-0">Visit information and help <i className="bi bi-arrow-right ms-1" aria-hidden="true" /></Button></div></footer>
       </div>
-    </div>
+    </main>
   );
 }
 

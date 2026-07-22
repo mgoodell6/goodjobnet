@@ -1,9 +1,9 @@
-import React from 'react';
+import { Card } from 'react-bootstrap';
 
 function InformationAndHelp() {
   return (
     <div className="help-container fade-in">
-      <div className="help-card">
+      <Card className="help-card border-0 shadow-sm">
         <h1 className="help-title">Information & Help</h1>
 
         <div className="help-section">
@@ -58,7 +58,7 @@ function InformationAndHelp() {
             </li>
           </ul>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

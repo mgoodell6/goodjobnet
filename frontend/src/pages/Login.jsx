@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
+import { Button, Card, Form } from 'react-bootstrap';
 
 function Login({ onLogin }) {
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
@@ -86,7 +87,7 @@ function Login({ onLogin }) {
 
   return (
     <div className="app-container">
-      <div className="glass-panel main-form">
+      <Card className="glass-panel main-form border-0 shadow-sm">
         <header>
           <h1>Welcome to GoodJobNet</h1>
           <p className="subtitle">Employment resource for LDS wards and stakes in the Central Florida area</p>
@@ -103,19 +104,20 @@ function Login({ onLogin }) {
             <div className="form-grid">
               <div className="input-group full-width">
                 <label>Username</label>
-                <input type="text" required value={username} onChange={e => setUsername(e.target.value)} />
+                  <Form.Control type="text" required value={username} onChange={e => setUsername(e.target.value)} />
               </div>
               <div className="input-group full-width">
                 <label>Password</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
+                  <Form.Control
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     style={{ width: '100%', paddingRight: '2.5rem' }}
                   />
-                  <button
+                  <Button
+                    variant="link"
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     style={{
@@ -132,12 +134,12 @@ function Login({ onLogin }) {
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
             <div className="actions mt-2 mb-1">
-              <button type="submit" className="btn primary-btn">Login</button>
+              <Button type="submit" className="btn primary-btn">Login</Button>
             </div>
             <div className="text-center">
               <a href="#" onClick={(e) => { e.preventDefault(); setIsCreatingAccount(true); }}>Need an account? Apply here.</a>
@@ -148,19 +150,19 @@ function Login({ onLogin }) {
             <div className="form-grid">
               <div className="input-group full-width">
                 <label>Name</label>
-                <input type="text" name="name" required />
+                  <Form.Control type="text" name="name" required />
               </div>
               <div className="input-group">
                 <label>Ward</label>
-                <input type="text" name="ward" required />
+                  <Form.Control type="text" name="ward" required />
               </div>
               <div className="input-group">
                 <label>Stake</label>
-                <input type="text" name="stake" required />
+                  <Form.Control type="text" name="stake" required />
               </div>
               <div className="input-group full-width">
                 <label>Calling</label>
-                <select name="calling" required>
+                  <Form.Select name="calling" required>
                   <option value="">Select...</option>
                   <option value="Bishop">Bishop</option>
                   <option value="Relief Society President">Relief Society President</option>
@@ -168,31 +170,32 @@ function Login({ onLogin }) {
                   <option value="Self-Reliance specialist">Self-Reliance specialist</option>
                   <option value="Employment Center missionary/volunteer">Church Employment Center missionary/volunteer</option>
                   <option value="Other">Other</option>
-                </select>
+                  </Form.Select>
               </div>
               <div className="input-group">
                 <label>Email (Optional)</label>
-                <input type="email" name="email" />
+                  <Form.Control type="email" name="email" />
               </div>
               <div className="input-group">
                 <label>Phone (Optional)</label>
-                <input type="tel" name="phone" />
+                  <Form.Control type="tel" name="phone" />
               </div>
               <div className="input-group full-width">
                 <label>Desired Username (Unique)</label>
-                <input type="text" name="username" required />
+                  <Form.Control type="text" name="username" required />
               </div>
               <div className="input-group full-width">
                 <label>Password (Min 8 chars)</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
+                  <Form.Control
                     type={showRegisterPassword ? 'text' : 'password'}
                     name="password"
                     minLength="8"
                     required
                     style={{ width: '100%', paddingRight: '2.5rem' }}
                   />
-                  <button
+                  <Button
+                    variant="link"
                     type="button"
                     onClick={() => setShowRegisterPassword(!showRegisterPassword)}
                     style={{
@@ -209,19 +212,19 @@ function Login({ onLogin }) {
                     aria-label={showRegisterPassword ? 'Hide password' : 'Show password'}
                   >
                     {showRegisterPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
             <div className="actions mt-2 mb-1">
-              <button type="submit" className="btn primary-btn">Create Account</button>
+              <Button type="submit" className="btn primary-btn">Create Account</Button>
             </div>
             <div className="text-center">
               <a href="#" onClick={(e) => { e.preventDefault(); setIsCreatingAccount(false); }}>Back to Login</a>
             </div>
           </form>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

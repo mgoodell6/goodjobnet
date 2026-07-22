@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { FaMapMarkedAlt, FaSearch } from 'react-icons/fa';
+import { Card, Col, Row } from 'react-bootstrap';
 
 function JobSeekerDashboard() {
   return (
@@ -14,16 +15,10 @@ function JobSeekerDashboard() {
           <p><strong>Looking for employment?</strong> We are here to help. You can use the map to find active job opportunities near you, or search the available listings.</p>
         </div>
 
-        <div className="nav-grid">
-          <a href="https://www.google.com/maps/d/u/0/edit?mid=1YnckZ2k4jyCu6Agxg4VX0EyWK49puuo&ll=28.284392717060463%2C-82.04171770869505&z=9" target="_blank" rel="noopener noreferrer" className="nav-card">
-            <FaMapMarkedAlt />
-            <h3>Job Location Map</h3>
-          </a>
-          <Link to="/hot-job-search" className="nav-card">
-            <FaSearch />
-            <h3>Search for nearby jobs</h3>
-          </Link>
-        </div>
+        <Row className="g-3">
+          <Col md={6}><Card as="a" href="https://www.google.com/maps/d/u/0/edit?mid=1YnckZ2k4jyCu6Agxg4VX0EyWK49puuo&ll=28.284392717060463%2C-82.04171770869505&z=9" target="_blank" rel="noopener noreferrer" className="nav-card"><FaMapMarkedAlt /><h3>Job Location Map</h3></Card></Col>
+          <Col md={6}><Card as={Link} to="/hot-job-search" className="nav-card"><FaSearch /><h3>Search for nearby jobs</h3></Card></Col>
+        </Row>
 
         <div className="form-footer">
           <p className="footer-text">No one should go through a job search alone. We offer a team of employment coaches, resume assistance, interview preparation, and networking opportunities.</p>

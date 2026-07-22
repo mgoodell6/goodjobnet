@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { Card } from 'react-bootstrap';
+import MultiSelect from '../components/MultiSelect';
 
 const standardOptions = [
   "HVAC Repair", "Accountant", "Airport (Baggage/customer service/ground ops)",
@@ -149,7 +151,7 @@ function JobSeekerEntry({ user }) {
         setSuccess(false);
         setMessage(result.error || 'Failed to submit');
       }
-    } catch (err) {
+    } catch {
       setSuccess(false);
       setMessage('Error connecting to server.');
     }
@@ -158,11 +160,11 @@ function JobSeekerEntry({ user }) {
 
   return (
     <div className="app-container">
-      <div className="glass-panel main-form" style={{ maxWidth: seeker ? '1000px' : '700px' }}>
-        <header>
-          <h1>Job Seeker Entry</h1>
-          <p className="subtitle">Enter information for an individual seeking employment</p>
-        </header>
+      <Card className="glass-panel main-form border-0 shadow-sm" style={{ maxWidth: seeker ? '1000px' : '700px' }}>
+        <div className="search-hero page-hero">
+          <div><div className="portal-eyebrow">GoodJobNet job bank</div><h1 className="mb-2">Add a job seeker</h1><p className="subtitle">Enter information for an individual seeking employment.</p></div>
+          <div className="search-hero-icon"><i className="bi bi-person-plus" aria-hidden="true" /></div>
+        </div>
 
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
@@ -231,63 +233,14 @@ function JobSeekerEntry({ user }) {
             </div>
 
             <div className="input-group full-width">
-              <label>Desired Job type(s) (Hold Ctrl/Cmd to select multiple)</label>
-              <select 
+              <label>Desired Job type(s) (click to select multiple)</label>
+              <MultiSelect 
                 name="desired_job_types" 
-                multiple 
                 size="4" 
+                options={standardOptions}
                 value={selectedJobTypes} 
-                onChange={e => setSelectedJobTypes(Array.from(e.target.selectedOptions, option => option.value))}
-              >
-                <option value="HVAC Repair">HVAC Repair</option>
-                <option value="Accountant">Accountant</option>
-                <option value="Airport (Baggage/customer service/ground ops)">Airport (Baggage/customer service/ground ops)</option>
-                <option value="Auto Parts">Auto Parts</option>
-                <option value="Car Wash Attendant">Car Wash Attendant</option>
-                <option value="Cashier">Cashier</option>
-                <option value="Catering">Catering</option>
-                <option value="CDL Driver">CDL Driver</option>
-                <option value="Cement Mason/finisher">Cement Mason/finisher</option>
-                <option value="Computer / IT">Computer / IT</option>
-                <option value="Computer Programmer">Computer Programmer</option>
-                <option value="Construction">Construction</option>
-                <option value="Corrections">Corrections</option>
-                <option value="Custodian">Custodian</option>
-                <option value="Customer service">Customer service</option>
-                <option value="Data Entry">Data Entry</option>
-                <option value="Day Care / Preschool">Day Care/ Preschool</option>
-                <option value="Delivery Driver">Delivery Driver</option>
-                <option value="Drywaller">Drywaller</option>
-                <option value="Educator">Educator</option>
-                <option value="Electrician">Electrician</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Event Staff">Event Staff</option>
-                <option value="Fast food">Fast food</option>
-                <option value="Gas Station Attendant">Gas Station Attendant</option>
-                <option value="Grocery Store">Grocery Store</option>
-                <option value="Healthcare">Healthcare</option>
-                <option value="Hotel/Hospitality">Hotel/Hospitality</option>
-                <option value="Housekeeper">Housekeeper</option>
-                <option value="Information Technology (IT)">Information Technology (IT)</option>
-                <option value="Landscaping">Landscaping</option>
-                <option value="Manager (Department/Project)">Manager (Department/Project)</option>
-                <option value="Manager (Store/Crew)">Manager (Store/Crew)</option>
-                <option value="Mechanic">Mechanic</option>
-                <option value="Manufacturing">Manufacturing</option>
-                <option value="Nursing">Nursing</option>
-                <option value="Painter">Painter</option>
-                <option value="Pest Control">Pest Control</option>
-                <option value="Plumbing">Plumbing</option>
-                <option value="Restaurant (Cook/Waiter/Host)">Restaurant (Cook/Waiter/Host)</option>
-                <option value="Retail">Retail</option>
-                <option value="Sales">Sales</option>
-                <option value="Security">Security</option>
-                <option value="Stocking">Stocking</option>
-                <option value="Telephone/Call Center/Scheduling">Telephone/Call Center/Scheduling</option>
-                <option value="Theme Park">Theme Park</option>
-                <option value="Trucking/Transportation">Trucking/Transportation</option>
-                <option value="Warehousing/Logistics">Warehousing/Logistics</option>
-              </select>
+                onChange={setSelectedJobTypes}
+              />
             </div>
 
             <div className="input-group full-width">
@@ -456,7 +409,7 @@ function JobSeekerEntry({ user }) {
             )}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

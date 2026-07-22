@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Alert, Card, Table } from 'react-bootstrap';
 
 function AssignedJobSeekersList({ user }) {
   const [loading, setLoading] = useState(true);
@@ -36,7 +37,7 @@ function AssignedJobSeekersList({ user }) {
 
   return (
     <div className="app-container" style={{ flexDirection: 'column' }}>
-      <div className="glass-panel main-form" style={{ maxWidth: '1000px' }}>
+      <Card className="glass-panel main-form border-0 shadow-sm" style={{ maxWidth: '1000px' }}>
         <header>
           <h1>Assigned Job Seekers List</h1>
           <p className="subtitle">Unemployed individuals assigned to coach: <strong>{user?.name || 'Unknown'}</strong></p>
@@ -45,16 +46,14 @@ function AssignedJobSeekersList({ user }) {
         {loading ? (
           <p className="text-center">Loading assigned seekers...</p>
         ) : error ? (
-          <div style={{ padding: '1rem', background: 'rgba(231, 76, 60, 0.2)', color: '#c0392b', borderRadius: '8px', marginBottom: '1.5rem' }}>
-            {error}
-          </div>
+          <Alert variant="danger">{error}</Alert>
         ) : seekers.length === 0 ? (
           <p style={{ fontStyle: 'italic', color: 'var(--text-light)', marginTop: '0.5rem', marginBottom: '1.5rem' }}>
             No job seekers are currently assigned to you.
           </p>
         ) : (
           <div className="table-container mb-2">
-            <table>
+            <Table responsive hover>
               <thead>
                 <tr>
                   <th>Name</th>
@@ -86,7 +85,7 @@ function AssignedJobSeekersList({ user }) {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
         )}
 
@@ -100,7 +99,7 @@ function AssignedJobSeekersList({ user }) {
             Back to Dashboard
           </button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
