@@ -1352,7 +1352,7 @@ function HotJobsReview({ user }) {
           </header>
 
           <div className="form-grid mt-2">
-            <button className="btn primary-btn" onClick={() => fetchJobs('unverified_no_career')} style={{ height: 'auto', padding: '1.5rem', background: '#2980b9' }}>
+            <button className="btn primary-btn" onClick={() => fetchJobs('unverified_no_career')} style={{ height: 'auto', padding: '1.5rem', background: 'var(--portal-teal)' }}>
               Phone Verification Queue
             </button>
             <button className="btn primary-btn" onClick={() => fetchJobs('5days')} style={{ height: 'auto', padding: '1.5rem' }}>
@@ -1370,7 +1370,7 @@ function HotJobsReview({ user }) {
                   options={JOB_OPTIONS}
                   value={selectedJobTypes}
                   onChange={setSelectedJobTypes}
-                  style={{ width: '100%', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '0.5rem' }}
+                  style={{ width: '100%', background: 'var(--portal-sky)', color: 'var(--portal-ink)', border: '1px solid var(--portal-border)', borderRadius: '4px', padding: '0.5rem' }}
                 />
 
                 <div style={{ display: 'flex', gap: '1rem' }}>
@@ -1499,12 +1499,12 @@ function HotJobsReview({ user }) {
                 {voiceActive ? (isVoicePaused ? 'Voice Assistant PAUSED' : 'Voice Assistant ON') : 'Turn On Voice Assistant'}
               </button>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.3rem 0.6rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--portal-sky)', padding: '0.3rem 0.6rem', borderRadius: '4px', border: '1px solid var(--portal-border)' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: '500' }}>Call Mode:</span>
                 <select
                   value={callMethod}
                   onChange={e => setCallMethod(e.target.value)}
-                  style={{ background: 'white', color: 'var(--text-dark)', border: '1px solid #ced4da', padding: '0.3rem 0.6rem', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none' }}
+                    style={{ background: 'var(--portal-surface)', color: 'var(--portal-ink)', border: '1px solid var(--portal-border)', padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.85rem', cursor: 'pointer', outline: 'none' }}
                 >
                   <option value="google-voice">Google Voice (Automated)</option>
                   <option value="phone-link">Phone Link (Automated)</option>
@@ -1518,8 +1518,8 @@ function HotJobsReview({ user }) {
                 className={`status-dot ${voiceActive && !speechStatus.includes('Error') && !speechStatus.includes('Denied') && !speechStatus.includes('Offline') ? 'active' : ''}`}
                 style={{
                   background: (voiceActive && !speechStatus.includes('Error') && !speechStatus.includes('Denied') && !speechStatus.includes('Offline'))
-                    ? (speechStatus === 'System speaking...' ? '#f1c40f' : 'var(--success)')
-                    : (speechStatus.includes('Error') || speechStatus.includes('Denied')) ? 'var(--error)' : '#bdc3c7'
+                    ? (speechStatus === 'System speaking...' ? 'var(--portal-gold)' : 'var(--success)')
+                    : (speechStatus.includes('Error') || speechStatus.includes('Denied')) ? 'var(--error)' : 'var(--portal-muted)'
                 }}
               ></span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: 1 }}>
@@ -1529,10 +1529,10 @@ function HotJobsReview({ user }) {
                 {voiceActive && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-light)', minWidth: '55px' }}>Mic Level:</span>
-                    <div style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(0,0,0,0.15)', height: '8px', borderRadius: '4px', flex: 1, overflow: 'hidden' }}>
+                    <div style={{ background: 'var(--portal-sky)', border: '1px solid var(--portal-border)', height: '8px', borderRadius: '4px', flex: 1, overflow: 'hidden' }}>
                       <div
                         style={{
-                          background: micVolume > 60 ? 'var(--error)' : micVolume > 15 ? 'var(--success)' : 'rgba(0,0,0,0.15)',
+                          background: micVolume > 60 ? 'var(--error)' : micVolume > 15 ? 'var(--success)' : 'var(--portal-muted)',
                           height: '100%',
                           width: `${micVolume}%`,
                           transition: 'width 0.08s ease'
@@ -1547,7 +1547,7 @@ function HotJobsReview({ user }) {
           </div>
 
           {voiceActive && (
-            <div style={{ borderTop: '1px solid rgba(0,0,0,0.1)', paddingTop: '0.8rem', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <div style={{ borderTop: '1px solid var(--portal-border)', paddingTop: '0.8rem', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <span style={{ color: 'var(--text-light)', fontWeight: 'bold' }}>Last heard:</span>
@@ -1574,7 +1574,7 @@ function HotJobsReview({ user }) {
                 <span>• "Help"</span>
               </div>
 
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', background: 'rgba(241, 196, 15, 0.1)', borderLeft: '3px solid #f1c40f', padding: '0.4rem 0.8rem', borderRadius: '4px', marginTop: '0.4rem' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', background: 'color-mix(in srgb, var(--portal-gold) 12%, var(--portal-surface))', borderLeft: '3px solid var(--portal-gold)', padding: '0.4rem 0.8rem', borderRadius: '4px', marginTop: '0.4rem' }}>
                 <strong>Troubleshooting:</strong> If <em>Mic Level</em> stays at 0%, click the lock/settings icon next to the URL in the address bar. Ensure "Microphone" is set to "Allow". If it is allowed, check Chrome Settings &gt; Privacy and security &gt; Site settings &gt; Microphone to verify the correct physical device is selected as your default.
               </div>
 
@@ -1715,7 +1715,7 @@ function HotJobsReview({ user }) {
           })()}
 
           {message && (
-            <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '8px', background: success ? 'rgba(46, 204, 113, 0.2)' : 'rgba(231, 76, 60, 0.2)', color: success ? '#27ae60' : '#c0392b' }}>
+            <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '4px', background: success ? 'color-mix(in srgb, var(--success) 12%, var(--portal-surface))' : 'color-mix(in srgb, var(--error) 12%, var(--portal-surface))', color: success ? 'var(--success)' : 'var(--error)' }}>
               {message}
             </div>
           )}

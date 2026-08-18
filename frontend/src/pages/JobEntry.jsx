@@ -236,7 +236,7 @@ function JobEntry({ user }) {
           </div>
 
           {message && (
-            <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '8px', background: success ? 'rgba(46, 204, 113, 0.2)' : 'rgba(231, 76, 60, 0.2)', color: success ? '#27ae60' : '#c0392b' }}>
+            <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '4px', background: success ? 'color-mix(in srgb, var(--success) 12%, var(--portal-surface))' : 'color-mix(in srgb, var(--error) 12%, var(--portal-surface))', color: success ? 'var(--success)' : 'var(--error)' }}>
               {message}
             </div>
           )}

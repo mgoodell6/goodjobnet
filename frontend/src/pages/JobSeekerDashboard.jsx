@@ -16,7 +16,7 @@ function JobSeekerDashboard() {
         </div>
 
         <Row className="g-3">
-          <Col md={6}><Card as="a" href="https://www.google.com/maps/d/u/0/edit?mid=1YnckZ2k4jyCu6Agxg4VX0EyWK49puuo&ll=28.284392717060463%2C-82.04171770869505&z=9" target="_blank" rel="noopener noreferrer" className="nav-card"><FaMapMarkedAlt /><h3>Job Location Map</h3></Card></Col>
+          <Col md={6}><Card as={Link} to="/job-location-map" className="nav-card"><FaMapMarkedAlt /><h3>Job Location Map</h3></Card></Col>
           <Col md={6}><Card as={Link} to="/hot-job-search" className="nav-card"><FaSearch /><h3>Search for nearby jobs</h3></Card></Col>
         </Row>
 
@@ -26,8 +26,8 @@ function JobSeekerDashboard() {
             <p className="footer-quote">"We can accomplish so much more together than we can alone."</p>
             <p className="footer-author">- President Russell M. Nelson</p>
           </div>
-          <p style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem', color: '#7f8c8d' }}>
-            Orlando Employment Center  - contact us at - <a href="mailto:Orlandoemploymentoffice@gmail.com" style={{ color: '#3498db', textDecoration: 'underline' }}>Orlandoemploymentoffice@gmail.com</a>
+          <p style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem', color: 'var(--portal-muted)' }}>
+            Orlando Employment Center  - contact us at - <a href="mailto:Orlandoemploymentoffice@gmail.com" style={{ color: 'var(--portal-teal)', textDecoration: 'underline' }}>Orlandoemploymentoffice@gmail.com</a>
           </p>
         </div>
       </div>

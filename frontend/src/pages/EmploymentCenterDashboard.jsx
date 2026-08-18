@@ -3,7 +3,7 @@ import { FaBriefcase, FaUserTie, FaSearch } from 'react-icons/fa';
 import { useState, useEffect } from 'react';
 import { Card } from 'react-bootstrap';
 
-function EmploymentCenterDashboard() {
+function EmploymentCenterDashboard({ initialStats }) {
 
   const [stats, setStats] = useState({
     expiring_soon: '...',
@@ -124,6 +124,24 @@ function EmploymentCenterDashboard() {
   };
 
   useEffect(() => {
+    if (initialStats?.success) {
+      setStats({
+        expiring_soon: initialStats.expiring_soon,
+        two_years_soon: initialStats.two_years_soon,
+        new_jobs_count: initialStats.new_jobs_count,
+        new_jobs_url: initialStats.new_jobs_url,
+        new_seekers_count: initialStats.new_seekers_count,
+        new_seekers_url: initialStats.new_seekers_url,
+        expired_recently: initialStats.expired_recently,
+        total_hot_jobs: initialStats.total_hot_jobs,
+        total_job_seekers: initialStats.total_job_seekers,
+        job_types: initialStats.job_types || {},
+        seeker_types: initialStats.seeker_types || {},
+        unverified_no_career_count: initialStats.unverified_no_career_count
+      });
+      return;
+    }
+
     fetch('/api/dashboard-stats')
       .then(res => res.json())
       .then(data => {
@@ -147,19 +165,19 @@ function EmploymentCenterDashboard() {
       .catch(err => {
         console.error('Error fetching stats:', err);
       });
-  }, []);
+  }, [initialStats]);
 
 
 
   const getSharedColorMap = () => {
     const map = new Map();
-    map.set('Other', '#95a5a6');
+    map.set('Other', '#9aa8ad');
 
     let jobTypesArr = Object.entries(stats.job_types || {}).map(([l, c]) => ({ label: l, count: c })).sort((a, b) => b.count - a.count).slice(0, 5);
     let seekerTypesArr = Object.entries(stats.seeker_types || {}).map(([l, c]) => ({ label: l, count: c })).sort((a, b) => b.count - a.count).slice(0, 5);
 
     const allLabels = [...new Set([...jobTypesArr.map(t => t.label), ...seekerTypesArr.map(t => t.label)])];
-    const palette = ['#3a7bd5', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#1abc9c', '#d35400', '#2980b9', '#27ae60', '#e67e22'];
+    const palette = ['#006b9c', '#3c7d5a', '#c99a3d', '#6d8fa1', '#7b6f9e', '#4d9a9c', '#a66a4b', '#2f789a', '#5c8f70', '#b08048'];
 
     let colorIndex = 0;
     allLabels.forEach(label => {
@@ -272,7 +290,7 @@ function EmploymentCenterDashboard() {
   };
 
   return (
-    <div className="app-container" style={{ flexDirection: 'column' }}>
+    <main className="app-container admin-dashboard-page" style={{ flexDirection: 'column' }}>
       <Card className="glass-panel main-form border-0 shadow-sm" style={{ maxWidth: '1000px' }}>
         <header>
           <h1>Employment Center Dashboard</h1>
@@ -293,42 +311,42 @@ function EmploymentCenterDashboard() {
             <p style={{ fontWeight: 'bold', color: 'var(--text-color)', marginBottom: '1rem' }}>Total Job Seekers: {stats.total_job_seekers}</p>
             {renderPieChart(stats.seeker_types, stats.total_job_seekers, sharedColorMap, "No job seekers currently active")}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
-              <Link to="/assigned-job-seekers" className="btn primary-btn" style={{ width: 'auto', background: '#8e44ad' }}>Show my assigned Job Seekers list</Link>
+              <Link to="/assigned-job-seekers" className="btn primary-btn" style={{ width: 'auto', background: 'var(--portal-teal)' }}>Show my assigned Job Seekers list</Link>
             </div>
           </div>
         </div>
 
         {/* Middle Section: Alerts */}
-        <div className="alerts-section mb-2" style={{ background: 'rgba(231, 76, 60, 0.05)', border: '1px solid rgba(231, 76, 60, 0.2)', padding: '1.5rem', borderRadius: '12px' }}>
-          <h3 style={{ color: '#c0392b', marginBottom: '1rem' }}>Attention Needed</h3>
+        <div className="alerts-section mb-2" style={{ background: 'color-mix(in srgb, var(--portal-sky) 55%, var(--portal-surface))', border: '1px solid var(--portal-border)', padding: '1.5rem', borderRadius: '4px' }}>
+          <h3 style={{ color: 'var(--portal-navy)', marginBottom: '1rem' }}>Attention Needed</h3>
           <ul style={{ listStyle: 'none', padding: 0 }}>
-            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--portal-border)' }}>
               <Link to="/hot-jobs-5review" className="dashboard-alert-link">
                 <span>Hot Jobs expiring in 5 days:</span>
                 <strong>{stats.expiring_soon}</strong>
               </Link>
             </li>
-            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--portal-border)' }}>
               <Link to="/hot-jobs-46review" className="dashboard-alert-link">
                 <span>Hot Jobs that expired 4 - 6 weeks ago:</span>
                 <strong>{stats.expired_recently}</strong>
               </Link>
             </li>
-            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--portal-border)' }}>
               <Link to="/hot-jobs-review?category=unverified_no_career" className="dashboard-alert-link">
                 <span>Hot Jobs unverified &gt; 3 weeks (Phone Verification Required):</span>
                 <strong>{stats.unverified_no_career_count}</strong>
               </Link>
             </li>
-            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between' }}>
+            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--portal-border)', display: 'flex', justifyContent: 'space-between' }}>
               <span>JobBank rows reaching 2 years in next 3 months:</span>
               <strong>{stats.two_years_soon}</strong>
             </li>
-            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between' }}>
+            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--portal-border)', display: 'flex', justifyContent: 'space-between' }}>
               <span>New unreviewed Job Opportunities:</span>
               <strong>{stats.new_jobs_count}</strong>
             </li>
-            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between' }}>
+            <li style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--portal-border)', display: 'flex', justifyContent: 'space-between' }}>
               <span>New unreviewed Job Seekers:</span>
               <strong>{stats.new_seekers_count}</strong>
             </li>
@@ -336,7 +354,7 @@ function EmploymentCenterDashboard() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
             <div style={{ display: 'flex', gap: '1rem' }}>
-              <Link to="/hot-jobs-review" className="btn primary-btn" style={{ background: '#e74c3c', flex: 1 }}>
+              <Link to="/hot-jobs-review" className="btn primary-btn" style={{ background: 'var(--portal-teal)', flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                   <FaBriefcase /> Review Hot Jobs
                 </div>
@@ -380,8 +398,8 @@ function EmploymentCenterDashboard() {
               style={{ 
                 flex: 1,
                 maxWidth: '420px', 
-                background: 'linear-gradient(135deg, #2e7d32, #1b5e20)',
-                boxShadow: '0 4px 15px rgba(46, 125, 50, 0.3)'
+                background: 'var(--portal-teal)',
+                boxShadow: 'none'
               }}
             >
               {updating ? 'Updating jobBank jobSeeker information...' : 'Update jobBank jobSeeker information'}
@@ -392,8 +410,8 @@ function EmploymentCenterDashboard() {
               style={{ 
                 flex: 1,
                 maxWidth: '420px', 
-                background: 'linear-gradient(135deg, #3a7bd5, #3a6073)',
-                boxShadow: '0 4px 15px rgba(58, 123, 213, 0.3)',
+                background: 'var(--portal-navy)',
+                boxShadow: 'none',
                 cursor: importing ? 'default' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -437,7 +455,7 @@ function EmploymentCenterDashboard() {
                       width: 'auto', 
                       padding: '0.5rem 1.25rem', 
                       fontSize: '0.85rem',
-                      background: 'rgba(255,255,255,0.8)',
+                      background: 'var(--portal-surface)',
                       borderColor: 'var(--primary-color)',
                       color: 'var(--primary-color)'
                     }}
@@ -451,7 +469,7 @@ function EmploymentCenterDashboard() {
         </div>
 
       </Card>
-    </div>
+    </main>
   );
 }
 

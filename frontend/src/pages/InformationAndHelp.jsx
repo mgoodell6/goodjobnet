@@ -4,7 +4,7 @@ function InformationAndHelp() {
   return (
     <div className="help-container fade-in">
       <Card className="help-card border-0 shadow-sm">
-        <h1 className="help-title">Information & Help</h1>
+        <h1 className="help-title">Help and Information</h1>
 
         <div className="help-section">
           <h2>About the Job Bank</h2>

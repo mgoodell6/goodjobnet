@@ -19,7 +19,7 @@ function JobResults({ results, resultsRef }) {
     <div className="table-container">
       <Table responsive hover className="mb-0 align-middle">
         <thead><tr><th>Company</th><th>Role</th><th>Location</th><th>Distance</th><th>Posting</th><th>Notes</th></tr></thead>
-        <tbody>{jobs.map((job, idx) => <tr key={idx}><td className="fw-semibold">{job.company}</td><td>{job.role}</td><td>{job.location}</td><td>{job.distance || 'N/A'}</td><td>{job.career_website ? <a href={job.career_website} target="_blank" rel="noopener noreferrer">View posting</a> : 'N/A'}</td><td>{job.notes || 'N/A'}</td></tr>)}</tbody>
+        <tbody>{jobs.map((job, idx) => <tr key={idx}><td className="fw-semibold">{job.company}</td><td>{job.role}</td><td>{job.location}</td><td>{job.distance || 'N/A'}</td><td>{job.career_website ? <a href={job.career_website} target="_blank" rel="noopener noreferrer">View posting</a> : 'N/A'}</td><td className="notes-cell">{job.notes || 'N/A'}</td></tr>)}</tbody>
       </Table>
     </div>
   );
