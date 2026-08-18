@@ -21,13 +21,40 @@ function GlobalSearch() {
   const [loading, setLoading] = useState(false);
   const [bounds, setBounds] = useState(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [resultType, setResultType] = useState('both');
+  const [jobStatus, setJobStatus] = useState('all');
+  const [dateRange, setDateRange] = useState('all');
+  const [showCustomDates, setShowCustomDates] = useState(false);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [resultLimit, setResultLimit] = useState(10);
   const searchRef = useRef(null);
+  const filtersRef = useRef(null);
+  const resultsRef = useRef(null);
+
+  const closeSearch = () => {
+    setQuery('');
+    setResults(null);
+    setLoading(false);
+    setIsSearchFocused(false);
+  };
+
+  const openSearch = () => {
+    setResultType('both');
+    setJobStatus('all');
+    setDateRange('all');
+    setShowCustomDates(false);
+    setCustomStart('');
+    setCustomEnd('');
+    setResultLimit(10);
+    setIsSearchFocused(true);
+  };
 
   useEffect(() => {
     const updateBounds = () => {
       if (searchRef.current) {
         const rect = searchRef.current.getBoundingClientRect();
-        setBounds({ left: rect.left, top: rect.bottom + 8, width: rect.width });
+        setBounds({ top: rect.bottom + 8 });
       }
     };
     updateBounds();
@@ -39,6 +66,20 @@ function GlobalSearch() {
       resizeObserver.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    if (!isSearchFocused && !query.trim()) return undefined;
+    const handlePointerDown = event => {
+      const clickedSearch = searchRef.current?.contains(event.target);
+      const clickedFilters = filtersRef.current?.contains(event.target);
+      const clickedResults = resultsRef.current?.contains(event.target);
+      if (!clickedSearch && !clickedFilters && !clickedResults) {
+        closeSearch();
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [isSearchFocused, query]);
 
   useEffect(() => {
     const trimmedQuery = query.trim();
@@ -88,20 +129,44 @@ function GlobalSearch() {
     };
   }, [query]);
 
-  const jobs = [...(results?.jobs?.recent || []), ...(results?.jobs?.older || [])].slice(0, 6);
-  const seekers = [...(results?.seekers?.nearby || []), ...(results?.seekers?.other || [])].slice(0, 6);
+  useEffect(() => {
+    if (dateRange === 'custom') {
+      setDateRange('all');
+      setShowCustomDates(false);
+    }
+  }, [dateRange]);
+
+  const dateMatches = job => {
+    if (dateRange === 'all') return true;
+    const verifiedDate = new Date(job.date_verified);
+    if (Number.isNaN(verifiedDate.getTime())) return false;
+    const today = new Date();
+    if (dateRange === 'three-weeks') return verifiedDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate() - 21);
+    if (dateRange === 'three-months') return verifiedDate >= new Date(today.getFullYear(), today.getMonth() - 3, today.getDate());
+    const start = customStart ? new Date(`${customStart}T00:00:00`) : null;
+    const end = customEnd ? new Date(`${customEnd}T23:59:59`) : null;
+    return (!start || verifiedDate >= start) && (!end || verifiedDate <= end);
+  };
+  const jobs = [...(results?.jobs?.recent || []), ...(results?.jobs?.older || [])]
+    .filter(() => resultType !== 'seekers')
+    .filter(job => jobStatus === 'all' || (jobStatus === 'hiring' ? job.currently_hiring : !job.currently_hiring))
+    .filter(dateMatches)
+    .slice(0, resultType === 'both' ? 6 : resultLimit);
+  const seekers = [...(results?.seekers?.nearby || []), ...(results?.seekers?.other || [])]
+    .filter(() => resultType !== 'jobs')
+    .slice(0, resultType === 'both' ? 6 : resultLimit);
   const hasResults = jobs.length > 0 || seekers.length > 0;
 
   return (
     <div ref={searchRef} className={`nav-search${isSearchFocused ? ' nav-search-focused' : ''}`} role="search">
       <i className="bi bi-search" aria-hidden="true" />
-      <Form.Control type="search" placeholder="Search" aria-label="Search" value={query} onFocus={() => setIsSearchFocused(true)} onBlur={() => { if (!query.trim()) setIsSearchFocused(false); }} onChange={event => setQuery(event.target.value)} />
-      {query.trim().length >= 2 && bounds && <div className="global-search-results" style={{ left: `${bounds.left}px`, top: `${bounds.top}px`, width: `${bounds.width}px` }} role="region" aria-label="Search results">
-        {loading ? <div className="global-search-status">Searching jobs and job seekers...</div> : !hasResults ? <div className="global-search-status">No matching jobs or job seekers found.</div> : <>
+      <Form.Control type="search" placeholder="Search (Beta)" aria-label="Search" value={query} onFocus={openSearch} onChange={event => setQuery(event.target.value)} />
+      {query.trim().length >= 2 && bounds && <><div className="global-search-backdrop" aria-hidden="true" onPointerDown={closeSearch} /><div ref={filtersRef} className="global-search-filters" style={{ top: `${bounds.top}px` }}><Form.Select aria-label="Result type" value={resultType} onChange={event => setResultType(event.target.value)}><option value="both">Jobs and Job Seekers</option><option value="jobs">Jobs</option><option value="seekers">Job Seekers</option></Form.Select>{resultType === 'jobs' && <><Form.Select aria-label="Job status" value={jobStatus} onChange={event => setJobStatus(event.target.value)}><option value="all">All</option><option value="hiring">Currently Hiring</option><option value="verification">Needs Verification</option></Form.Select><div className="global-date-filter"><Form.Select aria-label="Verification date range" value={dateRange} onChange={event => { setDateRange(event.target.value); setShowCustomDates(event.target.value === 'custom'); }}><option value="all">All-time</option><option value="three-weeks">Last Three Weeks</option><option value="three-months">Last Three Months</option><option value="custom">Custom</option></Form.Select>{showCustomDates && <div className="global-date-dialog" role="dialog" aria-label="Custom date range"><Form.Control type="date" aria-label="Start date" value={customStart} onChange={event => setCustomStart(event.target.value)} /><Form.Control type="date" aria-label="End date" value={customEnd} onChange={event => setCustomEnd(event.target.value)} /><Button type="button" size="sm" className="primary-btn" onClick={() => setShowCustomDates(false)}>Apply</Button></div>}</div></>}</div><div ref={resultsRef} className="global-search-results" style={{ top: `${bounds.top + (showCustomDates ? 150 : 70)}px` }} role="region" aria-label="Search results"><div className="global-search-results-heading"><div className="global-search-results-title">Results</div>{resultType !== 'both' && <Form.Select className="global-result-limit" aria-label="Number of results to show" value={resultLimit} onChange={event => setResultLimit(Number(event.target.value))}><option value="10">Show 10</option><option value="30">Show 30</option></Form.Select>}</div>
+        {loading ? <div className="global-search-status">Searching jobs and job seekers...</div> : !hasResults ? <div className="global-search-status">No matching results found.</div> : <>
           {jobs.length > 0 && <section><h2>Jobs</h2>{jobs.map((job, index) => <Link key={`job-${index}`} to="/hot-job-search" className="global-search-result"><span className="global-search-result-icon"><i className="bi bi-briefcase" aria-hidden="true" /></span><span><strong>{job.company}</strong><small>{job.location || 'Job opportunity'}</small></span></Link>)}</section>}
           {seekers.length > 0 && <section><h2>Job Seekers</h2>{seekers.map((seeker, index) => <Link key={`seeker-${index}`} to="/job-seeker-search" className="global-search-result"><span className="global-search-result-icon"><i className="bi bi-person" aria-hidden="true" /></span><span><strong>{seeker.name}</strong><small>{seeker.desired_job_types || seeker.job_needed || 'Job seeker'}{seeker.city ? ` · ${seeker.city}` : ''}</small></span></Link>)}</section>}
         </>}
-      </div>}
+      </div></>}
     </div>
   );
 }
@@ -149,8 +214,9 @@ function TopBar({ user, handleLogout }) {
         <Navbar.Toggle aria-controls="goodjobnet-navigation" />
         <Navbar.Collapse id="goodjobnet-navigation">
           {!isPublicPage && <GlobalSearch />}
-          <Nav className="app-nav-links">
-            <NavDropdown title="Resources" id="resources-menu">
+          <div className="navbar-right-controls">
+            <Nav className="app-nav-links">
+              <NavDropdown title="Resources" id="resources-menu">
               <NavDropdown.Header>Publicly Accessible</NavDropdown.Header>
               <NavDropdown.Item as={Link} to="/hot-job-search"><i className="bi bi-search me-2" aria-hidden="true" />Find Jobs</NavDropdown.Item>
               <NavDropdown.Item as={Link} to="/job-location-map"><i className="bi bi-map me-2" aria-hidden="true" />Job Location Map</NavDropdown.Item>
@@ -165,9 +231,9 @@ function TopBar({ user, handleLogout }) {
                 <NavDropdown.Item as={Link} to="/job-entry"><i className="bi bi-briefcase me-2" aria-hidden="true" />Add job opportunity</NavDropdown.Item>
                 <NavDropdown.Item as={Link} to="/job-seeker-entry"><i className="bi bi-person-plus me-2" aria-hidden="true" />Add job seeker</NavDropdown.Item>
               </>}
-            </NavDropdown>
-          </Nav>
-          <div className="user-controls">
+              </NavDropdown>
+            </Nav>
+            <div className="user-controls">
             <Button variant="link" className="theme-toggle" onClick={() => setDarkMode(value => !value)} aria-label={darkMode ? 'Use light mode' : 'Use dark mode'}>
               <i className={`bi ${darkMode ? 'bi-sun' : 'bi-moon-stars'}`} aria-hidden="true" />
             </Button>
@@ -181,6 +247,7 @@ function TopBar({ user, handleLogout }) {
               <NavDropdown.Divider />
               <NavDropdown.Item onClick={handleLogout}><i className="bi bi-box-arrow-right me-2" aria-hidden="true" />Log out</NavDropdown.Item>
             </NavDropdown>}
+            </div>
           </div>
         </Navbar.Collapse>
       </Container>

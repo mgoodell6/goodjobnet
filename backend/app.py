@@ -496,6 +496,7 @@ def search_jobs():
                     role_val = get_row_field(row, "available_jobs") or "Various"
                     career_website = get_row_field(row, "career_website")
                     notes_val = get_row_field(row, "notes")
+                    date_verified = str(get_row_field(row, "date_verified")).strip()
                     
                     job_entry = {
                         "company": company or "Unknown",
@@ -503,7 +504,9 @@ def search_jobs():
                         "location": location,
                         "distance": "",
                         "career_website": career_website,
-                        "notes": notes_val
+                        "notes": notes_val,
+                        "currently_hiring": is_currently_hiring,
+                        "date_verified": date_verified
                     }
                     if is_currently_hiring:
                         recent.append(job_entry)
