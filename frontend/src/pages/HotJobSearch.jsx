@@ -55,8 +55,8 @@ function HotJobSearch({ user }) {
   };
 
   return (
-    <div className="app-container" style={{ flexDirection: 'column' }}>
-      <div className="glass-panel main-form" style={{ maxWidth: '1000px' }}>
+    <div className="app-container" style={{ flexDirection: 'column', maxWidth: '1400px' }}>
+      <div className="glass-panel main-form" style={{ maxWidth: '1300px' }}>
         <header>
           <h1>Job Search</h1>
           <p className="subtitle">

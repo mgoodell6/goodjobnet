@@ -186,8 +186,8 @@ function JobSeekerSearch({ user }) {
   };
 
   return (
-    <div className="app-container" style={{ flexDirection: 'column' }}>
-      <div className="glass-panel main-form" style={{ maxWidth: '1000px' }}>
+    <div className="app-container" style={{ flexDirection: 'column', maxWidth: '1400px' }}>
+      <div className="glass-panel main-form" style={{ maxWidth: '1300px' }}>
         <header>
           <h1>Job Seeker Search</h1>
           <p className="subtitle">Find unemployed individuals interested in a job type within a certain radius of an address</p>
