@@ -66,6 +66,20 @@ def invalidate_cache(key=None):
         _cache.clear()
         print("Invalidated entire cache")
 
+def parse_date_string(date_str):
+    if not date_str:
+        return None
+    d_str = str(date_str).strip().split(" ")[0]
+    if not d_str:
+        return None
+    formats = ["%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%m-%d-%Y", "%m-%d-%y"]
+    for fmt in formats:
+        try:
+            return datetime.datetime.strptime(d_str, fmt)
+        except ValueError:
+            continue
+    return None
+
 # ZIP Code Distance Helpers
 _zip_cache = {}
 
@@ -496,6 +510,7 @@ def search_jobs():
                     role_val = get_row_field(row, "available_jobs") or "Various"
                     career_website = get_row_field(row, "career_website")
                     notes_val = get_row_field(row, "notes")
+                    date_verified_str = str(get_row_field(row, "date_verified")).strip()
                     
                     job_entry = {
                         "company": company or "Unknown",
@@ -503,7 +518,8 @@ def search_jobs():
                         "location": location,
                         "distance": "",
                         "career_website": career_website,
-                        "notes": notes_val
+                        "notes": notes_val,
+                        "date_verified": date_verified_str
                     }
                     if is_currently_hiring:
                         recent.append(job_entry)
@@ -612,21 +628,15 @@ def search_jobs():
                 "location": location,
                 "distance": f"{round(dist_miles, 1)} miles" if dist_miles != float('inf') else ("" if not origin_zip else "N/A"),
                 "career_website": career_website,
-                "notes": notes_val
+                "notes": notes_val,
+                "date_verified": date_verified_str
             }
             
             # Check verification date
             if date_verified_str:
-                try:
-                    # Try parsing M/D/YYYY or YYYY-MM-DD
-                    if "-" in date_verified_str:
-                        date_obj = datetime.datetime.strptime(date_verified_str.split(" ")[0], "%Y-%m-%d")
-                    else:
-                        date_obj = datetime.datetime.strptime(date_verified_str.split(" ")[0], "%m/%d/%Y")
-                    if date_obj < two_years_ago:
-                        continue
-                except Exception:
-                    pass
+                date_obj = parse_date_string(date_verified_str)
+                if date_obj and date_obj < two_years_ago:
+                    continue
                     
             if is_currently_hiring:
                 recent.append(job_entry)
@@ -696,15 +706,10 @@ def dashboard_stats():
             age_days = 9999
             has_date = False
             if date_str:
-                try:
-                    if "-" in date_str:
-                        date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%Y-%m-%d")
-                    else:
-                        date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%m/%d/%Y")
+                date_obj = parse_date_string(date_str)
+                if date_obj:
                     age_days = (now - date_obj).days
                     has_date = True
-                except:
-                    pass
 
             if is_currently_hiring:
                 if has_date:
@@ -729,7 +734,7 @@ def dashboard_stats():
                             break
                     job_type_counts[matched_type] = job_type_counts.get(matched_type, 0) + 1
                 
-            if age_days > 21:
+            if age_days > 1095:
                 career_page = get_row_field(row, "career_website")
                 if not str(career_page).strip():
                     unverified_no_career_count += 1
@@ -815,15 +820,10 @@ def hot_jobs_review():
             has_valid_date = False
             
             if date_str:
-                try:
-                    if "-" in date_str:
-                        date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%Y-%m-%d")
-                    else:
-                        date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%m/%d/%Y")
+                date_obj = parse_date_string(date_str)
+                if date_obj:
                     age_days = (now - date_obj).days
                     has_valid_date = True
-                except:
-                    pass
             
             if category == "type":
                 row_type = str(get_row_field(row, "available_jobs")).lower()
@@ -902,7 +902,7 @@ def hot_jobs_review():
                     if not (28 <= age_days <= 42) or not has_career_page:
                         continue
                 elif category == "unverified_no_career":
-                    if age_days <= 60 or has_career_page:
+                    if age_days <= 1095 or has_career_page:
                         continue
 
             job = {
@@ -1658,16 +1658,9 @@ def update_snapshot():
             if len(row) > date_col_idx:
                 date_str = str(row[date_col_idx]).strip()
                 if date_str:
-                    try:
-                        if "-" in date_str:
-                            date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%Y-%m-%d")
-                        else:
-                            date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%m/%d/%Y")
-                            
-                        if date_obj >= three_weeks_ago:
-                            is_recent = True
-                    except:
-                        pass
+                    date_obj = parse_date_string(date_str)
+                    if date_obj and date_obj >= three_weeks_ago:
+                        is_recent = True
             
             if is_recent:
                 def get_val(key):
@@ -1732,16 +1725,9 @@ def job_seeker_matches_report():
             if not date_str:
                 continue
                 
-            try:
-                if "-" in date_str:
-                    date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%Y-%m-%d")
-                else:
-                    date_obj = datetime.datetime.strptime(date_str.split(" ")[0], "%m/%d/%Y")
-                    
-                if date_obj >= three_weeks_ago:
-                    hot_jobs.append(row)
-            except:
-                continue
+            date_obj = parse_date_string(date_str)
+            if date_obj and date_obj >= three_weeks_ago:
+                hot_jobs.append(row)
                 
         # 4. Generate report
         report = []

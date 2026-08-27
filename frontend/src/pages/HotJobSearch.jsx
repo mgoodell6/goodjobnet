@@ -55,8 +55,8 @@ function HotJobSearch({ user }) {
   };
 
   return (
-    <div className="app-container" style={{ flexDirection: 'column' }}>
-      <div className="glass-panel main-form" style={{ maxWidth: '1000px' }}>
+    <div className="app-container" style={{ flexDirection: 'column', maxWidth: '1400px' }}>
+      <div className="glass-panel main-form" style={{ maxWidth: '1300px' }}>
         <header>
           <h1>Job Search</h1>
           <p className="subtitle">
@@ -219,6 +219,7 @@ function HotJobSearch({ user }) {
                       <th>Role</th>
                       <th>Location</th>
                       <th>Distance</th>
+                      <th>Date Verified</th>
                       <th>Career Website</th>
                       <th>Notes</th>
                     </tr>
@@ -230,6 +231,7 @@ function HotJobSearch({ user }) {
                         <td>{job.role}</td>
                         <td>{job.location}</td>
                         <td>{job.distance || 'N/A'}</td>
+                        <td>{job.date_verified || 'N/A'}</td>
                         <td>
                           {job.career_website ? (
                             <a href={job.career_website} target="_blank" rel="noopener noreferrer">View Posting</a>
@@ -253,6 +255,7 @@ function HotJobSearch({ user }) {
                       <th>Role</th>
                       <th>Location</th>
                       <th>Distance</th>
+                      <th>Date Verified</th>
                       <th>Career Website</th>
                       <th>Notes</th>
                     </tr>
@@ -264,6 +267,7 @@ function HotJobSearch({ user }) {
                         <td>{job.role}</td>
                         <td>{job.location}</td>
                         <td>{job.distance || 'N/A'}</td>
+                        <td>{job.date_verified || 'N/A'}</td>
                         <td>
                           {job.career_website ? (
                             <a href={job.career_website} target="_blank" rel="noopener noreferrer">View Posting</a>
