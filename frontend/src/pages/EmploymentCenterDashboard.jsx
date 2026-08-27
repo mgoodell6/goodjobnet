@@ -316,7 +316,7 @@ function EmploymentCenterDashboard({ user }) {
             </li>
             <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
               <Link to="/hot-jobs-review?category=unverified_no_career" className="dashboard-alert-link">
-                <span>Hot Jobs unverified &gt; 3 weeks (Phone Verification Required):</span>
+                <span>Hot Jobs unverified &gt; 3 years (Phone Verification Required):</span>
                 <strong>{stats.unverified_no_career_count}</strong>
               </Link>
             </li>

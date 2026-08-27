@@ -14,7 +14,7 @@ import AssignedJobSeekersList from './pages/AssignedJobSeekersList';
 
 // Manual Version Configuration - Update this string to change the application version displayed in the header
 
-const APP_VERSION = "Beta v0.20";
+const APP_VERSION = "Beta v0.21";
 
 
 
