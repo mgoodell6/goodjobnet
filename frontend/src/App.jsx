@@ -11,6 +11,7 @@ import InformationAndHelp from './pages/InformationAndHelp';
 import HotJobsReview from './pages/HotJobsReview';
 import JobSeekerDashboard from './pages/JobSeekerDashboard';
 import AssignedJobSeekersList from './pages/AssignedJobSeekersList';
+import AdminPage from './pages/AdminPage';
 
 // Manual Version Configuration - Update this string to change the application version displayed in the header
 
@@ -28,7 +29,7 @@ function TopBar({ user, handleLogout }) {
 
   return (
     <div className="top-bar">
-      <Link to={user.role === 'admin' ? '/admin-dashboard' : '/dashboard'} className="brand" style={{ display: 'flex', flexDirection: 'column', textDecoration: 'none' }}>
+      <Link to="/employment-dashboard" className="brand" style={{ display: 'flex', flexDirection: 'column', textDecoration: 'none' }}>
         <div>GoodJobNet - <span style={{ color: 'red' }}>{APP_VERSION}</span></div>
         <div style={{ fontSize: '0.75rem', fontWeight: '400', color: 'var(--text-light)', marginTop: '2px' }}>Click here to return to dashboard</div>
       </Link>
@@ -42,14 +43,23 @@ function TopBar({ user, handleLogout }) {
 }
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('goodjobnet_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
 
   const handleLogin = (userData) => {
     setUser(userData);
+    localStorage.setItem('goodjobnet_user', JSON.stringify(userData));
   };
 
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem('goodjobnet_user');
     window.location.href = '/login';
   };
 
@@ -69,13 +79,14 @@ function App() {
         {user ? (
           <>
             <Route path="/dashboard" element={<GeneralDashboard />} />
-            <Route path="/admin-dashboard" element={<EmploymentCenterDashboard user={user} />} />
+            <Route path="/employment-dashboard" element={<EmploymentCenterDashboard user={user} />} />
             <Route path="/help" element={<InformationAndHelp />} />
             <Route path="/job-entry" element={<JobEntry user={user} />} />
             <Route path="/job-seeker-entry" element={<JobSeekerEntry user={user} />} />
             <Route path="/hot-jobs-review" element={<HotJobsReview user={user} />} />
             <Route path="/hot-jobs-5review" element={<HotJobsReview user={user} />} />
             <Route path="/hot-jobs-46review" element={<HotJobsReview user={user} />} />
+            <Route path="/admin-page" element={<AdminPage user={user} />} />
             <Route path="/assigned-job-seekers" element={<AssignedJobSeekersList user={user} />} />
             <Route path="/job-seeker-search" element={<JobSeekerSearch user={user} />} />
           </>

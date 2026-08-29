@@ -238,7 +238,7 @@ function JobSeekerSearch({ user }) {
             <button type="submit" className="btn primary-btn" style={{ maxWidth: '300px' }} disabled={loading}>
               {loading ? 'Searching...' : 'Look for potential job seekers'}
             </button>
-            <button type="button" className="btn secondary-btn" style={{ maxWidth: '300px', marginLeft: '1rem' }} onClick={() => navigate(user?.role === 'admin' ? '/admin-dashboard' : '/dashboard')}>
+            <button type="button" className="btn secondary-btn" style={{ maxWidth: '300px', marginLeft: '1rem' }} onClick={() => navigate(user?.role === 'admin' ? '/employment-dashboard' : '/dashboard')}>
               Back to Dashboard
             </button>
           </div>

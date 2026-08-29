@@ -95,7 +95,7 @@ function AssignedJobSeekersList({ user }) {
             type="button" 
             className="btn secondary-btn" 
             style={{ maxWidth: '300px' }} 
-            onClick={() => navigate('/admin-dashboard')}
+            onClick={() => navigate('/employment-dashboard')}
           >
             Back to Dashboard
           </button>
