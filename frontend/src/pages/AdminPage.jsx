@@ -229,7 +229,7 @@ function AdminPage({ user }) {
             style={{ opacity: exporting ? 0.7 : 1 }}
           >
             <FaCloudDownloadAlt className={exporting ? 'spin' : ''} />
-            <h3>{exporting ? 'Exporting JSearch Jobs...' : 'Export Jobs from JSearch'}</h3>
+            <h3>{exporting ? 'Exporting Jobs (JSearch & Companies)...' : 'Export Jobs (JSearch & Featured Companies)'}</h3>
           </button>
         </div>
 

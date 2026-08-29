@@ -6,6 +6,7 @@ import os
 import traceback
 import json
 import time
+import re
 import sqlite3
 import math
 import csv
@@ -2771,6 +2772,113 @@ RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", "457db76ea4msh6e72f507cddeb59p195b
 JSEARCH_HOST = "jsearch.p.rapidapi.com"
 JSEARCH_SHEET_ID = "1vyLxy_biwu0eKclIupvoXa71dolrw7_faHDDiLbozxw"
 
+def extract_street_address_and_zip(j):
+    street_addr = j.get('job_street_address') or ''
+    if isinstance(street_addr, str):
+        street_addr = street_addr.strip()
+    else:
+        street_addr = ''
+
+    if not street_addr:
+        addr_lines = j.get('job_address_lines')
+        if isinstance(addr_lines, list) and addr_lines:
+            street_addr = ", ".join([str(line).strip() for line in addr_lines if line and str(line).strip()])
+        elif isinstance(addr_lines, str) and addr_lines.strip():
+            street_addr = addr_lines.strip()
+
+    zip_code = str(j.get('job_postal_code') or '').strip()
+
+    street_pattern = re.compile(
+        r'\b(\d{1,5}\s+(?:[NnSsEeWw]\.?\s+)?(?:[A-Za-z0-9\.\'-]+\s+){1,4}(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Parkway|Pkwy|Highway|Hwy|Way|Court|Ct|Lane|Ln|Circle|Cir|Trail|Trl|Suite|Ste|Unit|#)\b\.?)',
+        re.IGNORECASE
+    )
+
+    zip_pattern = re.compile(r'\b(\d{5})(?:-\d{4})?\b')
+
+    # Scan full un-truncated job description
+    desc = (j.get('job_description') or '')
+    if not street_addr and desc:
+        for line in desc.split('\n'):
+            line_str = line.strip()
+            match = street_pattern.search(line_str)
+            if match:
+                addr_candidate = match.group(1).strip().strip(',')
+                if not addr_candidate.startswith('$'):
+                    street_addr = addr_candidate
+                    break
+
+    # Scan job title for street addresses
+    if not street_addr:
+        title_match = street_pattern.search(j.get('job_title', ''))
+        if title_match:
+            street_addr = title_match.group(1).strip().strip(',')
+
+    # Scan URL slugs from apply links
+    if not street_addr:
+        urls_to_check = [j.get('job_apply_link', '')]
+        for opt in j.get('apply_options', []):
+            if isinstance(opt, dict) and opt.get('apply_link'):
+                urls_to_check.append(opt.get('apply_link'))
+        for u in urls_to_check:
+            if not u:
+                continue
+            decoded_u = urllib.parse.unquote(u).replace('-', ' ')
+            match = street_pattern.search(decoded_u)
+            if match:
+                candidate = match.group(1).strip().strip(',')
+                if not candidate.startswith('$'):
+                    street_addr = candidate
+                    break
+
+    # Zip code extraction fallback
+    if not zip_code and desc:
+        zip_match = zip_pattern.search(desc)
+        if zip_match:
+            candidate_zip = zip_match.group(1)
+            if candidate_zip not in ['2024', '2025', '2026', '2027']:
+                zip_code = candidate_zip
+
+    return street_addr, zip_code
+
+
+def is_location_match(j, target_location):
+    if not target_location:
+        return True
+
+    parts = [p.strip() for p in target_location.split(',')]
+    target_city = parts[0].lower() if parts else ""
+    target_state = parts[1].lower() if len(parts) > 1 else ""
+
+    state_map = {
+        'fl': 'fl', 'florida': 'fl',
+        'dc': 'dc', 'district of columbia': 'dc',
+        'va': 'va', 'virginia': 'va',
+        'md': 'md', 'maryland': 'md',
+        'ga': 'ga', 'georgia': 'ga',
+        'ny': 'ny', 'new york': 'ny',
+        'ca': 'ca', 'california': 'ca',
+        'tx': 'tx', 'texas': 'tx',
+        'nc': 'nc', 'north carolina': 'nc'
+    }
+
+    job_city = str(j.get('job_city') or '').strip().lower()
+    job_state = str(j.get('job_state') or '').strip().lower()
+    job_loc = str(j.get('job_location') or '').strip().lower()
+
+    job_state_code = state_map.get(job_state, job_state[:2] if len(job_state) >= 2 else job_state)
+    target_state_code = state_map.get(target_state, target_state[:2] if len(target_state) >= 2 else target_state)
+
+    if job_state_code and target_state_code:
+        if job_state_code != target_state_code:
+            return False
+
+    if not job_state_code and target_state_code:
+        if f", {target_state_code}" not in job_loc and target_state not in job_loc:
+            return False
+
+    return True
+
+
 @app.route('/api/export-jsearch-jobs', methods=['POST'])
 def export_jsearch_jobs():
     try:
@@ -2801,7 +2909,19 @@ def export_jsearch_jobs():
         if not search_location:
             search_location = "Kissimmee, FL"
 
-        # 2. Access 'Job_Postings' worksheet
+        # 2. Check for optional 'Companies to Search' worksheet, or default to featured enterprise list
+        target_companies = ['Walmart', 'Publix', 'McDonalds']
+        try:
+            wks_companies = sh.worksheet_by_title('Companies to Search')
+            comp_records = wks_companies.get_all_records()
+            for r in comp_records:
+                c_name = str(r.get('Company', '') or r.get('Company Name', '') or r.get('Companies', '') or r.get('Job Types', '')).strip()
+                if c_name and c_name not in target_companies:
+                    target_companies.append(c_name)
+        except Exception:
+            pass
+
+        # 3. Access 'Job_Postings' worksheet
         try:
             wks_postings = sh.worksheet_by_title('Job_Postings')
         except pygsheets.WorksheetNotFound:
@@ -2809,19 +2929,48 @@ def export_jsearch_jobs():
 
         headers = wks_postings.get_row(1)
 
-        # Build existing keys set to prevent duplicate job exports
+        # Clear previously exported jobs before running fresh export
         existing_records = wks_postings.get_all_records()
+        manual_rows = []
+        for r in existing_records:
+            val_by = str(r.get('Validated/Entered By (Name)', '')).strip()
+            ent_by = str(r.get('Entered by - Name', '')).strip()
+            if val_by != 'JSearch API' and ent_by != 'System Import':
+                row_vals = [str(r.get(h, '')) for h in headers]
+                manual_rows.append(row_vals)
+
+        wks_postings.clear(start='A2')
+        if manual_rows:
+            wks_postings.append_table(values=manual_rows)
+
+        # Build existing keys set from preserved manual rows
         existing_keys = set()
         for r in existing_records:
-            comp = str(r.get('Name', '')).strip().lower()
-            title = str(r.get('Available Jobs', '')).strip().lower()
-            url = str(r.get('Career Page', '')).strip().lower()
-            if comp or title:
-                existing_keys.add((comp, title))
-                if url:
-                    existing_keys.add((comp, title, url))
+            val_by = str(r.get('Validated/Entered By (Name)', '')).strip()
+            ent_by = str(r.get('Entered by - Name', '')).strip()
+            if val_by != 'JSearch API' and ent_by != 'System Import':
+                comp = str(r.get('Name', '')).strip().lower()
+                title = str(r.get('Available Jobs', '')).strip().lower()
+                url = str(r.get('Career Page', '')).strip().lower()
+                if comp or title:
+                    existing_keys.add((comp, title))
+                    if url:
+                        existing_keys.add((comp, title, url))
 
-        # 3. Query JSearch API via RapidAPI for each keyword
+        # Build combined list of search targets (Job Categories + Target Companies)
+        search_targets = []
+        for kw in keywords:
+            search_targets.append({
+                'query': f"{kw} in {search_location}",
+                'industry_label': kw
+            })
+        for comp in target_companies:
+            search_targets.append({
+                'query': f"{comp} in {search_location}",
+                'industry_label': f"Featured Employer ({comp})"
+            })
+
+        # 4. Query JSearch API via RapidAPI for each search target
         today_str = datetime.date.today().strftime('%m/%d/%Y')
         all_new_rows = []
         total_fetched = 0
@@ -2831,8 +2980,9 @@ def export_jsearch_jobs():
         req_data = request.get_json(silent=True) or {}
         current_rapidapi_key = req_data.get('rapidapi_key') or os.environ.get("RAPIDAPI_KEY", RAPIDAPI_KEY)
 
-        for keyword in keywords:
-            search_query = f"{keyword} in {search_location}"
+        for target in search_targets:
+            search_query = target['query']
+            industry_label = target['industry_label']
             encoded_query = urllib.parse.quote(search_query)
             api_url = f"https://{JSEARCH_HOST}/search-v2?query={encoded_query}&page=1&num_pages=1"
 
@@ -2854,12 +3004,16 @@ def export_jsearch_jobs():
                     else:
                         jobs = []
                     for j in jobs:
-                        job_title = j.get('job_title', '').strip()
-                        company = j.get('employer_name', '').strip()
-                        city = j.get('job_city', '').strip()
-                        state = j.get('job_state', '').strip()
-                        url = j.get('job_apply_link', '').strip()
-                        snippet = j.get('job_description', '').strip()
+                        # Location validation check
+                        if not is_location_match(j, search_location):
+                            continue
+
+                        job_title = (j.get('job_title') or '').strip()
+                        company = (j.get('employer_name') or '').strip()
+                        city = (j.get('job_city') or '').strip()
+                        state = (j.get('job_state') or '').strip()
+                        url = (j.get('job_apply_link') or '').strip()
+                        snippet = (j.get('job_description') or '').strip()
 
                         # Deduplication check
                         comp_name = company if company else job_title
@@ -2882,19 +3036,7 @@ def export_jsearch_jobs():
                         if len(snippet) > 500:
                             snippet = snippet[:497] + '...'
 
-                        street_addr = j.get('job_street_address') or ''
-                        if isinstance(street_addr, str):
-                            street_addr = street_addr.strip()
-                        else:
-                            street_addr = ''
-
-                        if not street_addr:
-                            addr_lines = j.get('job_address_lines')
-                            if isinstance(addr_lines, list) and addr_lines:
-                                street_addr = ", ".join([str(line).strip() for line in addr_lines if line and str(line).strip()])
-                            elif isinstance(addr_lines, str) and addr_lines.strip():
-                                street_addr = addr_lines.strip()
-
+                        street_addr, zip_code = extract_street_address_and_zip(j)
                         loc = f"{city}, {state}" if (city and state) else (city or state or search_location)
                         full_address = f"{street_addr}, {loc}".strip(", ") if street_addr else loc
 
@@ -2916,13 +3058,13 @@ def export_jsearch_jobs():
                             'Address': street_addr,
                             'City': city,
                             'State': state,
-                            'Zip': '',
+                            'Zip': zip_code,
                             'Hiring Contact': '',
                             'Hiring Contact Phone': '',
                             'Hiring Contact email': '',
                             'Currently Hiring': 'True',
                             'Available Jobs': job_title,
-                            'Company Type / Industry': keyword,
+                            'Company Type / Industry': industry_label,
                             'Career Page': url,
                             'General Notes': notes,
                             'Number of Job Seekers looking for this type of employment': '',
@@ -2949,15 +3091,15 @@ def export_jsearch_jobs():
                 except Exception:
                     err_detail = str(http_err.reason)
                 err_msg = f"HTTP {http_err.code}: {err_detail}"
-                print(f"Error querying JSearch for keyword '{keyword}': {err_msg}")
-                api_errors.append(f"'{keyword}': {err_msg}")
+                print(f"Error querying JSearch for '{search_query}': {err_msg}")
+                api_errors.append(f"'{search_query}': {err_msg}")
                 continue
             except Exception as api_err:
-                print(f"Error querying JSearch for keyword '{keyword}': {api_err}")
-                api_errors.append(f"'{keyword}': {str(api_err)}")
+                print(f"Error querying JSearch for '{search_query}': {api_err}")
+                api_errors.append(f"'{search_query}': {str(api_err)}")
                 continue
 
-        # 4. Append new rows to 'Job_Postings' worksheet
+        # 5. Append new rows to 'Job_Postings' worksheet
         if all_new_rows:
             wks_postings.append_table(values=all_new_rows)
 
@@ -2971,7 +3113,7 @@ def export_jsearch_jobs():
         dup_msg = f" ({skipped_duplicates} existing duplicate job(s) skipped)" if skipped_duplicates > 0 else ""
         return jsonify({
             "success": True,
-            "message": f"Successfully processed JSearch API for {len(keywords)} job types ({total_fetched} new job postings exported{dup_msg} for location: {search_location}).",
+            "message": f"Successfully processed job export for {len(keywords)} job categories and {len(target_companies)} target companies ({total_fetched} new job postings exported{dup_msg} for location: {search_location}).",
             "count": total_fetched,
             "skipped_duplicates": skipped_duplicates,
             "url": f"https://docs.google.com/spreadsheets/d/{JSEARCH_SHEET_ID}/edit#gid=0"
