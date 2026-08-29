@@ -3013,6 +3013,28 @@ def export_jsearch_jobs():
                         city = (j.get('job_city') or '').strip()
                         state = (j.get('job_state') or '').strip()
                         url = (j.get('job_apply_link') or '').strip()
+                        publisher = (j.get('job_publisher') or '').strip()
+                        apply_options = j.get('apply_options', [])
+
+                        # Filter out Indeed jobs (check for non-Indeed alternative link if primary is Indeed)
+                        final_url = url
+                        if 'indeed' in final_url.lower() or 'indeed' in publisher.lower():
+                            alt_url = None
+                            for opt in apply_options:
+                                if isinstance(opt, dict) and opt.get('apply_link'):
+                                    opt_link = str(opt.get('apply_link')).strip()
+                                    if 'indeed' not in opt_link.lower():
+                                        alt_url = opt_link
+                                        break
+                            if alt_url:
+                                final_url = alt_url
+                            else:
+                                final_url = ""
+
+                        if not final_url or 'indeed' in final_url.lower():
+                            continue
+
+                        url = final_url
                         snippet = (j.get('job_description') or '').strip()
 
                         # Deduplication check
@@ -3037,6 +3059,12 @@ def export_jsearch_jobs():
                             snippet = snippet[:497] + '...'
 
                         street_addr, zip_code = extract_street_address_and_zip(j)
+
+                        # Exclude Walmart, Publix, and McDonalds jobs if they lack a complete street address
+                        is_featured_company = any(c in company.lower() for c in ['walmart', 'publix', 'mcdonald'])
+                        if is_featured_company and not street_addr.strip():
+                            continue
+
                         loc = f"{city}, {state}" if (city and state) else (city or state or search_location)
                         full_address = f"{street_addr}, {loc}".strip(", ") if street_addr else loc
 
