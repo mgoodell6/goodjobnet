@@ -335,7 +335,7 @@ function JobSeekerEntry({ user }) {
                 } else if (seeker) {
                   navigate('/job-seeker-search', { state: { keepResults: true } });
                 } else {
-                  navigate(user?.role === 'admin' ? '/admin-dashboard' : '/dashboard');
+                  navigate(user?.role === 'admin' ? '/employment-dashboard' : '/dashboard');
                 }
               }}
             >

@@ -234,7 +234,7 @@ function JobEntry({ user }) {
           )}
 
           <div className="actions mt-2 mb-1" style={{ display: 'flex', gap: '1rem' }}>
-            <button type="button" className="btn secondary-btn" onClick={() => navigate(user?.role === 'admin' ? '/admin-dashboard' : '/dashboard')}>Cancel</button>
+            <button type="button" className="btn secondary-btn" onClick={() => navigate(user?.role === 'admin' ? '/employment-dashboard' : '/dashboard')}>Cancel</button>
             <button type="submit" className="btn primary-btn" disabled={loading}>
               {loading ? 'Submitting...' : 'Submit Job'}
             </button>

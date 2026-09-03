@@ -6,11 +6,13 @@ import os
 import traceback
 import json
 import time
+import re
 import sqlite3
 import math
 import csv
 import io
 import urllib.request
+import urllib.parse
 import gc as garbage_collector
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -1553,7 +1555,7 @@ def register():
         wks = sh.worksheet_by_title("Users")
         
         calling = data.get("calling", "")
-        role = "admin" if calling == "Employment Center missionary/volunteer" else "user"
+        role = "admin"
         
         # Get headers and add "Approved" column if not present
         headers = wks.get_row(1)
@@ -1577,7 +1579,7 @@ def register():
             "Role": role,
             "Date Registered": datetime.datetime.now().strftime("%Y-%m-%d"),
             "Date Last Logged In": "",
-            "Approved": "FALSE",
+            "Approved": "TRUE",
             "PasswordHash": generate_password_hash(data.get("password", ""))
         }
         row_data = [row_dict.get(h, "") for h in headers]
@@ -2762,6 +2764,391 @@ def import_jobseekers():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
+
+RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", "457db76ea4msh6e72f507cddeb59p195bfcjsn8d2af1826386")
+JSEARCH_HOST = "jsearch.p.rapidapi.com"
+JSEARCH_SHEET_ID = "1vyLxy_biwu0eKclIupvoXa71dolrw7_faHDDiLbozxw"
+
+def extract_street_address_and_zip(j):
+    street_addr = j.get('job_street_address') or ''
+    if isinstance(street_addr, str):
+        street_addr = street_addr.strip()
+    else:
+        street_addr = ''
+
+    if not street_addr:
+        addr_lines = j.get('job_address_lines')
+        if isinstance(addr_lines, list) and addr_lines:
+            street_addr = ", ".join([str(line).strip() for line in addr_lines if line and str(line).strip()])
+        elif isinstance(addr_lines, str) and addr_lines.strip():
+            street_addr = addr_lines.strip()
+
+    zip_code = str(j.get('job_postal_code') or '').strip()
+
+    street_pattern = re.compile(
+        r'\b(\d{1,5}\s+(?:[NnSsEeWw]\.?\s+)?(?:[A-Za-z0-9\.\'-]+\s+){1,4}(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Parkway|Pkwy|Highway|Hwy|Way|Court|Ct|Lane|Ln|Circle|Cir|Trail|Trl|Suite|Ste|Unit|#)\b\.?)',
+        re.IGNORECASE
+    )
+
+    zip_pattern = re.compile(r'\b(\d{5})(?:-\d{4})?\b')
+
+    # Scan full un-truncated job description
+    desc = (j.get('job_description') or '')
+    if not street_addr and desc:
+        for line in desc.split('\n'):
+            line_str = line.strip()
+            match = street_pattern.search(line_str)
+            if match:
+                addr_candidate = match.group(1).strip().strip(',')
+                if not addr_candidate.startswith('$'):
+                    street_addr = addr_candidate
+                    break
+
+    # Scan job title for street addresses
+    if not street_addr:
+        title_match = street_pattern.search(j.get('job_title', ''))
+        if title_match:
+            street_addr = title_match.group(1).strip().strip(',')
+
+    # Scan URL slugs from apply links
+    if not street_addr:
+        urls_to_check = [j.get('job_apply_link', '')]
+        for opt in j.get('apply_options', []):
+            if isinstance(opt, dict) and opt.get('apply_link'):
+                urls_to_check.append(opt.get('apply_link'))
+        for u in urls_to_check:
+            if not u:
+                continue
+            decoded_u = urllib.parse.unquote(u).replace('-', ' ')
+            match = street_pattern.search(decoded_u)
+            if match:
+                candidate = match.group(1).strip().strip(',')
+                if not candidate.startswith('$'):
+                    street_addr = candidate
+                    break
+
+    # Zip code extraction fallback
+    if not zip_code and desc:
+        zip_match = zip_pattern.search(desc)
+        if zip_match:
+            candidate_zip = zip_match.group(1)
+            if candidate_zip not in ['2024', '2025', '2026', '2027']:
+                zip_code = candidate_zip
+
+    return street_addr, zip_code
+
+
+def is_location_match(j, target_location):
+    if not target_location:
+        return True
+
+    parts = [p.strip() for p in target_location.split(',')]
+    target_city = parts[0].lower() if parts else ""
+    target_state = parts[1].lower() if len(parts) > 1 else ""
+
+    state_map = {
+        'fl': 'fl', 'florida': 'fl',
+        'dc': 'dc', 'district of columbia': 'dc',
+        'va': 'va', 'virginia': 'va',
+        'md': 'md', 'maryland': 'md',
+        'ga': 'ga', 'georgia': 'ga',
+        'ny': 'ny', 'new york': 'ny',
+        'ca': 'ca', 'california': 'ca',
+        'tx': 'tx', 'texas': 'tx',
+        'nc': 'nc', 'north carolina': 'nc'
+    }
+
+    job_city = str(j.get('job_city') or '').strip().lower()
+    job_state = str(j.get('job_state') or '').strip().lower()
+    job_loc = str(j.get('job_location') or '').strip().lower()
+
+    job_state_code = state_map.get(job_state, job_state[:2] if len(job_state) >= 2 else job_state)
+    target_state_code = state_map.get(target_state, target_state[:2] if len(target_state) >= 2 else target_state)
+
+    if job_state_code and target_state_code:
+        if job_state_code != target_state_code:
+            return False
+
+    if not job_state_code and target_state_code:
+        if f", {target_state_code}" not in job_loc and target_state not in job_loc:
+            return False
+
+    return True
+
+
+@app.route('/api/export-jsearch-jobs', methods=['POST'])
+def export_jsearch_jobs():
+    try:
+        gc = get_gsheets_client()
+        sh = gc.open_by_key(JSEARCH_SHEET_ID)
+        
+        # 1. Read 'JobTypes to Search' worksheet
+        try:
+            wks_types = sh.worksheet_by_title('JobTypes to Search')
+        except pygsheets.WorksheetNotFound:
+            return jsonify({"success": False, "error": "Worksheet 'JobTypes to Search' not found in spreadsheet."}), 400
+
+        type_records = wks_types.get_all_records()
+        if not type_records:
+            return jsonify({"success": False, "error": "No records found in 'JobTypes to Search' worksheet."}), 400
+
+        # Extract search location from column 'City for Search Area (only one location can be listed)'
+        search_location = ""
+        keywords = []
+        for r in type_records:
+            job_type = str(r.get('Job Types', '')).strip()
+            if job_type:
+                keywords.append(job_type)
+            loc = str(r.get('City for Search Area (only one location can be listed)', '')).strip()
+            if loc and not search_location:
+                search_location = loc
+
+        if not search_location:
+            search_location = "Kissimmee, FL"
+
+        # 2. Check for optional 'Companies to Search' worksheet, or default to featured enterprise list
+        target_companies = ['Walmart', 'Publix', 'McDonalds']
+        try:
+            wks_companies = sh.worksheet_by_title('Companies to Search')
+            comp_records = wks_companies.get_all_records()
+            for r in comp_records:
+                c_name = str(r.get('Company', '') or r.get('Company Name', '') or r.get('Companies', '') or r.get('Job Types', '')).strip()
+                if c_name and c_name not in target_companies:
+                    target_companies.append(c_name)
+        except Exception:
+            pass
+
+        # 3. Access 'Job_Postings' worksheet
+        try:
+            wks_postings = sh.worksheet_by_title('Job_Postings')
+        except pygsheets.WorksheetNotFound:
+            return jsonify({"success": False, "error": "Worksheet 'Job_Postings' not found in spreadsheet."}), 400
+
+        headers = wks_postings.get_row(1)
+
+        # Clear previously exported jobs before running fresh export
+        existing_records = wks_postings.get_all_records()
+        manual_rows = []
+        for r in existing_records:
+            val_by = str(r.get('Validated/Entered By (Name)', '')).strip()
+            ent_by = str(r.get('Entered by - Name', '')).strip()
+            if val_by != 'JSearch API' and ent_by != 'System Import':
+                row_vals = [str(r.get(h, '')) for h in headers]
+                manual_rows.append(row_vals)
+
+        wks_postings.clear(start='A2')
+        if manual_rows:
+            wks_postings.append_table(values=manual_rows)
+
+        # Build existing keys set from preserved manual rows
+        existing_keys = set()
+        for r in existing_records:
+            val_by = str(r.get('Validated/Entered By (Name)', '')).strip()
+            ent_by = str(r.get('Entered by - Name', '')).strip()
+            if val_by != 'JSearch API' and ent_by != 'System Import':
+                comp = str(r.get('Name', '')).strip().lower()
+                title = str(r.get('Available Jobs', '')).strip().lower()
+                url = str(r.get('Career Page', '')).strip().lower()
+                if comp or title:
+                    existing_keys.add((comp, title))
+                    if url:
+                        existing_keys.add((comp, title, url))
+
+        # Build combined list of search targets (Job Categories + Target Companies)
+        search_targets = []
+        for kw in keywords:
+            search_targets.append({
+                'query': f"{kw} in {search_location}",
+                'industry_label': kw
+            })
+        for comp in target_companies:
+            search_targets.append({
+                'query': f"{comp} in {search_location}",
+                'industry_label': f"Featured Employer ({comp})"
+            })
+
+        # 4. Query JSearch API via RapidAPI for each search target
+        today_str = datetime.date.today().strftime('%m/%d/%Y')
+        all_new_rows = []
+        total_fetched = 0
+        skipped_duplicates = 0
+        api_errors = []
+
+        req_data = request.get_json(silent=True) or {}
+        current_rapidapi_key = req_data.get('rapidapi_key') or os.environ.get("RAPIDAPI_KEY", RAPIDAPI_KEY)
+
+        for target in search_targets:
+            search_query = target['query']
+            industry_label = target['industry_label']
+            encoded_query = urllib.parse.quote(search_query)
+            api_url = f"https://{JSEARCH_HOST}/search-v2?query={encoded_query}&page=1&num_pages=1"
+
+            req = urllib.request.Request(api_url)
+            req.add_header('x-rapidapi-key', current_rapidapi_key)
+            req.add_header('x-rapidapi-host', JSEARCH_HOST)
+            req.add_header('Accept', 'application/json')
+            req.add_header('User-Agent', 'Mozilla/5.0')
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw_text = resp.read().decode('utf-8')
+                    data = json.loads(raw_text)
+                    data_payload = data.get('data', {})
+                    if isinstance(data_payload, dict):
+                        jobs = data_payload.get('jobs', [])
+                    elif isinstance(data_payload, list):
+                        jobs = data_payload
+                    else:
+                        jobs = []
+                    for j in jobs:
+                        # Location validation check
+                        if not is_location_match(j, search_location):
+                            continue
+
+                        job_title = (j.get('job_title') or '').strip()
+                        company = (j.get('employer_name') or '').strip()
+                        city = (j.get('job_city') or '').strip()
+                        state = (j.get('job_state') or '').strip()
+                        url = (j.get('job_apply_link') or '').strip()
+                        publisher = (j.get('job_publisher') or '').strip()
+                        apply_options = j.get('apply_options', [])
+
+                        # Filter out Indeed jobs (check for non-Indeed alternative link if primary is Indeed)
+                        final_url = url
+                        if 'indeed' in final_url.lower() or 'indeed' in publisher.lower():
+                            alt_url = None
+                            for opt in apply_options:
+                                if isinstance(opt, dict) and opt.get('apply_link'):
+                                    opt_link = str(opt.get('apply_link')).strip()
+                                    if 'indeed' not in opt_link.lower():
+                                        alt_url = opt_link
+                                        break
+                            if alt_url:
+                                final_url = alt_url
+                            else:
+                                final_url = ""
+
+                        if not final_url or 'indeed' in final_url.lower():
+                            continue
+
+                        url = final_url
+                        snippet = (j.get('job_description') or '').strip()
+
+                        # Deduplication check
+                        comp_name = company if company else job_title
+                        comp_key = comp_name.lower().strip()
+                        title_key = job_title.lower().strip()
+                        url_key = url.lower().strip()
+
+                        comp_title_pair = (comp_key, title_key)
+                        url_pair = (comp_key, title_key, url_key) if url_key else None
+
+                        if comp_title_pair in existing_keys or (url_pair and url_pair in existing_keys):
+                            skipped_duplicates += 1
+                            continue
+
+                        # Add to existing keys to prevent duplicates within this batch
+                        existing_keys.add(comp_title_pair)
+                        if url_pair:
+                            existing_keys.add(url_pair)
+
+                        if len(snippet) > 500:
+                            snippet = snippet[:497] + '...'
+
+                        street_addr, zip_code = extract_street_address_and_zip(j)
+
+                        # Exclude Walmart, Publix, and McDonalds jobs if they lack a complete street address
+                        is_featured_company = any(c in company.lower() for c in ['walmart', 'publix', 'mcdonald'])
+                        if is_featured_company and not street_addr.strip():
+                            continue
+
+                        loc = f"{city}, {state}" if (city and state) else (city or state or search_location)
+                        full_address = f"{street_addr}, {loc}".strip(", ") if street_addr else loc
+
+                        # Check salary info if present
+                        min_sal = j.get('job_min_salary')
+                        max_sal = j.get('job_max_salary')
+                        sal_period = j.get('job_salary_period')
+                        salary_info = ""
+                        if min_sal and max_sal:
+                            salary_info = f" Salary: ${min_sal} - ${max_sal} ({sal_period})."
+                        elif min_sal:
+                            salary_info = f" Salary: ${min_sal} ({sal_period})."
+
+                        notes = f"{snippet}{salary_info}".strip()
+
+                        # Construct row object matching headers
+                        row_dict = {
+                            'Name': company if company else job_title,
+                            'Address': street_addr,
+                            'City': city,
+                            'State': state,
+                            'Zip': zip_code,
+                            'Hiring Contact': '',
+                            'Hiring Contact Phone': '',
+                            'Hiring Contact email': '',
+                            'Currently Hiring': 'True',
+                            'Available Jobs': job_title,
+                            'Company Type / Industry': industry_label,
+                            'Career Page': url,
+                            'General Notes': notes,
+                            'Number of Job Seekers looking for this type of employment': '',
+                            'Date last verified': today_str,
+                            'Validated/Entered By (Name)': 'JSearch API',
+                            'Requries Action': '',
+                            'Full Address (do not enter this manually)': full_address,
+                            'Entered by - Name': 'System Import',
+                            'Ward': '',
+                            'Stake': '',
+                            'Phone': '',
+                            'email': '',
+                            'Potential Duplicate': ''
+                        }
+
+                        # Build ordered row list based on headers
+                        row_vals = [str(row_dict.get(h, '')) for h in headers]
+                        all_new_rows.append(row_vals)
+                        total_fetched += 1
+            except urllib.error.HTTPError as http_err:
+                try:
+                    err_body = json.loads(http_err.read().decode('utf-8'))
+                    err_detail = err_body.get('message', str(http_err.reason))
+                except Exception:
+                    err_detail = str(http_err.reason)
+                err_msg = f"HTTP {http_err.code}: {err_detail}"
+                print(f"Error querying JSearch for '{search_query}': {err_msg}")
+                api_errors.append(f"'{search_query}': {err_msg}")
+                continue
+            except Exception as api_err:
+                print(f"Error querying JSearch for '{search_query}': {api_err}")
+                api_errors.append(f"'{search_query}': {str(api_err)}")
+                continue
+
+        # 5. Append new rows to 'Job_Postings' worksheet
+        if all_new_rows:
+            wks_postings.append_table(values=all_new_rows)
+
+        if total_fetched == 0 and skipped_duplicates == 0 and api_errors:
+            return jsonify({
+                "success": False,
+                "error": f"JSearch API returned error: {api_errors[0]}. Please verify RapidAPI subscription & Key.",
+                "details": f"API Errors: {'; '.join(api_errors)}"
+            }), 400
+
+        dup_msg = f" ({skipped_duplicates} existing duplicate job(s) skipped)" if skipped_duplicates > 0 else ""
+        return jsonify({
+            "success": True,
+            "message": f"Successfully processed job export for {len(keywords)} job categories and {len(target_companies)} target companies ({total_fetched} new job postings exported{dup_msg} for location: {search_location}).",
+            "count": total_fetched,
+            "skipped_duplicates": skipped_duplicates,
+            "url": f"https://docs.google.com/spreadsheets/d/{JSEARCH_SHEET_ID}/edit#gid=0"
+        })
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server error exporting JSearch jobs", "details": str(e)}), 500
     finally:
         garbage_collector.collect()
 

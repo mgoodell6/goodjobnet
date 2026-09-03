@@ -20,108 +20,7 @@ function EmploymentCenterDashboard({ user }) {
     unverified_no_career_count: '...'
   });
 
-  const [updating, setUpdating] = useState(false);
-  const [updateStatus, setUpdateStatus] = useState(null);
-  const [importing, setImporting] = useState(false);
-  const [importStatus, setImportStatus] = useState(null);
 
-  const handleUpdateJobSeekerInfo = () => {
-    setUpdating(true);
-    setUpdateStatus(null);
-    setImportStatus(null);
-    fetch('/api/update-jobseeker-info', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-      .then(res => res.json())
-      .then(data => {
-        setUpdating(false);
-        if (data.success) {
-          setUpdateStatus({ success: true, message: data.message });
-          fetch('/api/dashboard-stats')
-            .then(res => res.json())
-            .then(statsData => {
-              if (statsData.success) {
-                setStats(prev => ({
-                  ...prev,
-                  total_hot_jobs: statsData.total_hot_jobs,
-                  total_job_seekers: statsData.total_job_seekers,
-                  job_types: statsData.job_types || {},
-                  seeker_types: statsData.seeker_types || {},
-                  expiring_soon: statsData.expiring_soon,
-                  two_years_soon: statsData.two_years_soon,
-                  new_jobs_count: statsData.new_jobs_count,
-                  new_seekers_count: statsData.new_seekers_count,
-                  expired_recently: statsData.expired_recently,
-                  unverified_no_career_count: statsData.unverified_no_career_count
-                }));
-              }
-            });
-        } else {
-          setUpdateStatus({ success: false, message: data.error || 'Failed to update.' });
-        }
-      })
-      .catch(err => {
-        setUpdating(false);
-        setUpdateStatus({ success: false, message: 'Network error occurred.' });
-        console.error('Error updating jobseeker info:', err);
-      });
-  };
-
-  const handleImportJobSeekers = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setImporting(true);
-    setImportStatus(null);
-    setUpdateStatus(null);
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    fetch('/api/import-jobseekers', {
-      method: 'POST',
-      body: formData
-    })
-      .then(res => res.json())
-      .then(data => {
-        setImporting(false);
-        e.target.value = '';
-        if (data.success) {
-          setImportStatus({ success: true, message: data.message, url: data.url });
-          fetch('/api/dashboard-stats')
-            .then(res => res.json())
-            .then(statsData => {
-              if (statsData.success) {
-                setStats({
-                  expiring_soon: statsData.expiring_soon,
-                  two_years_soon: statsData.two_years_soon,
-                  new_jobs_count: statsData.new_jobs_count,
-                  new_jobs_url: statsData.new_jobs_url,
-                  new_seekers_count: statsData.new_seekers_count,
-                  new_seekers_url: statsData.new_seekers_url,
-                  expired_recently: statsData.expired_recently,
-                  total_hot_jobs: statsData.total_hot_jobs,
-                  total_job_seekers: statsData.total_job_seekers,
-                  job_types: statsData.job_types || {},
-                  seeker_types: statsData.seeker_types || {},
-                  unverified_no_career_count: statsData.unverified_no_career_count
-                });
-              }
-            });
-        } else {
-          setImportStatus({ success: false, message: data.error || 'Failed to import.' });
-        }
-      })
-      .catch(err => {
-        setImporting(false);
-        e.target.value = '';
-        setImportStatus({ success: false, message: 'Network error occurred.' });
-        console.error('Error importing job seekers:', err);
-      });
-  };
 
   useEffect(() => {
     fetch('/api/dashboard-stats')
@@ -342,20 +241,7 @@ function EmploymentCenterDashboard({ user }) {
                 </div>
               </Link>
             </div>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <a href={stats.new_jobs_url} target="_blank" rel="noopener noreferrer" className="btn secondary-btn" style={{ flex: 1, fontSize: '0.9rem' }}>
-                Review New Job Opportunities
-              </a>
-              {stats.new_seekers_url ? (
-                <a href={stats.new_seekers_url} target="_blank" rel="noopener noreferrer" className="btn secondary-btn" style={{ flex: 1, fontSize: '0.9rem' }}>
-                  Review New Job Seekers
-                </a>
-              ) : (
-                <button disabled className="btn secondary-btn" style={{ flex: 1, fontSize: '0.9rem', opacity: 0.5 }}>
-                  Review New Job Seekers
-                </button>
-              )}
-            </div>
+
           </div>
         </div>
 
@@ -379,84 +265,7 @@ function EmploymentCenterDashboard({ user }) {
           </Link>
         </div>
 
-        <div style={{ marginTop: '2.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: '900px' }}>
-            <button 
-              className="btn primary-btn" 
-              onClick={handleUpdateJobSeekerInfo} 
-              disabled={updating}
-              style={{ 
-                flex: 1,
-                maxWidth: '420px', 
-                background: 'linear-gradient(135deg, #2e7d32, #1b5e20)',
-                boxShadow: '0 4px 15px rgba(46, 125, 50, 0.3)'
-              }}
-            >
-              {updating ? 'Updating jobBank jobSeeker information...' : 'Update jobBank jobSeeker information'}
-            </button>
 
-            <label 
-              className="btn primary-btn" 
-              style={{ 
-                flex: 1,
-                maxWidth: '420px', 
-                background: 'linear-gradient(135deg, #3a7bd5, #3a6073)',
-                boxShadow: '0 4px 15px rgba(58, 123, 213, 0.3)',
-                cursor: importing ? 'default' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: 0,
-                opacity: importing ? 0.7 : 1
-              }}
-            >
-              {importing ? 'Importing current Job Seeker List...' : 'Import current Job Seeker List'}
-              <input 
-                type="file" 
-                accept=".xlsx" 
-                onChange={handleImportJobSeekers} 
-                disabled={importing}
-                style={{ display: 'none' }} 
-              />
-            </label>
-          </div>
-
-          {(updateStatus || importStatus) && (
-            <div style={{ marginTop: '0.5rem', textAlign: 'center' }}>
-              <p style={{ 
-                fontSize: '0.95rem', 
-                fontWeight: 500, 
-                color: (updateStatus?.success || importStatus?.success) ? 'var(--success)' : 'var(--error)',
-                margin: 0
-              }}>
-                {updateStatus ? updateStatus.message : importStatus.message}
-              </p>
-              {importStatus?.success && importStatus?.url && (
-                <div style={{ marginTop: '0.75rem' }}>
-                  <a 
-                    href={importStatus.url} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="btn secondary-btn" 
-                    style={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      gap: '0.5rem', 
-                      width: 'auto', 
-                      padding: '0.5rem 1.25rem', 
-                      fontSize: '0.85rem',
-                      background: 'rgba(255,255,255,0.8)',
-                      borderColor: 'var(--primary-color)',
-                      color: 'var(--primary-color)'
-                    }}
-                  >
-                    Open Merged Seeker Spreadsheet
-                  </a>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
 
       </div>
     </div>

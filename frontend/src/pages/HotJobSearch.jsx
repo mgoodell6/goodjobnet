@@ -195,7 +195,7 @@ function HotJobSearch({ user }) {
             </button>
             <button type="button" className="btn secondary-btn" style={{ maxWidth: '300px', marginLeft: '1rem' }} onClick={() => {
               if (user) {
-                navigate(user.role === 'admin' ? '/admin-dashboard' : '/dashboard');
+                navigate(user.role === 'admin' ? '/employment-dashboard' : '/dashboard');
               } else {
                 navigate('/');
               }

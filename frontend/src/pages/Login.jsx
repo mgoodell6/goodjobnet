@@ -37,11 +37,7 @@ function Login({ onLogin }) {
           email: data.email || "",
           phone: data.phone || ""
         });
-        if (data.role === 'admin') {
-          navigate('/admin-dashboard');
-        } else {
-          navigate('/dashboard');
-        }
+        navigate('/employment-dashboard');
       } else {
         alert((data.error || 'Invalid credentials') + (data.details ? '\n\nDetails: ' + data.details : ''));
       }
@@ -73,7 +69,7 @@ function Login({ onLogin }) {
 
       const responseData = await response.json();
       if (responseData.success) {
-        alert("Account request submitted successfully!\n\nAn administrator must manually approve your account before you can log in. Please check back later.");
+        alert("Account created successfully! You may now log in with your credentials.");
         setIsCreatingAccount(false);
       } else {
         alert(responseData.error || 'Registration failed');
@@ -149,26 +145,6 @@ function Login({ onLogin }) {
               <div className="input-group full-width">
                 <label>Name</label>
                 <input type="text" name="name" required />
-              </div>
-              <div className="input-group">
-                <label>Ward</label>
-                <input type="text" name="ward" required />
-              </div>
-              <div className="input-group">
-                <label>Stake</label>
-                <input type="text" name="stake" required />
-              </div>
-              <div className="input-group full-width">
-                <label>Calling</label>
-                <select name="calling" required>
-                  <option value="">Select...</option>
-                  <option value="Bishop">Bishop</option>
-                  <option value="Relief Society President">Relief Society President</option>
-                  <option value="Elders Quorum President">Elders Quorum President</option>
-                  <option value="Self-Reliance specialist">Self-Reliance specialist</option>
-                  <option value="Employment Center missionary/volunteer">Church Employment Center missionary/volunteer</option>
-                  <option value="Other">Other</option>
-                </select>
               </div>
               <div className="input-group">
                 <label>Email (Optional)</label>
