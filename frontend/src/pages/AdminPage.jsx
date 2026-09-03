@@ -148,14 +148,6 @@ function AdminPage({ user }) {
                 {user?.role === 'admin' ? 'Administrator' : user?.role || 'Standard User'}
               </p>
             </div>
-            <div>
-              <strong style={{ color: 'var(--text-light)', fontSize: '0.85rem' }}>Ward / Calling</strong>
-              <p style={{ fontWeight: '600' }}>{user?.ward || 'Not specified'}</p>
-            </div>
-            <div>
-              <strong style={{ color: 'var(--text-light)', fontSize: '0.85rem' }}>Stake</strong>
-              <p style={{ fontWeight: '600' }}>{user?.stake || 'Not specified'}</p>
-            </div>
           </div>
         </div>
 
