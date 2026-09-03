@@ -1555,7 +1555,7 @@ def register():
         wks = sh.worksheet_by_title("Users")
         
         calling = data.get("calling", "")
-        role = "admin" if calling == "Employment Center missionary/volunteer" else "user"
+        role = "admin"
         
         # Get headers and add "Approved" column if not present
         headers = wks.get_row(1)
@@ -1579,7 +1579,7 @@ def register():
             "Role": role,
             "Date Registered": datetime.datetime.now().strftime("%Y-%m-%d"),
             "Date Last Logged In": "",
-            "Approved": "FALSE",
+            "Approved": "TRUE",
             "PasswordHash": generate_password_hash(data.get("password", ""))
         }
         row_data = [row_dict.get(h, "") for h in headers]

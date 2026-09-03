@@ -15,7 +15,7 @@ import AdminPage from './pages/AdminPage';
 
 // Manual Version Configuration - Update this string to change the application version displayed in the header
 
-const APP_VERSION = "Beta v0.21";
+const APP_VERSION = "Beta v0.22";
 
 
 
