@@ -107,9 +107,10 @@ function HotJobSearch({ user }) {
           {searchMode === 'company' ? (
             <div className="form-grid">
               <div className="input-group full-width">
-                <label>Company Name</label>
+                <label htmlFor="hotjobsearch-company_name">Company Name</label>
                 <input 
                   type="text" 
+                  id="hotjobsearch-company_name"
                   name="company_name" 
                   placeholder="Enter company name (e.g. Walmart, Disney)..." 
                   required 
@@ -119,8 +120,8 @@ function HotJobSearch({ user }) {
           ) : (
             <div className="form-grid">
               <div className="input-group">
-                <label>Job Type (Hold Ctrl/Cmd to select multiple)</label>
-                <select name="job_type" multiple size="4">
+                <label htmlFor="hotjobsearch-job_type">Job Type (Hold Ctrl/Cmd to select multiple)</label>
+                <select id="hotjobsearch-job_type" name="job_type" multiple size="4">
                   <option value="HVAC Repair">HVAC Repair</option>
                   <option value="Accountant">Accountant</option>
                   <option value="Airport (Baggage/customer service/ground ops)">Airport (Baggage/customer service/ground ops)</option>
@@ -173,18 +174,18 @@ function HotJobSearch({ user }) {
               </div>
 
               <div className="input-group">
-                <label>Find a job near this location (Street, City, Zipcode)</label>
-                <textarea name="address" rows="4" placeholder="Enter full address..."></textarea>
+                <label htmlFor="hotjobsearch-address">Find a job near this location (Street, City, Zipcode)</label>
+                <textarea id="hotjobsearch-address" name="address" rows="4" placeholder="Enter full address..."></textarea>
               </div>
 
               <div className="input-group">
-                <label>Other Job Type (Not in list)</label>
-                <input type="text" name="other_job_type" placeholder="Enter other job type..." />
+                <label htmlFor="hotjobsearch-other_job_type">Other Job Type (Not in list)</label>
+                <input id="hotjobsearch-other_job_type" type="text" name="other_job_type" placeholder="Enter other job type..." />
               </div>
 
               <div className="input-group">
-                <label>List jobs within radius of (miles)</label>
-                <input type="number" name="radius" defaultValue="20" min="1" />
+                <label htmlFor="hotjobsearch-radius">List jobs within radius of (miles)</label>
+                <input id="hotjobsearch-radius" type="number" name="radius" defaultValue="20" min="1" />
               </div>
             </div>
           )}
@@ -209,7 +210,7 @@ function HotJobSearch({ user }) {
           <div className="results-section mt-2">
             <h2>Search Results</h2>
 
-            <h3 style={{ marginTop: '1.5rem', color: '#2ecc71' }}>Currently Hiring Jobs</h3>
+            <h3 style={{ marginTop: '1.5rem', color: 'var(--success)' }}>Currently Hiring Jobs</h3>
             {results.recent && results.recent.length > 0 ? (
               <div className="table-container">
                 <table>
@@ -245,7 +246,7 @@ function HotJobSearch({ user }) {
               </div>
             ) : <p>No currently hiring jobs found.</p>}
 
-            <h3 style={{ marginTop: '2rem', color: '#f39c12' }}>Other Jobs Meeting Criteria (Not Currently Hiring)</h3>
+            <h3 style={{ marginTop: '2rem', color: '#8a650d' }}>Other Jobs Meeting Criteria (Not Currently Hiring)</h3>
             {results.older && results.older.length > 0 ? (
               <div className="table-container">
                 <table>

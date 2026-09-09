@@ -77,13 +77,13 @@ function JobEntry({ user }) {
           <div className="form-grid">
 
             <div className="input-group">
-              <label>Company Name <span className="required">*</span></label>
-              <input type="text" name="company_name" required />
+              <label htmlFor="jobentry-company_name">Company Name <span className="required">*</span></label>
+              <input id="jobentry-company_name" type="text" name="company_name" required />
             </div>
 
             <div className="input-group">
-              <label>Company Type</label>
-              <input type="text" name="company_type" list="company-types" placeholder="Enter or select type..." />
+              <label htmlFor="jobentry-company_type">Company Type</label>
+              <input id="jobentry-company_type" type="text" name="company_type" list="company-types" placeholder="Enter or select type..." />
               <datalist id="company-types">
                 <option value="Call Center" />
                 <option value="Construction" />
@@ -105,18 +105,18 @@ function JobEntry({ user }) {
             </div>
 
             <div className="input-group full-width">
-              <label>Company Street Address <span className="required">*</span></label>
-              <input type="text" name="company_street" required />
+              <label htmlFor="jobentry-company_street">Company Street Address <span className="required">*</span></label>
+              <input id="jobentry-company_street" type="text" name="company_street" required />
             </div>
 
             <div className="input-group">
-              <label>City <span className="required">*</span></label>
-              <input type="text" name="company_city" required />
+              <label htmlFor="jobentry-company_city">City <span className="required">*</span></label>
+              <input id="jobentry-company_city" type="text" name="company_city" required />
             </div>
 
             <div className="input-group">
-              <label>Company State <span className="required">*</span></label>
-              <select name="company_state" required>
+              <label htmlFor="jobentry-company_state">Company State <span className="required">*</span></label>
+              <select id="jobentry-company_state" name="company_state" required>
                 <option value="">Select State...</option>
                 <option value="FL">Florida</option>
                 {/* Simplified for demo, add all states as needed */}
@@ -129,45 +129,45 @@ function JobEntry({ user }) {
             </div>
 
             <div className="input-group">
-              <label>Company Zipcode <span className="required">*</span></label>
-              <input type="text" name="company_zip" required />
+              <label htmlFor="jobentry-company_zip">Company Zipcode <span className="required">*</span></label>
+              <input id="jobentry-company_zip" type="text" name="company_zip" required />
             </div>
 
 
 
             <div className="input-group">
-              <label>Career Website URL</label>
-              <input type="text" name="career_website" />
+              <label htmlFor="jobentry-career_website">Career Website URL</label>
+              <input id="jobentry-career_website" type="text" name="career_website" />
             </div>
 
             <div className="input-group">
-              <label>Hiring Contact Name</label>
-              <input type="text" name="contact_name" />
+              <label htmlFor="jobentry-contact_name">Hiring Contact Name</label>
+              <input id="jobentry-contact_name" type="text" name="contact_name" />
             </div>
 
             <div className="input-group">
-              <label>Hiring Contact Phone</label>
-              <input type="tel" name="contact_phone" />
+              <label htmlFor="jobentry-contact_phone">Hiring Contact Phone</label>
+              <input id="jobentry-contact_phone" type="tel" name="contact_phone" />
             </div>
 
             <div className="input-group">
-              <label>Hiring Contact Email</label>
-              <input type="email" name="contact_email" />
+              <label htmlFor="jobentry-contact_email">Hiring Contact Email</label>
+              <input id="jobentry-contact_email" type="email" name="contact_email" />
             </div>
 
 
 
             <div className="input-group">
-              <label>Currently Hiring <span className="required">*</span></label>
-              <select name="currently_hiring" required defaultValue="Yes">
+              <label htmlFor="jobentry-currently_hiring">Currently Hiring <span className="required">*</span></label>
+              <select id="jobentry-currently_hiring" name="currently_hiring" required defaultValue="Yes">
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
               </select>
             </div>
 
             <div className="input-group full-width">
-              <label>Available Jobs (Select multiple with Ctrl/Cmd, and/or enter manually)</label>
-              <select name="available_jobs_select" multiple size="6">
+              <label htmlFor="jobentry-available_jobs_select">Available Jobs (Select multiple with Ctrl/Cmd, and/or enter manually)</label>
+              <select id="jobentry-available_jobs_select" name="available_jobs_select" multiple size="6">
                 <option value="HVAC Repair">HVAC Repair</option>
                 <option value="Accountant">Accountant</option>
                 <option value="Airport (Baggage/customer service/ground ops)">Airport (Baggage/customer service/ground ops)</option>
@@ -221,8 +221,8 @@ function JobEntry({ user }) {
             </div>
 
             <div className="input-group full-width">
-              <label>Additional Notes</label>
-              <textarea name="notes" rows="2"></textarea>
+              <label htmlFor="jobentry-notes">Additional Notes</label>
+              <textarea id="jobentry-notes" name="notes" rows="2"></textarea>
             </div>
 
           </div>

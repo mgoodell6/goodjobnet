@@ -1458,12 +1458,12 @@ function HotJobsReview({ user }) {
   return (
     <div className="app-container fade-in">
       <div className="glass-panel main-form">
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <header className="review-heading">
           <div>
             <h1>{reviewTitle}</h1>
             <p className="subtitle">Review and update hot jobs</p>
           </div>
-          <div style={{ textAlign: 'right' }}>
+          <div className="review-record-summary">
             <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Job {currentIndex + 1} of {jobs.length}</span>
             <div style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>
               Last Verified: {currentJob.date_last_verified || 'Never'} ({currentJob.age_days === 9999 ? 'Never Verified' : `${currentJob.age_days} days ago`})
@@ -1499,7 +1499,7 @@ function HotJobsReview({ user }) {
                 {voiceActive ? (isVoicePaused ? 'Voice Assistant PAUSED' : 'Voice Assistant ON') : 'Turn On Voice Assistant'}
               </button>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.3rem 0.6rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+              <div className="call-mode-control">
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: '500' }}>Call Mode:</span>
                 <select
                   value={callMethod}
@@ -1513,7 +1513,7 @@ function HotJobsReview({ user }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', minWidth: '220px' }}>
+            <div className="voice-status">
               <span
                 className={`status-dot ${voiceActive && !speechStatus.includes('Error') && !speechStatus.includes('Denied') && !speechStatus.includes('Offline') ? 'active' : ''}`}
                 style={{
@@ -1605,8 +1605,8 @@ function HotJobsReview({ user }) {
                 </div>
 
                 <div className="input-group">
-                  <label>Company Type</label>
-                  <input type="text" name="company_type" defaultValue={currentJob.company_type || ''} list="company-types" placeholder="Enter or select type..." />
+                  <label htmlFor="hotjobsreview-company_type">Company Type</label>
+                  <input id="hotjobsreview-company_type" type="text" name="company_type" defaultValue={currentJob.company_type || ''} list="company-types" placeholder="Enter or select type..." />
                   <datalist id="company-types">
                     <option value="Call Center" />
                     <option value="Construction" />
@@ -1628,18 +1628,18 @@ function HotJobsReview({ user }) {
                 </div>
 
                 <div className="input-group full-width">
-                  <label>Company Street Address</label>
-                  <input type="text" name="company_street" defaultValue={currentJob.company_street} />
+                  <label htmlFor="hotjobsreview-company_street">Company Street Address</label>
+                  <input id="hotjobsreview-company_street" type="text" name="company_street" defaultValue={currentJob.company_street} />
                 </div>
 
                 <div className="input-group">
-                  <label>City</label>
-                  <input type="text" name="company_city" defaultValue={currentJob.company_city} />
+                  <label htmlFor="hotjobsreview-company_city">City</label>
+                  <input id="hotjobsreview-company_city" type="text" name="company_city" defaultValue={currentJob.company_city} />
                 </div>
 
                 <div className="input-group">
-                  <label>Company State</label>
-                  <select name="company_state" defaultValue={currentJob.company_state || 'FL'}>
+                  <label htmlFor="hotjobsreview-company_state">Company State</label>
+                  <select id="hotjobsreview-company_state" name="company_state" defaultValue={currentJob.company_state || 'FL'}>
                     <option value="">Select State...</option>
                     <option value="FL">Florida</option>
                     <option value="AL">Alabama</option>
@@ -1651,8 +1651,8 @@ function HotJobsReview({ user }) {
                 </div>
 
                 <div className="input-group">
-                  <label>Company Zipcode</label>
-                  <input type="text" name="company_zip" defaultValue={currentJob.company_zip} />
+                  <label htmlFor="hotjobsreview-company_zip">Company Zipcode</label>
+                  <input id="hotjobsreview-company_zip" type="text" name="company_zip" defaultValue={currentJob.company_zip} />
                 </div>
 
                 <div className="input-group full-width">
@@ -1673,18 +1673,18 @@ function HotJobsReview({ user }) {
                 </div>
 
                 <div className="input-group">
-                  <label>Hiring Contact Phone</label>
-                  <input type="tel" name="contact_phone" defaultValue={currentJob.contact_phone} />
+                  <label htmlFor="hotjobsreview-contact_phone">Hiring Contact Phone</label>
+                  <input id="hotjobsreview-contact_phone" type="tel" name="contact_phone" defaultValue={currentJob.contact_phone} />
                 </div>
 
                 <div className="input-group">
-                  <label>Hiring Contact Email</label>
-                  <input type="email" name="contact_email" defaultValue={currentJob.contact_email} />
+                  <label htmlFor="hotjobsreview-contact_email">Hiring Contact Email</label>
+                  <input id="hotjobsreview-contact_email" type="email" name="contact_email" defaultValue={currentJob.contact_email} />
                 </div>
 
                 <div className="input-group">
-                  <label>Currently Hiring</label>
-                  <select
+                  <label htmlFor="hotjobsreview-currently_hiring">Currently Hiring</label>
+                  <select id="hotjobsreview-currently_hiring"
                     name="currently_hiring"
                     defaultValue={
                       (currentJob.currently_hiring === 'TRUE' ||
@@ -1701,16 +1701,16 @@ function HotJobsReview({ user }) {
                 </div>
 
                 <div className="input-group full-width">
-                  <label>Available Jobs (Select multiple with Ctrl/Cmd, and/or enter manually)</label>
-                  <select name="available_jobs_select" multiple size="6" defaultValue={matchedJobs}>
+                  <label htmlFor="hotjobsreview-available_jobs_select">Available Jobs (Select multiple with Ctrl/Cmd, and/or enter manually)</label>
+                  <select id="hotjobsreview-available_jobs_select" name="available_jobs_select" multiple size="6" defaultValue={matchedJobs}>
                     {JOB_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                   <input type="text" name="available_jobs_manual" defaultValue={unmatchedJobs.join(', ')} placeholder="Other available jobs (comma separated)" style={{ marginTop: '0.5rem' }} />
                 </div>
 
                 <div className="input-group full-width">
-                  <label>Additional Notes</label>
-                  <textarea name="notes" rows="2" defaultValue={currentJob.notes}></textarea>
+                  <label htmlFor="hotjobsreview-notes">Additional Notes</label>
+                  <textarea id="hotjobsreview-notes" name="notes" rows="2" defaultValue={currentJob.notes}></textarea>
                 </div>
               </div>
             );

@@ -1,0 +1,12 @@
+import { Link } from 'react-router-dom';
+import { ArrowUpRight, ArrowRight, BriefcaseBusiness, UserPlus, MapPin } from 'lucide-react';
+import { visibleApps } from '../components/navigation';
+export function AppsPage({ user }) {
+  return <div className="workspace-page"><div className="page-heading"><div><p className="eyebrow">YOUR WORKSPACE</p><h1>Everything you need, in one place</h1><p>Find your next opportunity. Help someone find theirs.</p></div></div><div className="apps-catalog">{visibleApps(user).map(({ title, path, icon: Icon, color, description }) => <Link className="catalog-card" to={path} key={path}><span className={'app-icon ' + color}><Icon size={29} /></span><h2>{title}</h2><p>{description}</p><ArrowUpRight className="card-arrow" size={18} /></Link>)}</div></div>;
+}
+export function CreatePage() {
+  return <div className="workspace-page"><div className="page-heading"><div><p className="eyebrow">MAKE A CONNECTION</p><h1>What would you like to add?</h1><p>Share opportunities and connect people with employment support.</p></div></div><div className="create-grid"><Link className="catalog-card" to="/job-entry"><span className="app-icon blue"><BriefcaseBusiness size={32} /></span><h2>Job opportunity</h2><p>Share an employer, available roles, location, and contact details with the employment center.</p><span className="text-link">Add a job <ArrowRight size={16} /></span></Link><Link className="catalog-card" to="/job-seeker-entry"><span className="app-icon teal"><UserPlus size={32} /></span><h2>Job seeker</h2><p>Add a person's experience, interests, and support needs to help them take their next step.</p><span className="text-link">Add a job seeker <ArrowRight size={16} /></span></Link></div></div>;
+}
+export function MapPage() {
+  return <div className="workspace-page"><div className="page-heading"><div><p className="eyebrow">EXPLORE CENTRAL FLORIDA</p><h1>Opportunities near you</h1><p>Explore the employment center's job location map.</p></div><a className="subtle-button" href="https://www.google.com/maps/d/u/0/viewer?mid=1YnckZ2k4jyCu6Agxg4VX0EyWK49puuo&ll=28.284392717060463%2C-82.04171770869505&z=9" target="_blank" rel="noreferrer">Open in Google Maps <ArrowUpRight size={16} /></a></div><div className="map-panel"><iframe title="Orlando Employment Center job locations" src="https://www.google.com/maps/d/embed?mid=1YnckZ2k4jyCu6Agxg4VX0EyWK49puuo" loading="lazy" /></div><p className="map-caption"><MapPin size={16} /> Prefer a list? <Link to="/hot-job-search">Search jobs by location and distance</Link></p></div>;
+}
