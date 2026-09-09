@@ -196,16 +196,16 @@ function JobSeekerSearch({ user }) {
         <form onSubmit={handleSearch}>
           <div className="form-grid">
             <div className="input-group full-width">
-              <label>Search by Name (Optional - Bypasses job types and location filters)</label>
-              <input type="text" name="name" placeholder="Enter seeker name..." defaultValue={savedInputs.name || ''} />
+              <label htmlFor="jobseekersearch-name">Search by Name (Optional - Bypasses job types and location filters)</label>
+              <input id="jobseekersearch-name" type="text" name="name" placeholder="Enter seeker name..." defaultValue={savedInputs.name || ''} />
               <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginTop: '0.6rem', fontWeight: '500' }}>
                 OR, search by job type(s) and radius from given location
               </div>
             </div>
 
             <div className="input-group">
-              <label>Job Type (Hold Ctrl/Cmd to select multiple)</label>
-              <select 
+              <label htmlFor="jobseekersearch-job_type">Job Type (Hold Ctrl/Cmd to select multiple)</label>
+              <select id="jobseekersearch-job_type"
                 name="job_type" 
                 multiple 
                 size="4"
@@ -219,18 +219,18 @@ function JobSeekerSearch({ user }) {
             </div>
 
             <div className="input-group">
-              <label>Find individuals near this location (Street, City, Zipcode)</label>
-              <textarea name="address" rows="4" placeholder="Enter full address including zip code... (e.g. 32801)" defaultValue={savedInputs.address}></textarea>
+              <label htmlFor="jobseekersearch-address">Find individuals near this location (Street, City, Zipcode)</label>
+              <textarea id="jobseekersearch-address" name="address" rows="4" placeholder="Enter full address including zip code... (e.g. 32801)" defaultValue={savedInputs.address}></textarea>
             </div>
 
             <div className="input-group">
-              <label>Other Job Type (Not in list)</label>
-              <input type="text" name="other_job_type" placeholder="Enter other job type..." defaultValue={savedInputs.other_job_type} />
+              <label htmlFor="jobseekersearch-other_job_type">Other Job Type (Not in list)</label>
+              <input id="jobseekersearch-other_job_type" type="text" name="other_job_type" placeholder="Enter other job type..." defaultValue={savedInputs.other_job_type} />
             </div>
 
             <div className="input-group">
-              <label>List individuals within radius of (miles)</label>
-              <input type="number" name="radius" defaultValue={savedInputs.radius || '20'} min="1" required />
+              <label htmlFor="jobseekersearch-radius">List individuals within radius of (miles)</label>
+              <input id="jobseekersearch-radius" type="number" name="radius" defaultValue={savedInputs.radius || '20'} min="1" required />
             </div>
           </div>
 
@@ -354,7 +354,7 @@ function JobSeekerSearch({ user }) {
                   <p className="text-center">Loading matching jobs from JobBank...</p>
                 ) : (
                   <>
-                    <h3 style={{ marginTop: '1.5rem', color: '#2ecc71', borderBottom: '2px solid #2ecc71', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
+                    <h3 style={{ marginTop: '1.5rem', color: 'var(--success)', borderBottom: '2px solid #2ecc71', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
                       Currently Hiring Jobs ({matchingJobs.recent.length})
                     </h3>
                     {matchingJobs.recent.length > 0 ? (
@@ -392,7 +392,7 @@ function JobSeekerSearch({ user }) {
                       </div>
                     ) : <p style={{ fontStyle: 'italic', color: 'var(--text-light)', marginBottom: '1.5rem' }}>No currently hiring jobs found matching criteria.</p>}
 
-                    <h3 style={{ marginTop: '2rem', color: '#f39c12', borderBottom: '2px solid #f39c12', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
+                    <h3 style={{ marginTop: '2rem', color: '#8a650d', borderBottom: '2px solid #f39c12', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
                       Other Jobs Meeting Criteria (Not Currently Hiring) ({matchingJobs.older.length})
                     </h3>
                     {matchingJobs.older.length > 0 ? (

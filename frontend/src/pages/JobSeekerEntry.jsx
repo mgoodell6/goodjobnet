@@ -160,60 +160,60 @@ function JobSeekerEntry({ user }) {
     <div className="app-container">
       <div className="glass-panel main-form" style={{ maxWidth: seeker ? '1000px' : '700px' }}>
         <header>
-          <h1>Job Seeker Entry</h1>
-          <p className="subtitle">Enter information for an individual seeking employment</p>
+          <h1>{seeker ? 'Job seeker details' : 'Job Seeker Entry'}</h1>
+          <p className="subtitle">{seeker ? 'Review contact information, employment interests, and matching jobs.' : 'Enter information for an individual seeking employment'}</p>
         </header>
 
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
             <div className="input-group full-width">
-              <label>Name of Job Seeker <span className="required">*</span></label>
-              <input type="text" name="name" defaultValue={seeker?.name || ''} required />
+              <label htmlFor="jobseekerentry-name">Name of Job Seeker <span className="required">*</span></label>
+              <input id="jobseekerentry-name" type="text" name="name" defaultValue={seeker?.name || ''} required />
             </div>
 
             <div className="input-group full-width">
-              <label>Street Address</label>
-              <input type="text" name="street" defaultValue={seeker?.street || ''} />
+              <label htmlFor="jobseekerentry-street">Street Address</label>
+              <input id="jobseekerentry-street" type="text" name="street" defaultValue={seeker?.street || ''} />
             </div>
 
             <div className="input-group">
-              <label>City</label>
-              <input type="text" name="city" defaultValue={seeker?.city || ''} />
+              <label htmlFor="jobseekerentry-city">City</label>
+              <input id="jobseekerentry-city" type="text" name="city" defaultValue={seeker?.city || ''} />
             </div>
 
             <div className="input-group">
-              <label>Zipcode</label>
-              <input type="text" name="zipcode" defaultValue={seeker?.zipcode || ''} />
+              <label htmlFor="jobseekerentry-zipcode">Zipcode</label>
+              <input id="jobseekerentry-zipcode" type="text" name="zipcode" defaultValue={seeker?.zipcode || ''} />
             </div>
 
             <div className="input-group">
-              <label>Ward</label>
-              <input type="text" name="ward" defaultValue={seeker?.ward || ''} />
+              <label htmlFor="jobseekerentry-ward">Ward</label>
+              <input id="jobseekerentry-ward" type="text" name="ward" defaultValue={seeker?.ward || ''} />
             </div>
 
             <div className="input-group">
-              <label>Stake</label>
-              <input type="text" name="stake" defaultValue={seeker?.stake || ''} />
+              <label htmlFor="jobseekerentry-stake">Stake</label>
+              <input id="jobseekerentry-stake" type="text" name="stake" defaultValue={seeker?.stake || ''} />
             </div>
 
             <div className="input-group">
-              <label>Phone</label>
-              <input type="tel" name="phone" defaultValue={seeker?.phone || ''} />
+              <label htmlFor="jobseekerentry-phone">Phone</label>
+              <input id="jobseekerentry-phone" type="tel" name="phone" defaultValue={seeker?.phone || ''} />
             </div>
 
             <div className="input-group">
-              <label>Email</label>
-              <input type="email" name="email" defaultValue={seeker?.email || ''} />
+              <label htmlFor="jobseekerentry-email">Email</label>
+              <input id="jobseekerentry-email" type="email" name="email" defaultValue={seeker?.email || ''} />
             </div>
 
             <div className="input-group full-width">
-              <label>Skills/Education</label>
-              <textarea name="skills_education" rows="3" placeholder="Enter skills and education..." defaultValue={seeker?.skills_education || ''}></textarea>
+              <label htmlFor="jobseekerentry-skills_education">Skills/Education</label>
+              <textarea id="jobseekerentry-skills_education" name="skills_education" rows="3" placeholder="Enter skills and education..." defaultValue={seeker?.skills_education || ''}></textarea>
             </div>
 
             <div className="input-group full-width">
-              <label>Desired Company Type for employer</label>
-              <select name="job_needed" defaultValue={seeker?.job_needed || ''}>
+              <label htmlFor="jobseekerentry-job_needed">Desired Company Type for employer</label>
+              <select id="jobseekerentry-job_needed" name="job_needed" defaultValue={seeker?.job_needed || ''}>
                 <option value="">Select Type...</option>
                 <option value="Construction">Construction</option>
                 <option value="Driving">Driving</option>
@@ -231,8 +231,8 @@ function JobSeekerEntry({ user }) {
             </div>
 
             <div className="input-group full-width">
-              <label>Desired Job type(s) (Hold Ctrl/Cmd to select multiple)</label>
-              <select 
+              <label htmlFor="jobseekerentry-desired_job_types">Desired Job type(s) (Hold Ctrl/Cmd to select multiple)</label>
+              <select id="jobseekerentry-desired_job_types"
                 name="desired_job_types" 
                 multiple 
                 size="4" 
@@ -291,13 +291,13 @@ function JobSeekerEntry({ user }) {
             </div>
 
             <div className="input-group full-width">
-              <label>Other Job Type (Not in list)</label>
-              <input type="text" name="other_job_type" placeholder="Enter other job type..." defaultValue={customSelected} />
+              <label htmlFor="jobseekerentry-other_job_type">Other Job Type (Not in list)</label>
+              <input id="jobseekerentry-other_job_type" type="text" name="other_job_type" placeholder="Enter other job type..." defaultValue={customSelected} />
             </div>
 
             <div className="input-group full-width">
-              <label>General Notes</label>
-              <textarea name="general_notes" rows="3" placeholder="Any additional notes..." defaultValue={seeker?.general_notes || ''}></textarea>
+              <label htmlFor="jobseekerentry-general_notes">General Notes</label>
+              <textarea id="jobseekerentry-general_notes" name="general_notes" rows="3" placeholder="Any additional notes..." defaultValue={seeker?.general_notes || ''}></textarea>
             </div>
 
             <div className="input-group full-width">
@@ -328,7 +328,9 @@ function JobSeekerEntry({ user }) {
               type="button" 
               className="btn secondary-btn" 
               onClick={() => {
-                if (fromAssigned) {
+                if (location.state?.fromUniversal) {
+                  navigate(location.state.fromUniversal);
+                } else if (fromAssigned) {
                   navigate('/assigned-job-seekers');
                 } else if (fromSearch) {
                   navigate('/job-seeker-search', { state: { keepResults: true } });
@@ -361,7 +363,7 @@ function JobSeekerEntry({ user }) {
               <p className="text-center">Loading matching jobs from JobBank...</p>
             ) : (
               <>
-                <h3 style={{ marginTop: '1.5rem', color: '#2ecc71', borderBottom: '2px solid #2ecc71', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
+                <h3 style={{ marginTop: '1.5rem', color: 'var(--success)', borderBottom: '2px solid #2ecc71', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
                   Currently Hiring Jobs ({matchingJobs.recent.length})
                 </h3>
                 {matchingJobs.recent.length > 0 ? (
@@ -407,7 +409,7 @@ function JobSeekerEntry({ user }) {
                   </div>
                 ) : <p style={{ fontStyle: 'italic', color: 'var(--text-light)', marginBottom: '1.5rem' }}>No currently hiring jobs found matching criteria.</p>}
 
-                <h3 style={{ marginTop: '2rem', color: '#f39c12', borderBottom: '2px solid #f39c12', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
+                <h3 style={{ marginTop: '2rem', color: '#8a650d', borderBottom: '2px solid #f39c12', paddingBottom: '0.4rem', marginBottom: '0.8rem' }}>
                   Other Jobs Meeting Criteria (Not Currently Hiring) ({matchingJobs.older.length})
                 </h3>
                 {matchingJobs.older.length > 0 ? (

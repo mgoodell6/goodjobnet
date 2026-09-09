@@ -1,5 +1,3 @@
-import React from 'react';
-
 function InformationAndHelp() {
   return (
     <div className="help-container fade-in">
@@ -56,7 +54,15 @@ function InformationAndHelp() {
             <li>
               <strong>Orlando Employment Center:</strong> <a href="tel:407-826-9375">407-826-9375</a>
             </li>
+            <li>
+              <strong>Employment support:</strong> <a href="mailto:Orlandoemploymentoffice@gmail.com">Orlandoemploymentoffice@gmail.com</a>
+            </li>
           </ul>
+        </div>
+        <div className="form-footer">
+          <p>No one should go through a job search alone. Our employment coaches offer resume assistance, interview preparation, and networking opportunities.</p>
+          <p className="footer-quote">“We can accomplish so much more together than we can alone.”</p>
+          <p className="footer-author">— President Russell M. Nelson</p>
         </div>
       </div>
     </div>

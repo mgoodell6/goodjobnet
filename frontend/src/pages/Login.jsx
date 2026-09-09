@@ -1,205 +1,50 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaEye, FaEyeSlash } from 'react-icons/fa';
+﻿import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Eye, EyeOff, KeyRound, ArrowRight } from 'lucide-react';
+import { signInDestination } from '../signInDestination';
 
-function Login({ onLogin }) {
-  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+export default function Login({ onLogin }) {
+  const [register, setRegister] = useState(false);
+  const [step, setStep] = useState('username');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const navigate = useNavigate();
-
-  const handleLogin = async (e) => {
+  const location = useLocation();
+  useEffect(() => { document.title = 'Sign in | GoodJobNet'; }, []);
+  const submit = async e => {
     e.preventDefault();
+    setError('');
+    if (!register && step === 'username') { setStep('password'); return; }
+    setBusy(true);
     try {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+      const payload = register ? Object.fromEntries(new FormData(e.currentTarget).entries()) : { username, password };
+      const response = await fetch(register ? '/api/register' : '/api/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("Received non-JSON response:", text);
-        alert(`Server Configuration Error: The server returned HTML instead of JSON. This usually means the API is down or not properly routed. Status: ${response.status}`);
-        return;
-      }
-
+      if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Unable to reach the sign-in service. Please try again.');
       const data = await response.json();
-
-      if (data.success) {
-        onLogin({
-          name: data.name || username,
-          role: data.role,
-          ward: data.ward || "",
-          stake: data.stake || "",
-          email: data.email || "",
-          phone: data.phone || ""
-        });
-        navigate('/employment-dashboard');
-      } else {
-        alert((data.error || 'Invalid credentials') + (data.details ? '\n\nDetails: ' + data.details : ''));
+      if (!data.success) throw new Error((data.error || 'Unable to sign in. Check your username and password.') + (data.details ? ' ' + data.details : ''));
+      if (register) { setRegister(false); setStep('username'); setNotice('Account created successfully. You can now sign in.'); }
+      else {
+        onLogin({ name: data.name || username, role: data.role, ward: data.ward || '', stake: data.stake || '', email: data.email || '', phone: data.phone || '' });
+        navigate(signInDestination(location.state?.from), { replace: true });
       }
-    } catch (err) {
-      console.error("Login Error:", err);
-      alert(`Network error: ${err.message || 'Unable to reach the server'}. Please check your internet connection or try again later.`);
-    }
+    } catch (err) { setError(err.message || 'Unable to connect. Please try again.'); }
+    finally { setBusy(false); }
   };
-
-  const handleCreateAccount = async (e) => {
-    e.preventDefault();
-    try {
-      const formElement = e.target;
-      const formData = new FormData(formElement);
-      const data = Object.fromEntries(formData.entries());
-
-      const response = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("Received non-JSON response:", text);
-        alert(`Server Configuration Error: The server returned HTML instead of JSON. This usually means the API is down or not properly routed. Status: ${response.status}`);
-        return;
-      }
-
-      const responseData = await response.json();
-      if (responseData.success) {
-        alert("Account created successfully! You may now log in with your credentials.");
-        setIsCreatingAccount(false);
-      } else {
-        alert(responseData.error || 'Registration failed');
-      }
-    } catch (err) {
-      console.error("Registration Error:", err);
-      alert(`Network error: ${err.message || 'Unable to reach the server'}. Please check your internet connection or try again later.`);
-    }
-  };
-
-  return (
-    <div className="app-container">
-      <div className="glass-panel main-form">
-        <header>
-          <h1>Welcome to GoodJobNet</h1>
-          <p className="subtitle">Employment resource for LDS wards and stakes in the Central Florida area</p>
-        </header>
-
-        <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
-          <p>This site helps keep the Orlando Employment Center aware of needs in the area and provides connection to employment opportunities that have been pre-screened.</p>
-          <p><strong>Note:</strong> Log-in accounts are intended for use by church members in leadership roles.</p>
-        </div>
-
-
-        {!isCreatingAccount ? (
-          <form onSubmit={handleLogin}>
-            <div className="form-grid">
-              <div className="input-group full-width">
-                <label>Username</label>
-                <input type="text" required value={username} onChange={e => setUsername(e.target.value)} />
-              </div>
-              <div className="input-group full-width">
-                <label>Password</label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    style={{ width: '100%', paddingRight: '2.5rem' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={{
-                      position: 'absolute',
-                      right: '10px',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      color: 'var(--text-light)',
-                      padding: '4px'
-                    }}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="actions mt-2 mb-1">
-              <button type="submit" className="btn primary-btn">Login</button>
-            </div>
-            <div className="text-center">
-              <a href="#" onClick={(e) => { e.preventDefault(); setIsCreatingAccount(true); }}>Need an account? Apply here.</a>
-            </div>
-          </form>
-        ) : (
-          <form onSubmit={handleCreateAccount}>
-            <div className="form-grid">
-              <div className="input-group full-width">
-                <label>Name</label>
-                <input type="text" name="name" required />
-              </div>
-              <div className="input-group">
-                <label>Email (Optional)</label>
-                <input type="email" name="email" />
-              </div>
-              <div className="input-group">
-                <label>Phone (Optional)</label>
-                <input type="tel" name="phone" />
-              </div>
-              <div className="input-group full-width">
-                <label>Desired Username (Unique)</label>
-                <input type="text" name="username" required />
-              </div>
-              <div className="input-group full-width">
-                <label>Password (Min 8 chars)</label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
-                    type={showRegisterPassword ? 'text' : 'password'}
-                    name="password"
-                    minLength="8"
-                    required
-                    style={{ width: '100%', paddingRight: '2.5rem' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowRegisterPassword(!showRegisterPassword)}
-                    style={{
-                      position: 'absolute',
-                      right: '10px',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      color: 'var(--text-light)',
-                      padding: '4px'
-                    }}
-                    aria-label={showRegisterPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showRegisterPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="actions mt-2 mb-1">
-              <button type="submit" className="btn primary-btn">Create Account</button>
-            </div>
-            <div className="text-center">
-              <a href="#" onClick={(e) => { e.preventDefault(); setIsCreatingAccount(false); }}>Back to Login</a>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
-  );
+  const switchMode = () => { setRegister(!register); setStep('username'); setError(''); setVisible(false); };
+  return <div className="login-page"><div className="login-ambient" aria-hidden="true" /><div className={'login-stack ' + (register ? 'registration-stack' : '')}><section className="login-card"><Link to="/" className="login-brand"><span className="brand-mark"><span /><span /><span /></span>GoodJobNet</Link>
+    {!register && step === 'password' && <button className="login-identity" type="button" onClick={() => { setStep('username'); setError(''); }}><ArrowLeft size={16} />{username}</button>}
+    <h1>{register ? 'Create your account' : step === 'username' ? 'Sign in' : 'Enter password'}</h1><p>{register ? 'Apply for access to the employment workspace.' : step === 'username' ? 'to continue to GoodJobNet' : 'Use your GoodJobNet account password.'}</p>
+    {error && <p className="login-error" role="alert">{error}</p>}{notice && <p className="login-notice" role="status">{notice}</p>}
+    <form onSubmit={submit}>
+      {register ? <div className="form-grid"><div className="input-group full-width"><label htmlFor="register-name">Name</label><input id="register-name" name="name" required autoComplete="name" /></div><div className="input-group"><label htmlFor="register-email">Email (optional)</label><input id="register-email" type="email" name="email" autoComplete="email" /></div><div className="input-group"><label htmlFor="register-phone">Phone (optional)</label><input id="register-phone" type="tel" name="phone" autoComplete="tel" /></div><div className="input-group full-width"><label htmlFor="register-username">Choose a unique username</label><input id="register-username" name="username" required autoComplete="username" /></div><div className="input-group full-width"><label htmlFor="register-password">Password (at least 8 characters)</label><div className="password-field"><input id="register-password" type={visible ? 'text' : 'password'} name="password" minLength={8} required autoComplete="new-password" /><button type="button" className="icon-button" aria-label={visible ? 'Hide password' : 'Show password'} onClick={() => setVisible(!visible)}>{visible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></div></div>
+      : step === 'username' ? <div className="input-group"><label className="sr-only" htmlFor="login-username">Username</label><input key="username" id="login-username" autoFocus required autoComplete="username" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} /></div>
+      : <div className="input-group"><label className="sr-only" htmlFor="login-password">Password</label><div className="password-field"><input key="password" id="login-password" autoFocus type={visible ? 'text' : 'password'} required autoComplete="current-password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} /><button type="button" className="icon-button" aria-label={visible ? 'Hide password' : 'Show password'} onClick={() => setVisible(!visible)}>{visible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></div>}
+      <div className="login-links">{register ? <button type="button" onClick={switchMode}>Already have an account? Sign in</button> : <><span>Need an account? <button type="button" onClick={switchMode}>Apply here</button></span><Link to="/help">Need help signing in?</Link></>}</div><div className="login-actions"><button type="submit" className="login-submit" disabled={busy}>{busy ? 'Please wait…' : register ? 'Create account' : step === 'username' ? 'Next' : 'Sign in'}</button></div>
+    </form></section><Link to="/" className="login-options"><KeyRound size={21} /><span>Looking for a job? Explore without signing in</span><ArrowRight size={17} /></Link><p className="login-context">Workspace accounts are intended for church members in leadership roles serving wards and stakes in Central Florida.</p></div><footer className="login-footer"><span>GoodJobNet · Orlando Employment Center</span><Link to="/help">Help & contact</Link></footer></div>;
 }
-
-export default Login;

@@ -124,12 +124,12 @@ function AdminPage({ user }) {
   return (
     <div className="app-container fade-in">
       <div className="glass-panel main-form" style={{ maxWidth: '900px' }}>
-        <header style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(58, 123, 213, 0.1)', padding: '12px', borderRadius: '50%', marginBottom: '10px' }}>
+        <header className="admin-heading">
+          <div className="admin-heading-icon">
             <FaShieldAlt style={{ fontSize: '2.5rem', color: 'var(--primary-color)' }} />
           </div>
-          <h1 style={{ fontSize: '2rem', color: 'var(--text-dark)', marginBottom: '0.5rem' }}>System Administration</h1>
-          <p className="subtitle">GoodJobNet Admin Portal</p>
+          <div><h1>System Administration</h1>
+          <p className="subtitle">GoodJobNet Admin Portal</p></div>
         </header>
 
         {/* User Session Info Card */}
@@ -137,7 +137,7 @@ function AdminPage({ user }) {
           <h2 style={{ fontSize: '1.2rem', color: 'var(--text-dark)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <FaUser style={{ color: 'var(--primary-color)' }} /> Active Session Info
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: '1rem' }}>
             <div>
               <strong style={{ color: 'var(--text-light)', fontSize: '0.85rem' }}>Account Name</strong>
               <p style={{ fontWeight: '600' }}>{user?.name || 'N/A'}</p>
