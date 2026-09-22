@@ -109,9 +109,22 @@ function AdminPage({ user }) {
       .then(data => {
         setExporting(false);
         if (data.success) {
-          setExportStatus({ success: true, message: data.message, url: data.url, count: data.count });
+          setExportStatus({
+            success: true,
+            message: data.message,
+            warning: data.warning,
+            jsearch_limit_exceeded: data.jsearch_limit_exceeded,
+            url: data.url,
+            count: data.count
+          });
         } else {
-          setExportStatus({ success: false, message: (data.error || 'Failed to export JSearch jobs.') + (data.details ? ` (${data.details})` : '') });
+          setExportStatus({
+            success: false,
+            message: (data.error || 'Failed to export JSearch jobs.') + (data.details ? ` (${data.details})` : ''),
+            warning: data.warning,
+            jsearch_limit_exceeded: data.jsearch_limit_exceeded,
+            url: data.url
+          });
         }
       })
       .catch(err => {
@@ -231,11 +244,16 @@ function AdminPage({ user }) {
             <p style={{
               fontSize: '1rem',
               fontWeight: 500,
-              color: (updateStatus?.success || importStatus?.success || exportStatus?.success) ? 'var(--success)' : 'var(--error)',
+              color: (updateStatus?.success || importStatus?.success || (exportStatus?.success && !exportStatus?.jsearch_limit_exceeded)) ? 'var(--success)' : 'var(--error)',
               margin: 0
             }}>
               {updateStatus ? updateStatus.message : importStatus ? importStatus.message : exportStatus.message}
             </p>
+            {exportStatus?.warning && (
+              <p style={{ fontSize: '0.9rem', color: '#e67e22', fontWeight: 600, marginTop: '0.5rem' }}>
+                ⚠️ {exportStatus.warning}
+              </p>
+            )}
             {importStatus?.success && importStatus?.url && (
               <div style={{ marginTop: '0.75rem' }}>
                 <a
@@ -259,7 +277,7 @@ function AdminPage({ user }) {
                 </a>
               </div>
             )}
-            {exportStatus?.success && exportStatus?.url && (
+            {exportStatus?.url && (
               <div style={{ marginTop: '0.75rem' }}>
                 <a
                   href={exportStatus.url}
