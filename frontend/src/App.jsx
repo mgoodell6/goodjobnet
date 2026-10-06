@@ -16,7 +16,7 @@ const APP_VERSION = "Beta v0.24";
 
 
 
-function TopBar({ user, handleLogout }) {
+function TopBar({ user, handleLogout }) {}
 import Shell from './components/Shell';
 import ThemeProvider from './components/ThemeProvider';
 import Home from './pages/Home';
