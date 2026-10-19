@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 function JobEntry({ user }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,12 +36,15 @@ function JobEntry({ user }) {
     delete data.available_jobs_select;
     delete data.available_jobs_manual;
 
+    const enteredName = data.submitter_name ? data.submitter_name.trim() : '';
+    data.submitter_name = enteredName || user?.name || '';
+    data.entered_by_name = data.submitter_name;
+
     if (user) {
-      data.submitter_name = user.name;
-      data.submitter_ward = user.ward;
-      data.submitter_stake = user.stake;
-      data.submitter_phone = user.phone;
-      data.submitter_email = user.email;
+      data.submitter_ward = user.ward || '';
+      data.submitter_stake = user.stake || '';
+      data.submitter_phone = user.phone || '';
+      data.submitter_email = user.email || '';
     }
 
     try {
@@ -225,6 +229,16 @@ function JobEntry({ user }) {
               <textarea name="notes" rows="2"></textarea>
             </div>
 
+            <div className="input-group full-width">
+              <label>Name of person entering new job information <span className="required">*</span></label>
+              <input 
+                type="text" 
+                name="submitter_name" 
+                defaultValue={user?.name || ''} 
+                placeholder="Enter your name..." 
+                required 
+              />
+            </div>
           </div>
 
           {message && (
@@ -234,7 +248,19 @@ function JobEntry({ user }) {
           )}
 
           <div className="actions mt-2 mb-1" style={{ display: 'flex', gap: '1rem' }}>
-            <button type="button" className="btn secondary-btn" onClick={() => navigate(user?.role === 'admin' ? '/employment-dashboard' : '/dashboard')}>Cancel</button>
+            <button 
+              type="button" 
+              className="btn secondary-btn" 
+              onClick={() => {
+                if (location.state?.from === 'employment' && user?.role === 'admin') {
+                  navigate('/employment-dashboard');
+                } else {
+                  navigate('/');
+                }
+              }}
+            >
+              Return to Dashboard
+            </button>
             <button type="submit" className="btn primary-btn" disabled={loading}>
               {loading ? 'Submitting...' : 'Submit Job'}
             </button>

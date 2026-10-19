@@ -1499,7 +1499,7 @@ function HotJobsReview({ user }) {
           </div>
 
           <div className="actions mt-2" style={{ textAlign: 'center' }}>
-            <button type="button" className="btn secondary-btn" onClick={() => navigate(user?.role === 'admin' ? '/employment-dashboard' : '/dashboard')} style={{ width: 'auto' }}>Back to Dashboard</button>
+            <button type="button" className="btn secondary-btn" onClick={() => navigate(user?.role === 'admin' ? '/employment-dashboard' : '/')} style={{ width: 'auto' }}>Back to Dashboard</button>
           </div>
         </div>
       </div>
@@ -1520,7 +1520,7 @@ function HotJobsReview({ user }) {
           </header>
           <div className="actions mt-2">
             <button type="button" className="btn secondary-btn" onClick={handleGoBack}>Go Back</button>
-            <button type="button" className="btn primary-btn" onClick={() => navigate(user?.role === 'admin' ? '/employment-dashboard' : '/dashboard')}>Dashboard</button>
+            <button type="button" className="btn primary-btn" onClick={() => navigate(user?.role === 'admin' ? '/employment-dashboard' : '/')}>Dashboard</button>
           </div>
         </div>
       </div>
