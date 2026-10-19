@@ -1,7 +1,6 @@
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useState } from 'react';
 import Login from './pages/Login';
-import GeneralDashboard from './pages/GeneralDashboard';
 import JobEntry from './pages/JobEntry';
 import HotJobSearch from './pages/HotJobSearch';
 import JobSeekerSearch from './pages/JobSeekerSearch';
@@ -14,15 +13,26 @@ import AdminPage from './pages/AdminPage';
 
 // Manual Version Configuration - Update this string to change the application version displayed in the header
 
-const APP_VERSION = "Beta v0.26";
+const APP_VERSION = "Beta v0.27";
 
 
 
 function TopBar({ user, handleLogout }) {
   const location = useLocation();
   const isJobSeekerDashboard = location.pathname === '/' || location.pathname === '/job-seeker-dashboard';
+  const isHotJobSearch = location.pathname === '/hot-job-search';
+  const isHotJobSearchFromJobSeeker = isHotJobSearch && (location.state?.from !== 'employment' || !user || user.role !== 'admin');
+  const isJobEntry = location.pathname === '/job-entry';
+  const isJobEntryFromJobSeeker = isJobEntry && (location.state?.from !== 'employment' || !user || user.role !== 'admin');
 
-  if (!user || isJobSeekerDashboard) {
+  // Suppress top banner for unauthenticated users, non-admins, JobSeekerDashboard, or pages from job seeker context
+  if (
+    !user ||
+    user.role !== 'admin' ||
+    isJobSeekerDashboard ||
+    isHotJobSearchFromJobSeeker ||
+    isJobEntryFromJobSeeker
+  ) {
     return null;
   }
 
@@ -72,23 +82,28 @@ function App() {
 
       <Routes>
         <Route path="/" element={<JobSeekerDashboard />} />
-        <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="/job-seeker-dashboard" element={<JobSeekerDashboard />} />
+        <Route path="/dashboard" element={<Navigate to="/" replace />} />
         <Route path="/hot-job-search" element={<HotJobSearch user={user} />} />
-        {user ? (
+        <Route path="/job-entry" element={<JobEntry user={user} />} />
+        <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        {user && user.role === 'admin' ? (
           <>
-            <Route path="/dashboard" element={<GeneralDashboard />} />
             <Route path="/employment-dashboard" element={<EmploymentCenterDashboard user={user} />} />
             <Route path="/help" element={<InformationAndHelp />} />
-            <Route path="/job-entry" element={<JobEntry user={user} />} />
             <Route path="/hot-jobs-review" element={<HotJobsReview user={user} />} />
             <Route path="/hot-jobs-5review" element={<HotJobsReview user={user} />} />
             <Route path="/admin-page" element={<AdminPage user={user} />} />
             <Route path="/assigned-job-seekers" element={<AssignedJobSeekersList user={user} />} />
             <Route path="/job-seeker-search" element={<JobSeekerSearch user={user} />} />
+            <Route path="*" element={<Navigate to="/employment-dashboard" replace />} />
           </>
         ) : (
-          <Route path="*" element={<Login onLogin={handleLogin} />} />
+          <>
+            <Route path="/employment-dashboard" element={<Navigate to="/" replace />} />
+            <Route path="/help" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </>
         )}
       </Routes>
     </Router>

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FaMapMarkedAlt, FaSearch } from 'react-icons/fa';
+import { FaMapMarkedAlt, FaSearch, FaBriefcase } from 'react-icons/fa';
 
 function JobSeekerDashboard() {
   return (
@@ -19,7 +19,11 @@ function JobSeekerDashboard() {
             <FaMapMarkedAlt />
             <h3>Job Location Map</h3>
           </a>
-          <Link to="/hot-job-search" className="nav-card">
+          <Link to="/job-entry" state={{ from: 'job-seeker' }} className="nav-card">
+            <FaBriefcase />
+            <h3>Job Entry Form</h3>
+          </Link>
+          <Link to="/hot-job-search" state={{ from: 'job-seeker' }} className="nav-card">
             <FaSearch />
             <h3>Search for nearby jobs</h3>
           </Link>

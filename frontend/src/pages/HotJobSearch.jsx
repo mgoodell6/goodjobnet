@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 function HotJobSearch({ user }) {
   const [loading, setLoading] = useState(false);
@@ -9,6 +9,7 @@ function HotJobSearch({ user }) {
   const [radius, setRadius] = useState('20');
   const [zipcode, setZipcode] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLocationModeChange = (mode) => {
     setLocationMode(mode);
@@ -318,14 +319,19 @@ function HotJobSearch({ user }) {
             <button type="submit" className="btn primary-btn" style={{ maxWidth: '300px' }} disabled={loading}>
               {loading ? 'Searching...' : 'Search'}
             </button>
-            <button type="button" className="btn secondary-btn" style={{ maxWidth: '300px', marginLeft: '1rem' }} onClick={() => {
-              if (user) {
-                navigate(user.role === 'admin' ? '/employment-dashboard' : '/dashboard');
-              } else {
-                navigate('/');
-              }
-            }}>
-              {user ? 'Back to Dashboard' : 'Back to Job Seeker Dashboard'}
+            <button 
+              type="button" 
+              className="btn secondary-btn" 
+              style={{ maxWidth: '300px', marginLeft: '1rem' }} 
+              onClick={() => {
+                if (location.state?.from === 'employment' && user?.role === 'admin') {
+                  navigate('/employment-dashboard');
+                } else {
+                  navigate('/');
+                }
+              }}
+            >
+              Return to Dashboard
             </button>
           </div>
         </form>

@@ -230,11 +230,11 @@ function EmploymentCenterDashboard({ user }) {
             <FaMapMarkedAlt />
             <h3>Job Location Map</h3>
           </a>
-          <Link to="/job-entry" className="nav-card">
+          <Link to="/job-entry" state={{ from: 'employment' }} className="nav-card">
             <FaBriefcase />
             <h3>Job Entry Form</h3>
           </Link>
-          <Link to="/hot-job-search" className="nav-card">
+          <Link to="/hot-job-search" state={{ from: 'employment' }} className="nav-card">
             <FaSearch />
             <h3>Search for nearby jobs</h3>
           </Link>

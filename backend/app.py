@@ -469,35 +469,92 @@ def submit_job():
             available_jobs_str = ""
 
         current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-
-        row_data = [
-            data.get("company_name", ""),
-            data.get("company_street", ""),
-            data.get("company_city", ""),
-            data.get("company_state", ""),
-            data.get("company_zip", ""),
-            data.get("contact_name", ""),
-            data.get("contact_phone", ""),
-            data.get("contact_email", ""),
-            "TRUE" if data.get("currently_hiring", "Yes") == "Yes" else "FALSE",
-            available_jobs_str,
-            data.get("company_type", ""),
-            data.get("career_website", ""),
-            data.get("notes", ""),
-            current_date,
-            data.get("submitter_name", ""),
-            data.get("submitter_ward", ""),
-            data.get("submitter_stake", ""),
-            data.get("submitter_phone", ""),
-            data.get("submitter_email", "")
-        ]
+        submitter_name = (data.get("entered_by_name") or data.get("submitter_name") or "").strip()
 
         try:
             gc = get_gsheets_client()
             sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
             wks = sh.worksheet_by_title(WORKSHEET_NAME_JOBS)
+
+            # Retrieve headers from sheet to ensure accurate column mapping
+            headers = wks.get_row(1)
+            while headers and not str(headers[-1]).strip():
+                headers.pop()
+
+            field_mapping = {
+                "name": data.get("company_name", ""),
+                "company name": data.get("company_name", ""),
+                "address": data.get("company_street", ""),
+                "company_street": data.get("company_street", ""),
+                "street": data.get("company_street", ""),
+                "city": data.get("company_city", ""),
+                "company_city": data.get("company_city", ""),
+                "state": data.get("company_state", ""),
+                "company_state": data.get("company_state", ""),
+                "zip": data.get("company_zip", ""),
+                "zipcode": data.get("company_zip", ""),
+                "zip code": data.get("company_zip", ""),
+                "company_zip": data.get("company_zip", ""),
+                "hiring contact": data.get("contact_name", ""),
+                "hiring contact name": data.get("contact_name", ""),
+                "contact name": data.get("contact_name", ""),
+                "hiring contact phone": data.get("contact_phone", ""),
+                "contact phone": data.get("contact_phone", ""),
+                "hiring contact email": data.get("contact_email", ""),
+                "contact email": data.get("contact_email", ""),
+                "currently hiring": "TRUE" if data.get("currently_hiring", "Yes") == "Yes" else "FALSE",
+                "available jobs": available_jobs_str,
+                "company type / industry": data.get("company_type", ""),
+                "company type": data.get("company_type", ""),
+                "career page": data.get("career_website", ""),
+                "career website": data.get("career_website", ""),
+                "general notes": data.get("notes", ""),
+                "notes": data.get("notes", ""),
+                "date last verified": current_date,
+                "date entered": current_date,
+                "validated/entered by (name)": submitter_name,
+                "validated by": submitter_name,
+                "entered by": submitter_name,
+                "entered by - name": submitter_name,
+                "ward": data.get("submitter_ward", ""),
+                "stake": data.get("submitter_stake", ""),
+                "phone": data.get("submitter_phone") or data.get("contact_phone", ""),
+                "email": data.get("submitter_email") or data.get("contact_email", "")
+            }
+
+            if headers:
+                row_data = [field_mapping.get(str(h).strip().lower(), "") for h in headers]
+            else:
+                row_data = [
+                    data.get("company_name", ""),
+                    data.get("company_street", ""),
+                    data.get("company_city", ""),
+                    data.get("company_state", ""),
+                    data.get("company_zip", ""),
+                    data.get("contact_name", ""),
+                    data.get("contact_phone", ""),
+                    data.get("contact_email", ""),
+                    "TRUE" if data.get("currently_hiring", "Yes") == "Yes" else "FALSE",
+                    available_jobs_str,
+                    data.get("company_type", ""),
+                    data.get("career_website", ""),
+                    data.get("notes", ""),
+                    "",  # Number of Job Seekers looking for this type of employment
+                    current_date,  # Date last verified
+                    submitter_name,  # Validated/Entered By (Name)
+                    "",  # Requries Action
+                    "",  # Full Address (do not enter this manually)
+                    submitter_name,  # Entered by - Name
+                    data.get("submitter_ward", ""),
+                    data.get("submitter_stake", ""),
+                    data.get("submitter_phone") or data.get("contact_phone", ""),
+                    data.get("submitter_email") or data.get("contact_email", "")
+                ]
+
             col1_vals = wks.get_col(1, include_tailing_empty=False)
             next_row = len(col1_vals) + 1
+            if next_row > wks.rows:
+                wks.add_rows(next_row - wks.rows + 10)
             wks.update_values(crange=f'A{next_row}', values=[row_data])
             invalidate_cache('new_jobs_records')
             invalidate_cache('master_jobs_records')

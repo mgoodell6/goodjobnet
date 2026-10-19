@@ -37,7 +37,7 @@ function Login({ onLogin }) {
           email: data.email || "",
           phone: data.phone || ""
         });
-        navigate('/employment-dashboard');
+        navigate(data.role === 'admin' ? '/employment-dashboard' : '/');
       } else {
         alert((data.error || 'Invalid credentials') + (data.details ? '\n\nDetails: ' + data.details : ''));
       }
