@@ -19,7 +19,8 @@ import {
   FaUsers,
   FaClock,
   FaKeyboard,
-  FaChartPie
+  FaChartPie,
+  FaClone
 } from 'react-icons/fa';
 
 function InformationAndHelp() {
@@ -297,6 +298,13 @@ function InformationAndHelp() {
               <h3><FaBriefcase style={{ color: 'var(--primary-color)' }} /> JSearch Job Ingestion</h3>
               <p>
                 Automated fetch routine querying the RapidAPI JSearch service for featured corporate employers (Walmart, Amazon, Publix, Target, Home Depot, etc.) across the Orlando metro area, appending fresh opportunities to the intake queue.
+              </p>
+            </div>
+
+            <div className="help-feature-card">
+              <h3><FaClone style={{ color: 'var(--primary-color)' }} /> Detect JobBank Address Duplicates</h3>
+              <p>
+                Scans all entries in the <strong>JobBank</strong> spreadsheet, normalizing street addresses and cities to identify potential duplicates. Writes the total count of matching entries into the <code>Potential Duplicate</code> column (or <code>0</code> for unique entries).
               </p>
             </div>
           </div>
