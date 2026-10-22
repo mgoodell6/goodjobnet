@@ -15,6 +15,7 @@ import urllib.request
 import urllib.parse
 import gc as garbage_collector
 from werkzeug.security import generate_password_hash, check_password_hash
+from collections import defaultdict
 
 
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist'))
@@ -3796,6 +3797,146 @@ def update_hot_jobs_map():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Error updating HotJobsMapFile", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
+
+@app.route('/api/detect-jobbank-duplicates', methods=['POST'])
+def detect_jobbank_duplicates():
+    try:
+        gc = get_gsheets_client()
+
+        # Open JobBank spreadsheet
+        try:
+            sh_jb = gc.open_by_key(SPREADSHEET_ID_MASTER_JOBBANK)
+        except Exception:
+            sh_jb = gc.open_by_key(SPREADSHEET_ID_JOBS)
+
+        try:
+            wks_jb = sh_jb.worksheet_by_title("Destinations")
+        except Exception:
+            wks_jb = sh_jb.sheet1
+
+        all_values = wks_jb.get_all_values(include_tailing_empty_rows=False, include_tailing_empty=False)
+        if not all_values or len(all_values) < 2:
+            return jsonify({"success": False, "error": "JobBank spreadsheet has no job entries."}), 400
+
+        headers = list(all_values[0])
+
+        # Locate or add 'Potential Duplicate' column
+        target_header = "potential duplicate"
+        col_idx = -1
+        for i, h in enumerate(headers):
+            if str(h).strip().lower() == target_header:
+                col_idx = i + 1
+                break
+
+        if col_idx == -1:
+            headers.append("Potential Duplicate")
+            wks_jb.update_row(1, headers)
+            col_idx = len(headers)
+
+        # Locate Address and City columns
+        addr_col_idx = -1
+        city_col_idx = -1
+        for i, h in enumerate(headers):
+            h_lower = str(h).strip().lower()
+            if h_lower in ["address", "company_street", "street"] and addr_col_idx == -1:
+                addr_col_idx = i
+            if h_lower in ["city", "county", "company_city"] and city_col_idx == -1:
+                city_col_idx = i
+
+        generic_addresses = {
+            '', 'none', 'n/a', 'na', 'null', 'unknown', 'multiple', 'verify address',
+            'tbd', 'various', 'remote', 'work from home', 'not provided'
+        }
+
+        def normalize_street(addr):
+            if not addr:
+                return ''
+            s = str(addr).lower().strip()
+            if s in generic_addresses:
+                return ''
+            s = re.sub(r'#\s*', ' ste ', s)
+            s = re.sub(r'[^\w\s]', ' ', s)
+            replacements = {
+                'street': 'st', 'road': 'rd', 'boulevard': 'blvd', 'avenue': 'ave',
+                'drive': 'dr', 'court': 'ct', 'lane': 'ln', 'highway': 'hwy',
+                'parkway': 'pkwy', 'circle': 'cir', 'trail': 'trl', 'place': 'pl',
+                'terrace': 'ter', 'way': 'way',
+                'north': 'n', 'south': 's', 'east': 'e', 'west': 'w',
+                'suite': 'ste', 'unit': 'ste', 'apt': 'ste', 'apartment': 'ste'
+            }
+            tokens = [replacements.get(t, t) for t in s.split()]
+            normalized = ' '.join(tokens)
+            return normalized if len(normalized) > 3 else ''
+
+        def normalize_city(city):
+            if not city:
+                return ''
+            s = str(city).lower().strip()
+            s = re.sub(r'[^\w\s]', ' ', s)
+            return ' '.join(s.split())
+
+        address_groups = defaultdict(list)
+        row_keys = []
+
+        for row in all_values[1:]:
+            addr_val = row[addr_col_idx] if addr_col_idx != -1 and addr_col_idx < len(row) else ''
+            city_val = row[city_col_idx] if city_col_idx != -1 and city_col_idx < len(row) else ''
+
+            norm_street = normalize_street(addr_val)
+            norm_city = normalize_city(city_val)
+
+            if norm_street:
+                key = (norm_street, norm_city)
+                address_groups[key].append(row)
+                row_keys.append(key)
+            else:
+                row_keys.append(None)
+
+        update_payload = []
+        duplicate_rows_count = 0
+
+        for key in row_keys:
+            if key is None:
+                val = ''
+            else:
+                total_in_group = len(address_groups[key])
+                if total_in_group > 1:
+                    val = str(total_in_group)
+                    duplicate_rows_count += 1
+                else:
+                    val = '0'
+            update_payload.append([val])
+
+        duplicate_clusters_count = sum(1 for grp in address_groups.values() if len(grp) > 1)
+
+        def col_idx_to_letter(col):
+            letter = ''
+            while col > 0:
+                col, remainder = divmod(col - 1, 26)
+                letter = chr(65 + remainder) + letter
+            return letter
+
+        col_letter = col_idx_to_letter(col_idx)
+        range_str = f"{col_letter}2"
+        wks_jb.update_values(crange=range_str, values=update_payload)
+
+        invalidate_cache('master_jobs_records')
+        invalidate_cache('new_jobs_records')
+
+        return jsonify({
+            "success": True,
+            "message": f"Successfully scanned {len(update_payload)} JobBank entries! Found {duplicate_rows_count} potential duplicates across {duplicate_clusters_count} address locations.",
+            "total_jobs": len(update_payload),
+            "duplicate_rows": duplicate_rows_count,
+            "duplicate_locations": duplicate_clusters_count,
+            "url": sh_jb.url
+        })
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Error detecting duplicates in JobBank", "details": str(e)}), 500
     finally:
         garbage_collector.collect()
 
