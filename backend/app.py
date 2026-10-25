@@ -619,7 +619,8 @@ def search_jobs():
                         "distance": "",
                         "career_website": career_website,
                         "notes": notes_val,
-                        "date_verified": date_verified_str
+                        "date_verified": date_verified_str,
+                        "special_considerations": get_row_field(row, "special_considerations")
                     }
                     if is_currently_hiring and is_verified_recently:
                         recent.append(job_entry)
@@ -639,6 +640,14 @@ def search_jobs():
             garbage_collector.collect()
 
     job_types = data.get("job_types", [])
+    special_considerations = data.get("special_considerations", [])
+    if isinstance(special_considerations, str):
+        special_considerations = [s.strip() for s in special_considerations.split(",") if s.strip()]
+    elif isinstance(special_considerations, list):
+        special_considerations = [str(s).strip() for s in special_considerations if str(s).strip()]
+    else:
+        special_considerations = []
+
     location_mode = data.get("location_mode", "distance")
     target_zipcode = data.get("zipcode", "").strip()
     address = data.get("address", "")
@@ -705,6 +714,27 @@ def search_jobs():
                         break
                 if not match:
                     continue
+
+            # Filter by special considerations
+            if special_considerations:
+                row_sc = str(get_row_field(row, "special_considerations") or "").strip().lower()
+                sc_match = False
+                for sc in special_considerations:
+                    sc_lower = sc.lower()
+                    if "entry level" in sc_lower and "entry level" in row_sc:
+                        sc_match = True
+                        break
+                    elif "background" in sc_lower and "background" in row_sc:
+                        sc_match = True
+                        break
+                    elif "limited english" in sc_lower and "limited english" in row_sc:
+                        sc_match = True
+                        break
+                    elif sc_lower in row_sc:
+                        sc_match = True
+                        break
+                if not sc_match:
+                    continue
             
             # Check location filters
             dist_miles = float('inf')
@@ -759,7 +789,8 @@ def search_jobs():
                 "distance": formatted_dist,
                 "career_website": career_website,
                 "notes": notes_val,
-                "date_verified": date_verified_str
+                "date_verified": date_verified_str,
+                "special_considerations": get_row_field(row, "special_considerations")
             }
             
             # Check verification date

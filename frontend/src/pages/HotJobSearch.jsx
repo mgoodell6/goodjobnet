@@ -8,6 +8,7 @@ function HotJobSearch({ user }) {
   const [locationMode, setLocationMode] = useState('distance');
   const [radius, setRadius] = useState('20');
   const [zipcode, setZipcode] = useState('');
+  const [specialConsiderations, setSpecialConsiderations] = useState([]);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -18,6 +19,12 @@ function HotJobSearch({ user }) {
     } else {
       setRadius('20');
     }
+  };
+
+  const handleSpecialConsiderationChange = (val) => {
+    setSpecialConsiderations(prev =>
+      prev.includes(val) ? prev.filter(item => item !== val) : [...prev, val]
+    );
   };
 
   const handleSearch = async (e) => {
@@ -49,6 +56,7 @@ function HotJobSearch({ user }) {
           search_type: 'type-location',
           location_mode: 'zipcode',
           job_types: jobTypes,
+          special_considerations: specialConsiderations,
           zipcode: targetZip
         };
       } else {
@@ -56,6 +64,7 @@ function HotJobSearch({ user }) {
           search_type: 'type-location',
           location_mode: 'distance',
           job_types: jobTypes,
+          special_considerations: specialConsiderations,
           address: formData.get('address') || '',
           radius: radius || 20
         };
@@ -315,6 +324,62 @@ function HotJobSearch({ user }) {
             </div>
           )}
 
+          {searchMode === 'type-location' && (
+            <div className="input-group full-width" style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>
+              <label>Special Considerations</label>
+              <div className="checkbox-options-grid">
+                <label 
+                  className="checkbox-card-label"
+                  style={{
+                    borderColor: specialConsiderations.includes("Entry Level Position") ? 'var(--primary-color)' : '#ced4da',
+                    background: specialConsiderations.includes("Entry Level Position") ? 'rgba(58, 123, 213, 0.08)' : 'rgba(255, 255, 255, 0.7)'
+                  }}
+                >
+                  <input 
+                    type="checkbox" 
+                    name="special_considerations" 
+                    value="Entry Level Position" 
+                    checked={specialConsiderations.includes("Entry Level Position")}
+                    onChange={() => handleSpecialConsiderationChange("Entry Level Position")}
+                  />
+                  <span>Entry Level Position</span>
+                </label>
+                <label 
+                  className="checkbox-card-label"
+                  style={{
+                    borderColor: specialConsiderations.includes("Background Challenges OK") ? 'var(--primary-color)' : '#ced4da',
+                    background: specialConsiderations.includes("Background Challenges OK") ? 'rgba(58, 123, 213, 0.08)' : 'rgba(255, 255, 255, 0.7)'
+                  }}
+                >
+                  <input 
+                    type="checkbox" 
+                    name="special_considerations" 
+                    value="Background Challenges OK" 
+                    checked={specialConsiderations.includes("Background Challenges OK")}
+                    onChange={() => handleSpecialConsiderationChange("Background Challenges OK")}
+                  />
+                  <span>Background Challenges OK</span>
+                </label>
+                <label 
+                  className="checkbox-card-label"
+                  style={{
+                    borderColor: specialConsiderations.includes("Limited English OK") ? 'var(--primary-color)' : '#ced4da',
+                    background: specialConsiderations.includes("Limited English OK") ? 'rgba(58, 123, 213, 0.08)' : 'rgba(255, 255, 255, 0.7)'
+                  }}
+                >
+                  <input 
+                    type="checkbox" 
+                    name="special_considerations" 
+                    value="Limited English OK" 
+                    checked={specialConsiderations.includes("Limited English OK")}
+                    onChange={() => handleSpecialConsiderationChange("Limited English OK")}
+                  />
+                  <span>Limited English OK</span>
+                </label>
+              </div>
+            </div>
+          )}
+
           <div className="actions mt-2 text-center">
             <button type="submit" className="btn primary-btn" style={{ maxWidth: '300px' }} disabled={loading}>
               {loading ? 'Searching...' : 'Search'}
@@ -350,6 +415,7 @@ function HotJobSearch({ user }) {
                       <th>Role</th>
                       <th>Location</th>
                       <th>Distance</th>
+                      <th>Special Considerations</th>
                       <th>Date Verified</th>
                       <th>Career Website</th>
                       <th>Notes</th>
@@ -362,6 +428,7 @@ function HotJobSearch({ user }) {
                         <td>{job.role}</td>
                         <td>{job.location}</td>
                         <td>{job.distance || 'N/A'}</td>
+                        <td>{job.special_considerations || 'None'}</td>
                         <td>{job.date_verified || 'N/A'}</td>
                         <td>
                           {job.career_website ? (
@@ -386,6 +453,7 @@ function HotJobSearch({ user }) {
                       <th>Role</th>
                       <th>Location</th>
                       <th>Distance</th>
+                      <th>Special Considerations</th>
                       <th>Date Verified</th>
                       <th>Career Website</th>
                       <th>Notes</th>
@@ -398,6 +466,7 @@ function HotJobSearch({ user }) {
                         <td>{job.role}</td>
                         <td>{job.location}</td>
                         <td>{job.distance || 'N/A'}</td>
+                        <td>{job.special_considerations || 'None'}</td>
                         <td>{job.date_verified || 'N/A'}</td>
                         <td>
                           {job.career_website ? (
