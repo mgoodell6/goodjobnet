@@ -400,6 +400,7 @@ def get_row_field(row, field_name, default=""):
         "contact_email": ["Hiring Contact email", "Hiring Contact Email", "Contact Email", "Email Address", "contact_email", "email"],
         "available_jobs": ["Available Jobs", "Availible Jobs", "Job Title", "available_jobs"],
         "notes": ["General Notes", "Any additional Notes", "Notes", "notes"],
+        "special_considerations": ["Special Considerations", "Special Consideration", "special_considerations", "special_consideration"],
         "currently_hiring": ["Currently Hiring", "TRUE ", "currently_hiring"],
         "date_verified": ["Date last verified", "Date data verified", "Date Entered", "Last Date Contacted", "Date"],
         "seekers_looking": [
@@ -472,6 +473,15 @@ def submit_job():
         current_date = datetime.datetime.now().strftime("%Y-%m-%d")
         submitter_name = (data.get("entered_by_name") or data.get("submitter_name") or "").strip()
 
+        # Handle special considerations
+        special_cons_raw = data.get("special_considerations", "")
+        if isinstance(special_cons_raw, list):
+            special_cons_str = ", ".join([str(s).strip() for s in special_cons_raw if str(s).strip()])
+        elif isinstance(special_cons_raw, str):
+            special_cons_str = special_cons_raw.strip()
+        else:
+            special_cons_str = ""
+
         try:
             gc = get_gsheets_client()
             sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
@@ -509,6 +519,8 @@ def submit_job():
                 "company type": data.get("company_type", ""),
                 "career page": data.get("career_website", ""),
                 "career website": data.get("career_website", ""),
+                "special considerations": special_cons_str,
+                "special consideration": special_cons_str,
                 "general notes": data.get("notes", ""),
                 "notes": data.get("notes", ""),
                 "date last verified": current_date,
@@ -539,6 +551,7 @@ def submit_job():
                     available_jobs_str,
                     data.get("company_type", ""),
                     data.get("career_website", ""),
+                    special_cons_str,
                     data.get("notes", ""),
                     "",  # Number of Job Seekers looking for this type of employment
                     current_date,  # Date last verified
@@ -606,7 +619,8 @@ def search_jobs():
                         "distance": "",
                         "career_website": career_website,
                         "notes": notes_val,
-                        "date_verified": date_verified_str
+                        "date_verified": date_verified_str,
+                        "special_considerations": get_row_field(row, "special_considerations")
                     }
                     if is_currently_hiring and is_verified_recently:
                         recent.append(job_entry)
@@ -626,6 +640,14 @@ def search_jobs():
             garbage_collector.collect()
 
     job_types = data.get("job_types", [])
+    special_considerations = data.get("special_considerations", [])
+    if isinstance(special_considerations, str):
+        special_considerations = [s.strip() for s in special_considerations.split(",") if s.strip()]
+    elif isinstance(special_considerations, list):
+        special_considerations = [str(s).strip() for s in special_considerations if str(s).strip()]
+    else:
+        special_considerations = []
+
     location_mode = data.get("location_mode", "distance")
     target_zipcode = data.get("zipcode", "").strip()
     address = data.get("address", "")
@@ -692,6 +714,27 @@ def search_jobs():
                         break
                 if not match:
                     continue
+
+            # Filter by special considerations
+            if special_considerations:
+                row_sc = str(get_row_field(row, "special_considerations") or "").strip().lower()
+                sc_match = False
+                for sc in special_considerations:
+                    sc_lower = sc.lower()
+                    if "entry level" in sc_lower and "entry level" in row_sc:
+                        sc_match = True
+                        break
+                    elif "background" in sc_lower and "background" in row_sc:
+                        sc_match = True
+                        break
+                    elif "limited english" in sc_lower and "limited english" in row_sc:
+                        sc_match = True
+                        break
+                    elif sc_lower in row_sc:
+                        sc_match = True
+                        break
+                if not sc_match:
+                    continue
             
             # Check location filters
             dist_miles = float('inf')
@@ -746,7 +789,8 @@ def search_jobs():
                 "distance": formatted_dist,
                 "career_website": career_website,
                 "notes": notes_val,
-                "date_verified": date_verified_str
+                "date_verified": date_verified_str,
+                "special_considerations": get_row_field(row, "special_considerations")
             }
             
             # Check verification date
@@ -1302,6 +1346,7 @@ def update_hot_job():
             "contact_phone": ["Hiring Contact Phone", "Contact Phone", "Phone", "contact_phone"],
             "contact_email": ["Hiring Contact email", "Hiring Contact Email", "Contact Email", "Email Address", "contact_email", "email"],
             "available_jobs": ["Available Jobs", "Availible Jobs", "Job Title", "available_jobs"],
+            "special_considerations": ["Special Considerations", "Special Consideration", "special_considerations", "special_consideration"],
             "notes": ["General Notes", "Any additional Notes", "Notes", "notes"],
             "currently_hiring": ["Currently Hiring", "TRUE ", "currently_hiring"]
         }
