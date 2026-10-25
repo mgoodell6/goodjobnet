@@ -211,6 +211,15 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* Checkbox specific */
+input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--primary-color);
+}
+
 .checkbox-group {
   display: flex;
   align-items: center;
@@ -219,6 +228,35 @@ input:focus, select:focus, textarea:focus {
 }
 .checkbox-group input {
   width: auto;
+}
+
+.checkbox-options-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.25rem;
+}
+
+.checkbox-card-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: var(--text-dark);
+  user-select: none;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #ced4da;
+  transition: var(--transition);
+}
+
+.checkbox-card-label:hover {
+  background: white;
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 6px rgba(58, 123, 213, 0.1);
 }
 
 /* Navigation / Dashboard Cards */

@@ -36,6 +36,9 @@ function JobEntry({ user }) {
     delete data.available_jobs_select;
     delete data.available_jobs_manual;
 
+    const selectedConsiderations = formData.getAll('special_considerations');
+    data.special_considerations = selectedConsiderations.join(', ');
+
     const enteredName = data.submitter_name ? data.submitter_name.trim() : '';
     data.submitter_name = enteredName || user?.name || '';
     data.entered_by_name = data.submitter_name;
@@ -222,6 +225,36 @@ function JobEntry({ user }) {
                 <option value="Warehousing/Logistics">Warehousing/Logistics</option>
               </select>
               <input type="text" name="available_jobs_manual" placeholder="Other available jobs (comma separated)" style={{ marginTop: '0.5rem' }} />
+            </div>
+
+            <div className="input-group full-width">
+              <label>Special Considerations</label>
+              <div className="checkbox-options-grid">
+                <label className="checkbox-card-label">
+                  <input 
+                    type="checkbox" 
+                    name="special_considerations" 
+                    value="Entry Level Position" 
+                  />
+                  <span>Entry Level Position</span>
+                </label>
+                <label className="checkbox-card-label">
+                  <input 
+                    type="checkbox" 
+                    name="special_considerations" 
+                    value="Background Challenges OK" 
+                  />
+                  <span>Background Challenges OK</span>
+                </label>
+                <label className="checkbox-card-label">
+                  <input 
+                    type="checkbox" 
+                    name="special_considerations" 
+                    value="Limited English OK" 
+                  />
+                  <span>Limited English OK</span>
+                </label>
+              </div>
             </div>
 
             <div className="input-group full-width">

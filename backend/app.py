@@ -400,6 +400,7 @@ def get_row_field(row, field_name, default=""):
         "contact_email": ["Hiring Contact email", "Hiring Contact Email", "Contact Email", "Email Address", "contact_email", "email"],
         "available_jobs": ["Available Jobs", "Availible Jobs", "Job Title", "available_jobs"],
         "notes": ["General Notes", "Any additional Notes", "Notes", "notes"],
+        "special_considerations": ["Special Considerations", "Special Consideration", "special_considerations", "special_consideration"],
         "currently_hiring": ["Currently Hiring", "TRUE ", "currently_hiring"],
         "date_verified": ["Date last verified", "Date data verified", "Date Entered", "Last Date Contacted", "Date"],
         "seekers_looking": [
@@ -472,6 +473,15 @@ def submit_job():
         current_date = datetime.datetime.now().strftime("%Y-%m-%d")
         submitter_name = (data.get("entered_by_name") or data.get("submitter_name") or "").strip()
 
+        # Handle special considerations
+        special_cons_raw = data.get("special_considerations", "")
+        if isinstance(special_cons_raw, list):
+            special_cons_str = ", ".join([str(s).strip() for s in special_cons_raw if str(s).strip()])
+        elif isinstance(special_cons_raw, str):
+            special_cons_str = special_cons_raw.strip()
+        else:
+            special_cons_str = ""
+
         try:
             gc = get_gsheets_client()
             sh = gc.open_by_key(SPREADSHEET_ID_JOBS)
@@ -509,6 +519,8 @@ def submit_job():
                 "company type": data.get("company_type", ""),
                 "career page": data.get("career_website", ""),
                 "career website": data.get("career_website", ""),
+                "special considerations": special_cons_str,
+                "special consideration": special_cons_str,
                 "general notes": data.get("notes", ""),
                 "notes": data.get("notes", ""),
                 "date last verified": current_date,
@@ -539,6 +551,7 @@ def submit_job():
                     available_jobs_str,
                     data.get("company_type", ""),
                     data.get("career_website", ""),
+                    special_cons_str,
                     data.get("notes", ""),
                     "",  # Number of Job Seekers looking for this type of employment
                     current_date,  # Date last verified
@@ -1302,6 +1315,7 @@ def update_hot_job():
             "contact_phone": ["Hiring Contact Phone", "Contact Phone", "Phone", "contact_phone"],
             "contact_email": ["Hiring Contact email", "Hiring Contact Email", "Contact Email", "Email Address", "contact_email", "email"],
             "available_jobs": ["Available Jobs", "Availible Jobs", "Job Title", "available_jobs"],
+            "special_considerations": ["Special Considerations", "Special Consideration", "special_considerations", "special_consideration"],
             "notes": ["General Notes", "Any additional Notes", "Notes", "notes"],
             "currently_hiring": ["Currently Hiring", "TRUE ", "currently_hiring"]
         }
