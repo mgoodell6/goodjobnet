@@ -1022,6 +1022,7 @@ def hot_jobs_review():
                     "contact_email": get_row_field(row, "contact_email"),
                     "currently_hiring": "Yes" if is_hiring_val in ["TRUE", "YES", "1", "Y"] else "No",
                     "available_jobs": get_row_field(row, "available_jobs"),
+                    "special_considerations": get_row_field(row, "special_considerations"),
                     "notes": get_row_field(row, "notes"),
                     "date_last_verified": date_str,
                     "age_days": age_days,
@@ -1113,6 +1114,7 @@ def hot_jobs_review():
                     "contact_email": get_row_field(row, "contact_email"),
                     "currently_hiring": "Yes" if is_hiring_val in ["TRUE", "YES", "1", "Y"] else "No",
                     "available_jobs": available_jobs,
+                    "special_considerations": get_row_field(row, "special_considerations"),
                     "notes": get_row_field(row, "notes"),
                     "date_last_verified": date_str,
                     "age_days": age_days,
@@ -1182,6 +1184,7 @@ def hot_jobs_review():
                     "contact_email": get_row_field(row, "contact_email"),
                     "currently_hiring": "Yes" if is_hiring_val in ["TRUE", "YES", "1", "Y"] else "No",
                     "available_jobs": get_row_field(row, "available_jobs"),
+                    "special_considerations": get_row_field(row, "special_considerations"),
                     "notes": get_row_field(row, "notes"),
                     "date_last_verified": date_str,
                     "age_days": age_days,
@@ -1293,6 +1296,7 @@ def hot_jobs_review():
                 "contact_email": get_row_field(row, "contact_email"),
                 "currently_hiring": "Yes" if is_hiring_val in ["TRUE", "YES", "1", "Y"] else "No",
                 "available_jobs": get_row_field(row, "available_jobs"),
+                "special_considerations": get_row_field(row, "special_considerations"),
                 "notes": get_row_field(row, "notes"),
                 "date_last_verified": date_str,
                 "age_days": age_days,
@@ -1357,6 +1361,13 @@ def update_hot_job():
                 val = data[key]
                 if key == "currently_hiring":
                     val = "TRUE" if val == "Yes" else "FALSE"
+                elif key == "special_considerations":
+                    if isinstance(val, list):
+                        val = ", ".join([str(s).strip() for s in val if str(s).strip()])
+                    elif isinstance(val, str):
+                        val = val.strip()
+                    else:
+                        val = ""
 
                 # Find matching header
                 col_idx = -1
