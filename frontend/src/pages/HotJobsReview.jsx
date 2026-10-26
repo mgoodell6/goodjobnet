@@ -214,9 +214,10 @@ function HotJobsReview({ user }) {
     const contactPhoneFormatted = job.contact_phone ? job.contact_phone.split('').join(' ') : "not listed";
     const companyType = (job.company_type && job.company_type.trim()) ? job.company_type : "Nothing entered";
     const currentlyHiring = (job.currently_hiring === 'TRUE' || job.currently_hiring === 'Yes' || job.currently_hiring === true || String(job.currently_hiring).toUpperCase() === 'TRUE') ? 'Yes' : 'No';
+    const specConsText = (job.special_considerations && job.special_considerations.trim()) ? `. Special Considerations: ${job.special_considerations}` : "";
     const notesText = `. Additional Notes: ${(job.notes && job.notes.trim()) ? job.notes : "None"}`;
     const ageText = job.age_days === 9999 ? '. Never verified' : `. Age: ${job.age_days} days`;
-    const text = `Company: ${job.company_name || 'unknown'}. Company Type: ${companyType}. Currently Hiring: ${currentlyHiring}. Available Jobs: ${available}. Contact Phone: ${contactPhoneFormatted}${notesText}${ageText}.`;
+    const text = `Company: ${job.company_name || 'unknown'}. Company Type: ${companyType}. Currently Hiring: ${currentlyHiring}. Available Jobs: ${available}${specConsText}. Contact Phone: ${contactPhoneFormatted}${notesText}${ageText}.`;
     speak(text);
   };
 
@@ -1302,6 +1303,9 @@ function HotJobsReview({ user }) {
     delete data.available_jobs_select;
     delete data.available_jobs_manual;
 
+    const selectedConsiderations = formData.getAll('special_considerations');
+    data.special_considerations = selectedConsiderations.join(', ');
+
     if (user && user.name) {
       data.submitter_name = user.name;
     }
@@ -1710,6 +1714,11 @@ function HotJobsReview({ user }) {
             const matchedJobs = existingJobs.filter(j => JOB_OPTIONS.includes(j));
             const unmatchedJobs = existingJobs.filter(j => !JOB_OPTIONS.includes(j));
 
+            const existingSC = (currentJob.special_considerations || '').toLowerCase();
+            const isEntryLevel = existingSC.includes('entry level');
+            const isBackground = existingSC.includes('background');
+            const isLimitedEnglish = existingSC.includes('limited english');
+
             return (
               <div className="form-grid">
                 <div className="input-group">
@@ -1819,6 +1828,39 @@ function HotJobsReview({ user }) {
                     {JOB_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                   <input type="text" name="available_jobs_manual" defaultValue={unmatchedJobs.join(', ')} placeholder="Other available jobs (comma separated)" style={{ marginTop: '0.5rem' }} />
+                </div>
+
+                <div className="input-group full-width">
+                  <label>Special Considerations</label>
+                  <div className="checkbox-options-grid">
+                    <label className="checkbox-card-label">
+                      <input 
+                        type="checkbox" 
+                        name="special_considerations" 
+                        value="Entry Level Position" 
+                        defaultChecked={isEntryLevel}
+                      />
+                      <span>Entry Level Position</span>
+                    </label>
+                    <label className="checkbox-card-label">
+                      <input 
+                        type="checkbox" 
+                        name="special_considerations" 
+                        value="Background Challenges OK" 
+                        defaultChecked={isBackground}
+                      />
+                      <span>Background Challenges OK</span>
+                    </label>
+                    <label className="checkbox-card-label">
+                      <input 
+                        type="checkbox" 
+                        name="special_considerations" 
+                        value="Limited English OK" 
+                        defaultChecked={isLimitedEnglish}
+                      />
+                      <span>Limited English OK</span>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="input-group full-width">
