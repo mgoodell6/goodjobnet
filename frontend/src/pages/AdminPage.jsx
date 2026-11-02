@@ -1,6 +1,19 @@
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { FaShieldAlt, FaUser, FaBriefcase, FaUserTie, FaSync, FaCloudDownloadAlt, FaExternalLinkAlt, FaMapMarkedAlt, FaClone } from 'react-icons/fa';
+import { FaShieldAlt, FaUser, FaBriefcase, FaUserTie, FaSync, FaCloudDownloadAlt, FaExternalLinkAlt, FaMapMarkedAlt, FaClone, FaChartBar } from 'react-icons/fa';
+
+const USAGE_LABELS = {
+  job_location_map: 'Job Location Map',
+  nearby_jobs_search: 'Search for nearby jobs',
+  review_hot_jobs: 'Review Hot Jobs',
+  verify_assigned_seekers_jobs: 'Verify Jobs for My Assigned Seekers'
+};
+
+const USAGE_RANGES = [
+  { key: 'last_7', label: '7 days' },
+  { key: 'last_30', label: '30 days' },
+  { key: 'totals', label: 'All time' }
+];
 
 function AdminPage({ user }) {
   const navigate = useNavigate();
@@ -20,6 +33,25 @@ function AdminPage({ user }) {
   const [mapStatus, setMapStatus] = useState(null);
   const [detectingDups, setDetectingDups] = useState(false);
   const [dupStatus, setDupStatus] = useState(null);
+  const [usage, setUsage] = useState(null);
+  const [usageError, setUsageError] = useState(null);
+  const [usageRange, setUsageRange] = useState('last_30');
+
+  useEffect(() => {
+    fetch('/api/usage-stats')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setUsage(data);
+        } else {
+          setUsageError(data.error || 'Failed to load usage stats.');
+        }
+      })
+      .catch(err => {
+        setUsageError('Network error loading usage stats.');
+        console.error('Error fetching usage stats:', err);
+      });
+  }, []);
 
   useEffect(() => {
     fetch('/api/dashboard-stats')
@@ -449,6 +481,92 @@ function AdminPage({ user }) {
             )}
           </div>
         )}
+
+        {/* Usage Tracking */}
+        <div style={{ background: 'rgba(255, 255, 255, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '1.5rem', marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.2rem', color: 'var(--text-dark)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <FaChartBar style={{ color: 'var(--primary-color)' }} /> Dashboard Usage
+            </h2>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              {USAGE_RANGES.map(r => (
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() => setUsageRange(r.key)}
+                  className={`btn ${usageRange === r.key ? 'primary-btn' : 'secondary-btn'}`}
+                  style={{ width: 'auto', padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
+                >
+                  {r.label}
+                </button>
+              ))}
+              {usage?.sheet_url && (
+                <a href={usage.sheet_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                  Open sheet <FaExternalLinkAlt style={{ fontSize: '0.7rem' }} />
+                </a>
+              )}
+            </div>
+          </div>
+
+          {usageError && <p style={{ color: 'var(--error)' }}>{usageError}</p>}
+          {!usage && !usageError && <p style={{ color: 'var(--text-light)' }}>Loading usage stats...</p>}
+
+          {usage && (
+            <>
+              <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>Job Seeker Dashboard (anonymous)</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                {usage.job_seeker.targets.map(t => (
+                  <div key={t} style={{ background: 'white', borderRadius: '10px', padding: '1rem', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>{USAGE_LABELS[t] || t}</div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--primary-color)' }}>{usage.job_seeker[usageRange][t] ?? 0}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>
+                      clicks{usageRange === 'last_30' ? ` · ${usage.job_seeker.unique_sessions_30[t] ?? 0} unique visitors` : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>Employment Center Dashboard (staff)</h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', background: 'white', borderRadius: '10px' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--glass-border)' }}>
+                      <th style={{ padding: '0.5rem' }}>User</th>
+                      {usage.employment_center.targets.map(t => (
+                        <th key={t} style={{ padding: '0.5rem', textAlign: 'center' }}>{USAGE_LABELS[t] || t}</th>
+                      ))}
+                      <th style={{ padding: '0.5rem' }}>Last Click</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usage.employment_center.by_user.length === 0 && (
+                      <tr><td colSpan={usage.employment_center.targets.length + 2} style={{ padding: '0.75rem', textAlign: 'center', color: 'var(--text-light)' }}>No staff clicks logged yet.</td></tr>
+                    )}
+                    {usage.employment_center.by_user.map(u => (
+                      <tr key={u.username || '(blank)'} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                        <td style={{ padding: '0.5rem' }}>
+                          <strong>{u.name || u.username}</strong>
+                          {u.username && <span style={{ color: 'var(--text-light)' }}> ({u.username})</span>}
+                        </td>
+                        {usage.employment_center.targets.map(t => (
+                          <td key={t} style={{ padding: '0.5rem', textAlign: 'center' }}>{u[usageRange]?.[t] ?? 0}</td>
+                        ))}
+                        <td style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>{(u.last_click || '').replace('T', ' ')}</td>
+                      </tr>
+                    ))}
+                    <tr style={{ borderTop: '2px solid var(--glass-border)', fontWeight: 700 }}>
+                      <td style={{ padding: '0.5rem' }}>All staff</td>
+                      {usage.employment_center.targets.map(t => (
+                        <td key={t} style={{ padding: '0.5rem', textAlign: 'center' }}>{usage.employment_center[usageRange][t] ?? 0}</td>
+                      ))}
+                      <td></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Actions Footer */}
         <div className="actions mt-2 text-center" style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>

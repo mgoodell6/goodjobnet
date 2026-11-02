@@ -14,6 +14,8 @@ import io
 import urllib.request
 import urllib.parse
 import gc as garbage_collector
+import threading
+import atexit
 from werkzeug.security import generate_password_hash, check_password_hash
 from collections import defaultdict
 
@@ -38,6 +40,9 @@ WORKSHEET_NAME_SEEKERS = 'Sheet1'
 SPREADSHEET_ID_JOBSEEKERS_CSV_EXPORT = '1khmTUewP3EJremrR388R4-rjLZ8ej0RcnGyCfLFYpuY'
 SPREADSHEET_ID_PHONE_VERIFICATION = '1aUTms82Rgci168ATaD7XcyU1SFUjjnq4HxamxRJtFQw'
 SPREADSHEET_ID_HOT_JOBS_MAP = '1IlSEHWOyN7fr0osR4IMEyhc-UvxGCI7bUtbTbCRUBlY'
+SPREADSHEET_ID_USAGE_TRACKING = '1tGEEXUo5AIV1H0vMsiDGS9ImzbJ5sRfDaphOAVXvGvY'  # GoodJobNet_Usage
+WORKSHEET_NAME_JOBSEEKER_USAGE = 'JobSeekerUsage'
+WORKSHEET_NAME_EMPLOYMENT_CENTER_USAGE = 'EmploymentCenterUsage'
 
 
 _gsheets_client = None
@@ -1877,6 +1882,7 @@ def login():
                     return jsonify({
                         "success": True, 
                         "token": "dummy_token", 
+                        "username": row.get("Username", ""),
                         "role": row.get("Role", "user"),
                         "name": row.get("Name", ""),
                         "ward": row.get("Ward", ""),
@@ -3993,6 +3999,323 @@ def detect_jobbank_duplicates():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Error detecting duplicates in JobBank", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
+
+# ---------------------------------------------------------------------------
+# Usage Tracking (JobSeekerDashboard + EmploymentCenterDashboard button clicks)
+# Events are buffered in memory and written in batches to the GoodJobNet_Usage
+# spreadsheet to stay within Google Sheets API quotas.
+# ---------------------------------------------------------------------------
+USAGE_PAGE_JOB_SEEKER = 'job_seeker_dashboard'
+USAGE_PAGE_EMPLOYMENT_CENTER = 'employment_center_dashboard'
+
+USAGE_TRACKABLE = {
+    USAGE_PAGE_JOB_SEEKER: {'job_location_map', 'nearby_jobs_search'},
+    USAGE_PAGE_EMPLOYMENT_CENTER: {'review_hot_jobs', 'nearby_jobs_search', 'verify_assigned_seekers_jobs'},
+}
+
+USAGE_WORKSHEETS = {
+    USAGE_PAGE_JOB_SEEKER: WORKSHEET_NAME_JOBSEEKER_USAGE,
+    USAGE_PAGE_EMPLOYMENT_CENTER: WORKSHEET_NAME_EMPLOYMENT_CENTER_USAGE,
+}
+
+USAGE_HEADERS = {
+    USAGE_PAGE_JOB_SEEKER: ["Timestamp", "Date", "Page", "Target", "Session ID", "Device Type"],
+    USAGE_PAGE_EMPLOYMENT_CENTER: ["Timestamp", "Date", "Page", "Target", "Username", "Name"],
+}
+
+USAGE_FLUSH_BATCH_SIZE = 25
+USAGE_FLUSH_INTERVAL_SECONDS = 60
+USAGE_DEDUPE_SECONDS = 10
+USAGE_IP_LIMIT_PER_HOUR = 60
+
+_usage_lock = threading.Lock()
+_usage_buffer = {USAGE_PAGE_JOB_SEEKER: [], USAGE_PAGE_EMPLOYMENT_CENTER: []}
+_usage_last_flush = time.time()
+_usage_flush_timer = None
+_usage_recent_clicks = {}   # (dedupe_key, target) -> last timestamp
+_usage_ip_counts = {}       # ip -> [window_start, count]
+
+
+def _usage_client_ip():
+    forwarded = request.headers.get('X-Forwarded-For', '')
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    return request.remote_addr or 'unknown'
+
+
+def _usage_rate_limited(ip):
+    now = time.time()
+    window_start, count = _usage_ip_counts.get(ip, [now, 0])
+    if now - window_start > 3600:
+        window_start, count = now, 0
+    count += 1
+    _usage_ip_counts[ip] = [window_start, count]
+    if len(_usage_ip_counts) > 5000:
+        # Prevent unbounded growth: drop expired windows
+        for k in [k for k, v in _usage_ip_counts.items() if now - v[0] > 3600]:
+            del _usage_ip_counts[k]
+    return count > USAGE_IP_LIMIT_PER_HOUR
+
+
+def _usage_is_duplicate(dedupe_key, target):
+    now = time.time()
+    key = (dedupe_key, target)
+    last = _usage_recent_clicks.get(key)
+    _usage_recent_clicks[key] = now
+    if len(_usage_recent_clicks) > 5000:
+        for k in [k for k, v in _usage_recent_clicks.items() if now - v > USAGE_DEDUPE_SECONDS]:
+            del _usage_recent_clicks[k]
+    return last is not None and (now - last) < USAGE_DEDUPE_SECONDS
+
+
+def _usage_lookup_admin(username):
+    """Return the Users sheet row for an approved admin matching username, else None."""
+    uname = str(username).strip().lower()
+    if not uname:
+        return None
+    for row in get_users_records():
+        if str(row.get("Username", "")).strip().lower() == uname:
+            approved_val = str(row.get("Approved", "TRUE")).strip().upper()
+            role = str(row.get("Role", "")).strip().lower()
+            if approved_val in ["TRUE", "YES", "1", "Y"] and role == 'admin':
+                return row
+            return None
+    return None
+
+
+def _usage_get_worksheet(page):
+    gc = get_gsheets_client()
+    sh = gc.open_by_key(SPREADSHEET_ID_USAGE_TRACKING)
+    return sh.worksheet_by_title(USAGE_WORKSHEETS[page])
+
+
+def flush_usage_buffer():
+    """Write all buffered usage events to Google Sheets. Safe to call any time."""
+    global _usage_last_flush
+    with _usage_lock:
+        pending = {page: rows for page, rows in _usage_buffer.items() if rows}
+        for page in pending:
+            _usage_buffer[page] = []
+        _usage_last_flush = time.time()
+
+    for page, rows in pending.items():
+        try:
+            wks = _usage_get_worksheet(page)
+            first_row = [c for c in wks.get_row(1) if str(c).strip()]
+            if not first_row:
+                wks.update_row(1, USAGE_HEADERS[page])
+            wks.append_table(values=rows, start='A1', dimension='ROWS', overwrite=False)
+            invalidate_cache(f'usage_rows_{page}')
+        except Exception as e:
+            print(f"Failed to flush usage events for {page}: {e}")
+            # Put events back so they are retried on the next flush
+            with _usage_lock:
+                _usage_buffer[page] = rows + _usage_buffer[page]
+
+
+def _usage_schedule_flush():
+    global _usage_flush_timer
+    if _usage_flush_timer is None or not _usage_flush_timer.is_alive():
+        _usage_flush_timer = threading.Timer(USAGE_FLUSH_INTERVAL_SECONDS, _usage_timer_flush)
+        _usage_flush_timer.daemon = True
+        _usage_flush_timer.start()
+
+
+def _usage_timer_flush():
+    global _usage_flush_timer
+    _usage_flush_timer = None
+    flush_usage_buffer()
+    with _usage_lock:
+        has_pending = any(_usage_buffer.values())
+    if has_pending:
+        _usage_schedule_flush()
+
+
+atexit.register(flush_usage_buffer)
+
+
+@app.route('/api/track-click', methods=['POST'])
+def track_click():
+    try:
+        data = request.get_json(silent=True, force=True) or {}
+        page = str(data.get('page', '')).strip()
+        target = str(data.get('target', '')).strip()
+
+        if page not in USAGE_TRACKABLE or target not in USAGE_TRACKABLE[page]:
+            return jsonify({"success": False, "error": "Invalid tracking event"}), 400
+
+        if _usage_rate_limited(_usage_client_ip()):
+            return ('', 204)
+
+        now = datetime.datetime.now()
+        timestamp = now.strftime("%Y-%m-%dT%H:%M:%S")
+        date_str = now.strftime("%Y-%m-%d")
+
+        if page == USAGE_PAGE_EMPLOYMENT_CENTER:
+            submitted_username = str(data.get('username') or '').strip()
+            username, name = '', ''
+            if submitted_username:
+                admin_row = _usage_lookup_admin(submitted_username)
+                if admin_row is None:
+                    return jsonify({"success": False, "error": "Unknown user"}), 403
+                username = str(admin_row.get("Username", "")).strip()
+                name = str(admin_row.get("Name", "")).strip()
+            # Users logged in before 'username' was added to the login response send no
+            # username; their clicks are still counted with a blank username.
+            dedupe_key = username or str(data.get('session_id') or _usage_client_ip())
+            row = [timestamp, date_str, page, target, username, name]
+        else:
+            session_id = str(data.get('session_id') or '')[:64]
+            ua = (request.headers.get('User-Agent') or '')
+            device = 'mobile' if re.search(r'Mobi|Android|iPhone|iPad', ua) else 'desktop'
+            dedupe_key = session_id or _usage_client_ip()
+            row = [timestamp, date_str, page, target, session_id, device]
+
+        if _usage_is_duplicate(dedupe_key, target):
+            return ('', 204)
+
+        with _usage_lock:
+            _usage_buffer[page].append(row)
+            should_flush = (
+                sum(len(v) for v in _usage_buffer.values()) >= USAGE_FLUSH_BATCH_SIZE
+                or (time.time() - _usage_last_flush) >= USAGE_FLUSH_INTERVAL_SECONDS
+            )
+
+        if should_flush:
+            threading.Thread(target=flush_usage_buffer, daemon=True).start()
+        else:
+            _usage_schedule_flush()
+
+        return ('', 204)
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+
+
+def _usage_get_rows(page):
+    """Return logged rows (sheet + unflushed buffer) as lists in USAGE_HEADERS order."""
+    def fetch_rows():
+        wks = _usage_get_worksheet(page)
+        values = wks.get_all_values(include_tailing_empty_rows=False, include_tailing_empty=False)
+        if not values:
+            return []
+        header = [str(h).strip().lower() for h in values[0]]
+        expected = [h.lower() for h in USAGE_HEADERS[page]]
+        if 'target' in header:
+            idx = [header.index(h) if h in header else None for h in expected]
+            body = values[1:]
+        else:
+            idx = list(range(len(expected)))
+            body = values
+        rows = []
+        for r in body:
+            rows.append([(r[i] if i is not None and i < len(r) else '') for i in idx])
+        return rows
+
+    rows = list(get_cached_data(f'usage_rows_{page}', fetch_rows))
+    with _usage_lock:
+        rows.extend(list(_usage_buffer[page]))
+    return rows
+
+
+def _usage_summarize(rows, targets, now):
+    totals = {t: 0 for t in targets}
+    last_7 = {t: 0 for t in targets}
+    last_30 = {t: 0 for t in targets}
+    daily = {}
+    cutoff_30 = (now - datetime.timedelta(days=29)).date()
+    cutoff_7 = (now - datetime.timedelta(days=6)).date()
+    for r in rows:
+        date_val, target = r[1], r[3]
+        if target not in totals:
+            continue
+        totals[target] += 1
+        d = parse_date_string(date_val)
+        if not d:
+            continue
+        d = d.date()
+        if d >= cutoff_30:
+            last_30[target] += 1
+            day = daily.setdefault(d.isoformat(), {t: 0 for t in targets})
+            day[target] += 1
+        if d >= cutoff_7:
+            last_7[target] += 1
+    daily_list = [dict(date=k, **v) for k, v in sorted(daily.items())]
+    return totals, last_7, last_30, daily_list
+
+
+@app.route('/api/usage-stats', methods=['GET'])
+def usage_stats():
+    try:
+        now = datetime.datetime.now()
+        cutoff_30 = (now - datetime.timedelta(days=29)).date()
+        cutoff_7 = (now - datetime.timedelta(days=6)).date()
+
+        # Job seeker dashboard (anonymous)
+        js_targets = sorted(USAGE_TRACKABLE[USAGE_PAGE_JOB_SEEKER])
+        js_rows = _usage_get_rows(USAGE_PAGE_JOB_SEEKER)
+        js_totals, js_7, js_30, js_daily = _usage_summarize(js_rows, js_targets, now)
+        unique_sessions_30 = {t: set() for t in js_targets}
+        for r in js_rows:
+            d = parse_date_string(r[1])
+            if r[3] in unique_sessions_30 and r[4] and d and d.date() >= cutoff_30:
+                unique_sessions_30[r[3]].add(r[4])
+
+        # Employment center dashboard (staff, by username)
+        ec_targets = sorted(USAGE_TRACKABLE[USAGE_PAGE_EMPLOYMENT_CENTER])
+        ec_rows = _usage_get_rows(USAGE_PAGE_EMPLOYMENT_CENTER)
+        ec_totals, ec_7, ec_30, ec_daily = _usage_summarize(ec_rows, ec_targets, now)
+        by_user = {}
+        for r in ec_rows:
+            target = r[3]
+            if target not in ec_totals:
+                continue
+            username = r[4] or ''
+            entry = by_user.setdefault(username, {
+                "username": username,
+                "name": r[5] or ('(unknown - not re-logged in)' if not username else ''),
+                "totals": {t: 0 for t in ec_targets},
+                "last_7": {t: 0 for t in ec_targets},
+                "last_30": {t: 0 for t in ec_targets},
+                "last_click": ""
+            })
+            if r[5] and not entry["name"]:
+                entry["name"] = r[5]
+            entry["totals"][target] += 1
+            d = parse_date_string(r[1])
+            if d and d.date() >= cutoff_30:
+                entry["last_30"][target] += 1
+            if d and d.date() >= cutoff_7:
+                entry["last_7"][target] += 1
+            if str(r[0]) > entry["last_click"]:
+                entry["last_click"] = str(r[0])
+
+        return jsonify({
+            "success": True,
+            "job_seeker": {
+                "targets": js_targets,
+                "totals": js_totals,
+                "last_7": js_7,
+                "last_30": js_30,
+                "unique_sessions_30": {t: len(s) for t, s in unique_sessions_30.items()},
+                "daily": js_daily
+            },
+            "employment_center": {
+                "targets": ec_targets,
+                "totals": ec_totals,
+                "last_7": ec_7,
+                "last_30": ec_30,
+                "by_user": sorted(by_user.values(), key=lambda u: u["last_click"], reverse=True),
+                "daily": ec_daily
+            },
+            "sheet_url": f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID_USAGE_TRACKING}"
+        })
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Error loading usage stats", "details": str(e)}), 500
     finally:
         garbage_collector.collect()
 

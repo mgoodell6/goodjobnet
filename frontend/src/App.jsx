@@ -13,7 +13,7 @@ import AdminPage from './pages/AdminPage';
 
 // Manual Version Configuration - Update this string to change the application version displayed in the header
 
-const APP_VERSION = "Beta v0.29";
+const APP_VERSION = "Beta v0.30";
 
 
 
@@ -81,8 +81,8 @@ function App() {
       <TopBar user={user} handleLogout={handleLogout} />
 
       <Routes>
-        <Route path="/" element={<JobSeekerDashboard />} />
-        <Route path="/job-seeker-dashboard" element={<JobSeekerDashboard />} />
+        <Route path="/" element={<JobSeekerDashboard user={user} />} />
+        <Route path="/job-seeker-dashboard" element={<JobSeekerDashboard user={user} />} />
         <Route path="/dashboard" element={<Navigate to="/" replace />} />
         <Route path="/hot-job-search" element={<HotJobSearch user={user} />} />
         <Route path="/job-entry" element={<JobEntry user={user} />} />

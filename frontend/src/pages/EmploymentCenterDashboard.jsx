@@ -1,9 +1,13 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { FaBriefcase, FaUserTie, FaSearch, FaMapMarkedAlt } from 'react-icons/fa';
 import { useState, useEffect } from 'react';
+import { trackClick } from '../utils/tracking';
 
 function EmploymentCenterDashboard({ user }) {
   const navigate = useNavigate();
+
+  // Usage tracking: username is blank for sessions saved before login returned it.
+  const trackStaff = (target) => trackClick(target, 'employment_center_dashboard', user?.username || null);
 
   const [stats, setStats] = useState({
     unverified_jobseekers_count: '...',
@@ -185,7 +189,7 @@ function EmploymentCenterDashboard({ user }) {
             {renderPieChart(stats.seeker_types, stats.total_job_seekers, sharedColorMap, "No job seekers currently active")}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
               <Link to="/assigned-job-seekers" className="btn primary-btn" style={{ width: 'auto', background: '#8e44ad' }}>Show my assigned Job Seekers list</Link>
-              <Link to="/hot-jobs-review?category=my_assigned_seekers" className="btn secondary-btn" style={{ width: 'auto', borderColor: '#8e44ad', color: '#8e44ad' }}>Verify Jobs for My Assigned Seekers</Link>
+              <Link to="/hot-jobs-review?category=my_assigned_seekers" className="btn secondary-btn" style={{ width: 'auto', borderColor: '#8e44ad', color: '#8e44ad' }} onClick={() => trackStaff('verify_assigned_seekers_jobs')}>Verify Jobs for My Assigned Seekers</Link>
             </div>
           </div>
         </div>
@@ -214,7 +218,7 @@ function EmploymentCenterDashboard({ user }) {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
             <div style={{ display: 'flex', gap: '1rem' }}>
-              <Link to="/hot-jobs-review" className="btn primary-btn" style={{ background: '#e74c3c', flex: 1 }}>
+              <Link to="/hot-jobs-review" className="btn primary-btn" style={{ background: '#e74c3c', flex: 1 }} onClick={() => trackStaff('review_hot_jobs')}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                   <FaBriefcase /> Review Hot Jobs
                 </div>
@@ -234,7 +238,7 @@ function EmploymentCenterDashboard({ user }) {
             <FaBriefcase />
             <h3>Job Entry Form</h3>
           </Link>
-          <Link to="/hot-job-search" state={{ from: 'employment' }} className="nav-card">
+          <Link to="/hot-job-search" state={{ from: 'employment' }} className="nav-card" onClick={() => trackStaff('nearby_jobs_search')}>
             <FaSearch />
             <h3>Search for nearby jobs</h3>
           </Link>

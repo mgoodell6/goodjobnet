@@ -1,7 +1,14 @@
 import { Link } from 'react-router-dom';
 import { FaMapMarkedAlt, FaSearch, FaBriefcase } from 'react-icons/fa';
+import { trackClick } from '../utils/tracking';
 
-function JobSeekerDashboard() {
+function JobSeekerDashboard({ user }) {
+  // Usage tracking (anonymous). Staff clicks are skipped so they don't skew job seeker counts.
+  const track = (target) => {
+    if (user?.role === 'admin') return;
+    trackClick(target, 'job_seeker_dashboard');
+  };
+
   return (
     <div className="app-container">
       <div className="glass-panel main-form">
@@ -15,7 +22,7 @@ function JobSeekerDashboard() {
         </div>
 
         <div className="nav-grid">
-          <a href="https://www.google.com/maps/d/u/0/edit?mid=1YnckZ2k4jyCu6Agxg4VX0EyWK49puuo&ll=28.284392717060463%2C-82.04171770869505&z=9" target="_blank" rel="noopener noreferrer" className="nav-card">
+          <a href="https://www.google.com/maps/d/u/0/edit?mid=1YnckZ2k4jyCu6Agxg4VX0EyWK49puuo&ll=28.284392717060463%2C-82.04171770869505&z=9" target="_blank" rel="noopener noreferrer" className="nav-card" onClick={() => track('job_location_map')} onAuxClick={() => track('job_location_map')}>
             <FaMapMarkedAlt />
             <h3>Job Location Map</h3>
           </a>
@@ -23,7 +30,7 @@ function JobSeekerDashboard() {
             <FaBriefcase />
             <h3>Job Entry Form</h3>
           </Link>
-          <Link to="/hot-job-search" state={{ from: 'job-seeker' }} className="nav-card">
+          <Link to="/hot-job-search" state={{ from: 'job-seeker' }} className="nav-card" onClick={() => track('nearby_jobs_search')}>
             <FaSearch />
             <h3>Search for nearby jobs</h3>
           </Link>
