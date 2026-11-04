@@ -171,6 +171,41 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px rgba(58, 123, 213, 0.1);
 }
 
+/* Highlighted primary field (e.g. Available Jobs on the Job Entry form) */
+.primary-field-highlight {
+  background: #fff8e1;
+  border: 2px solid #f5b041;
+  border-left: 6px solid #f39c12;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+}
+
+.primary-field-highlight label {
+  font-weight: 700;
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.primary-field-highlight input,
+.primary-field-highlight select {
+  border: 2px solid #f39c12;
+  font-size: 1.05rem;
+}
+
+.primary-field-highlight input:focus,
+.primary-field-highlight select:focus {
+  border-color: #e67e22;
+  box-shadow: 0 0 0 4px rgba(243, 156, 18, 0.25);
+}
+
+.primary-field-hint {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-light);
+}
+
 /* Buttons */
 .btn {
   padding: 0.8rem 1.5rem;
