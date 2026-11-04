@@ -408,6 +408,7 @@ def get_row_field(row, field_name, default=""):
         "special_considerations": ["Special Considerations", "Special Consideration", "special_considerations", "special_consideration"],
         "currently_hiring": ["Currently Hiring", "TRUE ", "currently_hiring"],
         "date_verified": ["Date last verified", "Date data verified", "Date Entered", "Last Date Contacted", "Date"],
+        "validated_by": ["Validated/Entered By (Name)", "validated/entered by (name)", "Validated by", "validated by", "Validated By"],
         "seekers_looking": [
             "Number of Job Seekers looking for this type of employment",
             "Number of Job Seekers",
@@ -856,6 +857,7 @@ def dashboard_stats():
         ]
         
         job_type_counts = {}
+        validated_by_counts = {}
         total_hot_jobs_matched = 0
         
         for row in all_records:
@@ -896,6 +898,10 @@ def dashboard_stats():
                             matched_type = st
                             break
                     job_type_counts[matched_type] = job_type_counts.get(matched_type, 0) + 1
+
+                    validator = str(get_row_field(row, "validated_by", "")).strip()
+                    validator = validator if validator else "Unknown"
+                    validated_by_counts[validator] = validated_by_counts.get(validator, 0) + 1
                 
         # 1b. Get stats from Phone_Verification_List for Phone Verification Queue
         try:
@@ -962,6 +968,7 @@ def dashboard_stats():
             "total_hot_jobs": total_hot_jobs,
             "total_job_seekers": total_seekers_matched,
             "job_types": job_type_counts,
+            "validated_by_counts": validated_by_counts,
             "seeker_types": seeker_type_counts,
             "unverified_no_career_count": unverified_no_career_count
         })
