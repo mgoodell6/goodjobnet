@@ -62,10 +62,6 @@ function EmploymentCenterDashboard({ user }) {
 
           <div className="stat-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center', minHeight: '280px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
             {/* Placeholder: future metric (previously "Job Seekers by Desired Type" pie chart) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
-              <Link to="/assigned-job-seekers" className="btn primary-btn" style={{ width: 'auto', background: '#8e44ad' }}>Show my assigned Job Seekers list</Link>
-              <Link to="/hot-jobs-review?category=my_assigned_seekers" className="btn secondary-btn" style={{ width: 'auto', borderColor: '#8e44ad', color: '#8e44ad' }} onClick={() => trackStaff('verify_assigned_seekers_jobs')}>Verify Jobs for My Assigned Seekers</Link>
-            </div>
           </div>
         </div>
 

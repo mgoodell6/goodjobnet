@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useState } from 'react';
+import { trackClick } from './utils/tracking';
 import Login from './pages/Login';
 import JobEntry from './pages/JobEntry';
 import HotJobSearch from './pages/HotJobSearch';
@@ -42,6 +43,10 @@ function TopBar({ user, handleLogout }) {
         <div>GoodJobNet - <span style={{ color: 'red' }}>{APP_VERSION}</span></div>
         <div style={{ fontSize: '0.75rem', fontWeight: '400', color: 'var(--text-light)', marginTop: '2px' }}>Click here to return to dashboard</div>
       </Link>
+      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <Link to="/assigned-job-seekers" className="btn primary-btn" style={{ background: '#8e44ad', padding: '0.4rem 1rem', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>Show my assigned Job Seekers list</Link>
+        <Link to="/hot-jobs-review?category=my_assigned_seekers" className="btn secondary-btn" style={{ padding: '0.4rem 1rem', fontSize: '0.9rem', whiteSpace: 'nowrap', borderColor: '#8e44ad', color: '#8e44ad' }} onClick={() => trackClick('verify_assigned_seekers_jobs', 'employment_center_dashboard', user?.username || null)}>Verify Jobs for My Assigned Seekers</Link>
+      </div>
       <div className="user-controls">
         <Link to="/help" className="help-link-btn" style={{ marginRight: '15px' }}>Information and help</Link>
         <span>Welcome, {user.name}</span>
