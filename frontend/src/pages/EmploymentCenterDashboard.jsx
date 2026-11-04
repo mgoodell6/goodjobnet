@@ -126,8 +126,10 @@ function EmploymentCenterDashboard({ user }) {
                   if (!entry) return 0;
                   return Object.entries(entry).reduce((s, [k, v]) => (k !== 'date' && typeof v === 'number' ? s + v : s), 0);
                 };
+                const pad = (n) => String(n).padStart(2, '0');
+                const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
                 const data = days.map(d => {
-                  const key = d.toISOString().slice(0, 10);
+                  const key = dateKey(d);
                   return {
                     label: (d.getMonth() + 1) + '/' + d.getDate(),
                     jsCount: sumFor(jsDaily, key),
