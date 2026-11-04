@@ -46,126 +46,6 @@ function EmploymentCenterDashboard({ user }) {
 
 
 
-  const getSharedColorMap = () => {
-    const map = new Map();
-    map.set('Other', '#95a5a6');
-
-    let jobTypesArr = Object.entries(stats.job_types || {}).map(([l, c]) => ({ label: l, count: c })).sort((a, b) => b.count - a.count).slice(0, 5);
-    let seekerTypesArr = Object.entries(stats.seeker_types || {}).map(([l, c]) => ({ label: l, count: c })).sort((a, b) => b.count - a.count).slice(0, 5);
-
-    const allLabels = [...new Set([...jobTypesArr.map(t => t.label), ...seekerTypesArr.map(t => t.label)])];
-    const palette = ['#3a7bd5', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#1abc9c', '#d35400', '#2980b9', '#27ae60', '#e67e22'];
-
-    let colorIndex = 0;
-    allLabels.forEach(label => {
-      if (label !== 'Other' && !map.has(label)) {
-        map.set(label, palette[colorIndex % palette.length]);
-        colorIndex++;
-      }
-    });
-
-    return map;
-  };
-
-  const sharedColorMap = getSharedColorMap();
-
-  const renderPieChart = (typeCounts, total, colorMap, emptyMessage = "No active data") => {
-    if (total === '...') {
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '210px' }}>
-          <div style={{
-            width: '150px',
-            height: '150px',
-            borderRadius: '50%',
-            background: 'conic-gradient(#f6f8fb 0% 100%)',
-            margin: '0 auto 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '2px dashed var(--text-light)',
-            opacity: 0.5
-          }}>
-            <span style={{ color: 'var(--text-light)', fontSize: '0.85rem' }}>Loading...</span>
-          </div>
-        </div>
-      );
-    }
-
-    if (!typeCounts || Object.keys(typeCounts).length === 0 || total === 0) {
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '210px' }}>
-          <div style={{
-            width: '150px',
-            height: '150px',
-            borderRadius: '50%',
-            background: 'conic-gradient(#e5ebf1 0% 100%)',
-            margin: '0 auto 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '2px dashed #bdc3c7'
-          }}>
-            <span style={{ color: 'var(--text-light)', fontSize: '0.85rem', fontWeight: '500' }}>No Data</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', fontSize: '0.85rem', color: 'var(--text-light)', fontStyle: 'italic' }}>
-            {emptyMessage}
-          </div>
-        </div>
-      );
-    }
-
-    let typesArr = Object.entries(typeCounts).map(([label, count]) => ({ label, count }));
-    typesArr.sort((a, b) => b.count - a.count);
-
-    let topTypes = typesArr.slice(0, 5);
-    let otherCount = typesArr.slice(5).reduce((acc, curr) => acc + curr.count, 0);
-
-    const existingOtherIdx = topTypes.findIndex(t => t.label === "Other");
-    if (existingOtherIdx !== -1) {
-      otherCount += topTypes[existingOtherIdx].count;
-      topTypes.splice(existingOtherIdx, 1);
-    }
-
-    if (otherCount > 0) {
-      topTypes.push({ label: "Other", count: otherCount });
-    }
-
-    let gradientStops = [];
-    let currentPercent = 0;
-
-    const validTotal = Math.max(1, typesArr.reduce((sum, item) => sum + item.count, 0));
-
-    const legendItems = topTypes.map((t, idx) => {
-      const percentage = Math.round((t.count / validTotal) * 100);
-      const nextPercent = currentPercent + percentage;
-      const color = colorMap.get(t.label) || '#333';
-      gradientStops.push(`${color} ${currentPercent}% ${nextPercent}%`);
-      currentPercent = nextPercent;
-
-      return (
-        <span key={t.label} style={{ color: color }}>■ {t.label} ({percentage}%)</span>
-      );
-    });
-
-    if (gradientStops.length > 0) {
-      const lastStop = gradientStops[gradientStops.length - 1];
-      gradientStops[gradientStops.length - 1] = lastStop.replace(/\d+%$/, '100%');
-    }
-
-    const background = gradientStops.length > 0
-      ? `conic-gradient(${gradientStops.join(', ')})`
-      : 'conic-gradient(#bdc3c7 0% 100%)';
-
-    return (
-      <>
-        <div style={{ width: '150px', height: '150px', borderRadius: '50%', background: background, margin: '0 auto 1rem' }}></div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-          {legendItems}
-        </div>
-      </>
-    );
-  };
-
   return (
     <div className="app-container" style={{ flexDirection: 'column' }}>
       <div className="glass-panel main-form" style={{ maxWidth: '1000px' }}>
@@ -176,17 +56,12 @@ function EmploymentCenterDashboard({ user }) {
 
         {/* Top Section: Metrics */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
-          <div className="stat-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
-            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>Hot Jobs by Industry</h3>
-            <p style={{ fontWeight: 'bold', color: 'var(--text-color)', marginBottom: '1rem' }}>Total Hot Jobs: {stats.total_hot_jobs}</p>
-            {renderPieChart(stats.job_types, stats.total_hot_jobs, sharedColorMap, "No hot jobs currently active")}
-
+          <div className="stat-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center', minHeight: '280px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+            {/* Placeholder: future metric (previously "Hot Jobs by Industry" pie chart) */}
           </div>
 
-          <div className="stat-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center' }}>
-            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>Job Seekers by Desired Type</h3>
-            <p style={{ fontWeight: 'bold', color: 'var(--text-color)', marginBottom: '1rem' }}>Total Job Seekers: {stats.total_job_seekers}</p>
-            {renderPieChart(stats.seeker_types, stats.total_job_seekers, sharedColorMap, "No job seekers currently active")}
+          <div className="stat-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center', minHeight: '280px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+            {/* Placeholder: future metric (previously "Job Seekers by Desired Type" pie chart) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
               <Link to="/assigned-job-seekers" className="btn primary-btn" style={{ width: 'auto', background: '#8e44ad' }}>Show my assigned Job Seekers list</Link>
               <Link to="/hot-jobs-review?category=my_assigned_seekers" className="btn secondary-btn" style={{ width: 'auto', borderColor: '#8e44ad', color: '#8e44ad' }} onClick={() => trackStaff('verify_assigned_seekers_jobs')}>Verify Jobs for My Assigned Seekers</Link>
