@@ -1291,17 +1291,12 @@ function HotJobsReview({ user }) {
       data.career_website = careerWebsite;
     }
 
-    const selectedJobs = formData.getAll('available_jobs_select');
-    const manualJobs = data.available_jobs_manual;
-
-    let allJobs = [...selectedJobs];
-    if (manualJobs && manualJobs.trim() !== '') {
-      allJobs.push(manualJobs.trim());
-    }
-    data.available_jobs = allJobs.join(', ');
-
-    delete data.available_jobs_select;
-    delete data.available_jobs_manual;
+    // Normalize the comma-separated job titles (trim each, drop empties)
+    data.available_jobs = (data.available_jobs || '')
+      .split(',')
+      .map(j => j.trim())
+      .filter(Boolean)
+      .join(', ');
 
     const selectedConsiderations = formData.getAll('special_considerations');
     data.special_considerations = selectedConsiderations.join(', ');
@@ -1711,8 +1706,6 @@ function HotJobsReview({ user }) {
         <form ref={formRef} onSubmit={handleSubmit} key={`${currentJob.row_index}-${updateKey}`}>
           {(() => {
             const existingJobs = (currentJob.available_jobs || '').split(',').map(s => s.trim()).filter(Boolean);
-            const matchedJobs = existingJobs.filter(j => JOB_OPTIONS.includes(j));
-            const unmatchedJobs = existingJobs.filter(j => !JOB_OPTIONS.includes(j));
 
             const existingSC = (currentJob.special_considerations || '').toLowerCase();
             const isEntryLevel = existingSC.includes('entry level');
@@ -1804,9 +1797,10 @@ function HotJobsReview({ user }) {
                   <input type="email" name="contact_email" defaultValue={currentJob.contact_email} />
                 </div>
 
-                <div className="input-group">
-                  <label>Currently Hiring</label>
+                <div className="input-group primary-field-highlight">
+                  <label htmlFor="currently_hiring">Currently Hiring</label>
                   <select
+                    id="currently_hiring"
                     name="currently_hiring"
                     defaultValue={
                       (currentJob.currently_hiring === 'TRUE' ||
@@ -1822,12 +1816,16 @@ function HotJobsReview({ user }) {
                   </select>
                 </div>
 
-                <div className="input-group full-width">
-                  <label>Available Jobs (Select multiple with Ctrl/Cmd, and/or enter manually)</label>
-                  <select name="available_jobs_select" multiple size="6" defaultValue={matchedJobs}>
-                    {JOB_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                  <input type="text" name="available_jobs_manual" defaultValue={unmatchedJobs.join(', ')} placeholder="Other available jobs (comma separated)" style={{ marginTop: '0.5rem' }} />
+                <div className="input-group full-width primary-field-highlight">
+                  <label htmlFor="available_jobs">Available Jobs</label>
+                  <input
+                    type="text"
+                    id="available_jobs"
+                    name="available_jobs"
+                    defaultValue={existingJobs.join(', ')}
+                    placeholder="Enter available job titles, comma separated (e.g. Cashier, Stocking, Delivery Driver)"
+                  />
+                  <small className="primary-field-hint">Separate multiple job titles with commas.</small>
                 </div>
 
                 <div className="input-group full-width">
