@@ -112,7 +112,7 @@ function EmploymentCenterDashboard({ user }) {
           <div className="stat-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)', textAlign: 'center', minHeight: '280px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
             {/* Stacked bar chart: User selections over last 7 days by usage page */}
             <div>
-              <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: 'var(--primary-color)' }}>Site Usage - Target Selections (Last 7 Days)</h3>
+              <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: 'var(--primary-color)' }}>Site Usage - User Selections (Last 7 Days)</h3>
               {(() => {
                 const { jsDaily, ecDaily } = stats.usage_daily;
                 const days = [];
