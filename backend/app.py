@@ -3185,6 +3185,8 @@ def import_jobseekers():
 RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", "457db76ea4msh6e72f507cddeb59p195bfcjsn8d2af1826386")
 JSEARCH_HOST = "jsearch.p.rapidapi.com"
 JSEARCH_SHEET_ID = "1vyLxy_biwu0eKclIupvoXa71dolrw7_faHDDiLbozxw"
+ADZUNA_APP_ID = os.environ.get("ADZUNA_APP_ID", "72768e34")
+ADZUNA_APP_KEY = os.environ.get("ADZUNA_APP_KEY", "9315c49fafff55ed6d8d0d932cca6f58")
 
 def extract_street_address_and_zip(j):
     street_addr = j.get('job_street_address') or ''
@@ -3343,6 +3345,54 @@ def search_company_career_sites(company_name, location):
                 })
     except Exception as e:
         print(f"Error searching career site for '{company_name}': {e}")
+    return postings
+
+
+def search_adzuna(search_term, location):
+    """
+    Query the Adzuna API (free job aggregator) for job postings for a search term and location.
+    Results are normalized into the same shape as JSearch results so they flow through
+    the existing filtering / row-building logic.
+    """
+    postings = []
+    try:
+        params = urllib.parse.urlencode({
+            'app_id': ADZUNA_APP_ID,
+            'app_key': ADZUNA_APP_KEY,
+            'what': search_term,
+            'where': location,
+            'results_per_page': 10,
+        })
+        api_url = f"https://api.adzuna.com/v1/api/jobs/us/search/1?{params}"
+        req = urllib.request.Request(api_url, headers={
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0'
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+
+        parts = [p.strip() for p in location.split(',')]
+        city_val = parts[0] if parts else location
+        state_val = parts[1] if len(parts) > 1 else ''
+
+        for r in data.get('results', []):
+            min_sal = r.get('salary_min') or ''
+            max_sal = r.get('salary_max') or ''
+            postings.append({
+                'job_title': (r.get('title') or '').strip(),
+                'employer_name': str((r.get('company') or {}).get('display_name') or '').strip(),
+                'job_apply_link': (r.get('redirect_url') or '').strip(),
+                'job_description': (r.get('description') or '').strip(),
+                'job_city': city_val,
+                'job_state': state_val,
+                'job_min_salary': min_sal,
+                'job_max_salary': max_sal,
+                'job_salary_period': 'year' if (min_sal or max_sal) else '',
+                'job_publisher': 'Adzuna',
+                'adzuna_geo': True
+            })
+    except Exception as e:
+        print(f"Error querying Adzuna for '{search_term}': {e}")
     return postings
 
 
@@ -3512,9 +3562,15 @@ def export_jsearch_jobs():
                         jobs = career_jobs
                         fetched_from_career_site = True
 
+            # Adzuna API (free source) for every target - runs even when JSearch quota is exceeded
+            what_term = target.get('company_name') or industry_label
+            adzuna_jobs = search_adzuna(what_term, search_location)
+            jobs = jobs + adzuna_jobs
+
             for j in jobs:
-                # Location validation check for JSearch results
-                if not fetched_from_career_site and not is_location_match(j, search_location):
+                # Location validation check for JSearch results (Adzuna already geo-filtered server-side)
+                adzuna_geo = bool(j.get('adzuna_geo'))
+                if not fetched_from_career_site and not adzuna_geo and not is_location_match(j, search_location):
                     continue
 
                 job_title = (j.get('job_title') or '').strip()
@@ -3589,7 +3645,7 @@ def export_jsearch_jobs():
 
                 notes = f"{snippet}{salary_info}".strip()
 
-                validated_by = 'Career Site Search' if fetched_from_career_site else 'JSearch API'
+                validated_by = 'Career Site Search' if fetched_from_career_site else ('Adzuna API' if adzuna_geo else 'JSearch API')
 
                 # Construct row object matching headers
                 row_dict = {
