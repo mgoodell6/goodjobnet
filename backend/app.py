@@ -435,6 +435,19 @@ def get_row_field(row, field_name, default=""):
     return default
 
 
+# Adzuna ToS compliance: job listings sourced from Adzuna must be labeled
+def apply_adzuna_label(row, notes_val):
+    try:
+        validated_by = str(get_row_field(row, "validated_by") or "").strip().lower()
+        notes_str = str(notes_val or "")
+        if 'adzuna' in validated_by and '[source: adzuna]' not in notes_str.lower():
+            label = "[Source: Adzuna]"
+            return f"{notes_str} {label}".strip() if notes_str.strip() else label
+    except Exception:
+        pass
+    return notes_val
+
+
 # Authentication helper
 def get_gsheets_client():
     global _gsheets_client
@@ -613,7 +626,7 @@ def search_jobs():
                     
                     role_val = get_row_field(row, "available_jobs") or "Various"
                     career_website = get_row_field(row, "career_website")
-                    notes_val = get_row_field(row, "notes")
+                    notes_val = apply_adzuna_label(row, get_row_field(row, "notes"))
                     date_verified_str = str(get_row_field(row, "date_verified")).strip()
                     date_obj = parse_date_string(date_verified_str) if date_verified_str else None
                     is_verified_recently = (date_obj is not None and date_obj.date() >= three_weeks_ago)
@@ -698,7 +711,7 @@ def search_jobs():
             state_val = get_row_field(row, "company_state", "FL")
             zip_val = get_row_field(row, "company_zip")
             career_website = get_row_field(row, "career_website")
-            notes_val = get_row_field(row, "notes")
+            notes_val = apply_adzuna_label(row, get_row_field(row, "notes"))
             is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
             date_verified_str = str(get_row_field(row, "date_verified")).strip()
             
@@ -2765,7 +2778,7 @@ def seeker_matching_jobs():
             is_currently_hiring = is_hiring_val in ["TRUE", "YES", "1", "Y"]
             
             career_website = get_row_field(row, "career_website")
-            notes_val = get_row_field(row, "notes")
+            notes_val = apply_adzuna_label(row, get_row_field(row, "notes"))
             date_verified_str = str(get_row_field(row, "date_verified")).strip()
             date_obj = parse_date_string(date_verified_str) if date_verified_str else None
             is_verified_recently = (date_obj is not None and date_obj.date() >= three_weeks_ago)
@@ -3644,6 +3657,10 @@ def export_jsearch_jobs():
                     salary_info = f" Salary: ${min_sal} ({sal_period})."
 
                 notes = f"{snippet}{salary_info}".strip()
+
+                # Adzuna ToS compliance: label Adzuna-sourced postings in the notes area
+                if adzuna_geo:
+                    notes = f"{notes} [Source: Adzuna]".strip()
 
                 validated_by = 'Career Site Search' if fetched_from_career_site else ('Adzuna API' if adzuna_geo else 'JSearch API')
 
