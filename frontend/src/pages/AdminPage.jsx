@@ -1,6 +1,80 @@
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { FaShieldAlt, FaUser, FaBriefcase, FaUserTie, FaSync, FaCloudDownloadAlt, FaExternalLinkAlt, FaMapMarkedAlt, FaClone } from 'react-icons/fa';
+import { FaShieldAlt, FaUser, FaBriefcase, FaUserTie, FaSync, FaCloudDownloadAlt, FaExternalLinkAlt, FaMapMarkedAlt, FaClone, FaTimes } from 'react-icons/fa';
+
+const ADMIN_ACTION_SUMMARIES = {
+  updateJobSeekerInfo: {
+    title: 'Update JobBank & Phone Verification jobSeeker information',
+    summary: 'Matches each employer\'s Available Jobs against job seekers\' Desired Job Types and updates the "Number of Job Seekers looking for this type of employment" column in both the Master JobBank and Phone Verification spreadsheets.',
+    inputs: [
+      {
+        name: 'JobSeeker_SharePoint_export.csv',
+        location: 'Google Sheet ID: 1Yq9ajooDooK2WiSlSc71Ki61c5EOW-T1vg8qI2dBd_k',
+      },
+      {
+        name: 'GoodJobNet JobSeekers Export (Sheet1)',
+        location: 'Google Sheet ID: 1khmTUewP3EJremrR388R4-rjLZ8ej0RcnGyCfLFYpuY',
+      },
+      {
+        name: 'Master JobBank (tab: Destinations)',
+        location: 'Google Sheet ID: 1NxDQTta3xvch5jn_j-DpWvGg0zRfJhpGnLv9rFQxw6I',
+      },
+      {
+        name: 'Phone Verification List (Sheet1)',
+        location: 'Google Sheet ID: 1aUTms82Rgci168ATaD7XcyU1SFUjjnq4HxamxRJtFQw',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Master JobBank ("Number of Job Seekers looking for this type of employment" column)',
+        location: 'Google Sheet ID: 1NxDQTta3xvch5jn_j-DpWvGg0zRfJhpGnLv9rFQxw6I (tab: Destinations)',
+      },
+      {
+        name: 'Phone Verification List ("Number of Job Seekers looking for this type of employment" column)',
+        location: 'Google Sheet ID: 1aUTms82Rgci168ATaD7XcyU1SFUjjnq4HxamxRJtFQw (Sheet1)',
+      },
+    ],
+    confirmLabel: 'Run Update',
+  },
+  exportJSearchJobs: {
+    title: 'Export Jobs (JSearch & Featured Companies)',
+    summary: 'Reads job types, search city/area, and optional target companies, queries JSearch (RapidAPI), Adzuna, and featured company career sites (e.g., Walmart, Publix, McDonalds), skips duplicates, and appends new job postings.',
+    inputs: [
+      {
+        name: 'JSearch Config & Existing Postings (tabs: "JobTypes to Search", "Companies to Search", "Job_Postings")',
+        location: 'Google Sheet ID: 1vyLxy_biwu0eKclIupvoXa71dolrw7_faHDDiLbozxw',
+      },
+      {
+        name: 'Master JobBank (duplicate check)',
+        location: 'Google Sheet ID: 1NxDQTta3xvch5jn_j-DpWvGg0zRfJhpGnLv9rFQxw6I',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Job_Postings worksheet (appends new job postings)',
+        location: 'Google Sheet ID: 1vyLxy_biwu0eKclIupvoXa71dolrw7_faHDDiLbozxw (tab: Job_Postings)',
+      },
+    ],
+    confirmLabel: 'Run Export',
+  },
+  syncJobSeekersCsv: {
+    title: 'Sync JobSeeker CSV to Google Drive',
+    summary: 'Downloads the raw JobSeeker CSV file from Google Drive, parses complex fields (Desired Job Types, Special Considerations, Engagement Level) into human-readable columns, clears the target spreadsheet, and writes the formatted records.',
+    inputs: [
+      {
+        name: 'JobSeekerList.csv (or first .csv in folder)',
+        location: 'Google Drive Folder ID: 15rGolLs1_3u8qEbtZyrGZGGrtzLWoV3I',
+      },
+    ],
+    outputs: [
+      {
+        name: 'GoodJobNet JobSeekers Export (clears & overwrites Sheet1)',
+        location: 'Google Sheet ID: 1khmTUewP3EJremrR388R4-rjLZ8ej0RcnGyCfLFYpuY',
+      },
+    ],
+    confirmLabel: 'Run Sync',
+  },
+};
 
 function AdminPage({ user }) {
   const navigate = useNavigate();
@@ -20,6 +94,16 @@ function AdminPage({ user }) {
   const [mapStatus, setMapStatus] = useState(null);
   const [detectingDups, setDetectingDups] = useState(false);
   const [dupStatus, setDupStatus] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+
+  useEffect(() => {
+    if (!pendingAction) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setPendingAction(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [pendingAction]);
 
   useEffect(() => {
     fetch('/api/dashboard-stats')
@@ -281,7 +365,7 @@ function AdminPage({ user }) {
           {/* Card 3: Update jobBank jobSeeker information */}
           <button
             type="button"
-            onClick={handleUpdateJobSeekerInfo}
+            onClick={() => setPendingAction('updateJobSeekerInfo')}
             disabled={updating}
             className="nav-card"
             style={{ opacity: updating ? 0.7 : 1 }}
@@ -293,7 +377,7 @@ function AdminPage({ user }) {
           {/* Card 4: Export Jobs from JSearch */}
           <button
             type="button"
-            onClick={handleExportJSearchJobs}
+            onClick={() => setPendingAction('exportJSearchJobs')}
             disabled={exporting}
             className="nav-card"
             style={{ opacity: exporting ? 0.7 : 1 }}
@@ -305,7 +389,7 @@ function AdminPage({ user }) {
           {/* Card 5: Sync JobSeeker CSV to Google Drive */}
           <button
             type="button"
-            onClick={handleSyncJobSeekersCsv}
+            onClick={() => setPendingAction('syncJobSeekersCsv')}
             disabled={syncingCsv}
             className="nav-card"
             style={{ opacity: syncingCsv ? 0.7 : 1 }}
@@ -461,6 +545,88 @@ function AdminPage({ user }) {
             Back to Employment Center Dashboard
           </button>
         </div>
+        {/* Action Summary Confirmation Modal */}
+        {pendingAction && ADMIN_ACTION_SUMMARIES[pendingAction] && (() => {
+          const info = ADMIN_ACTION_SUMMARIES[pendingAction];
+          const handleConfirm = () => {
+            const action = pendingAction;
+            setPendingAction(null);
+            if (action === 'updateJobSeekerInfo') handleUpdateJobSeekerInfo();
+            else if (action === 'exportJSearchJobs') handleExportJSearchJobs();
+            else if (action === 'syncJobSeekersCsv') handleSyncJobSeekersCsv();
+          };
+          return (
+            <div className="admin-modal-overlay" onClick={() => setPendingAction(null)}>
+              <div
+                className="admin-modal-card"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="admin-modal-title"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="admin-modal-header">
+                  <h3 id="admin-modal-title">{info.title}</h3>
+                  <button
+                    type="button"
+                    className="admin-modal-close"
+                    aria-label="Close popup"
+                    onClick={() => setPendingAction(null)}
+                  >
+                    <FaTimes />
+                  </button>
+                </div>
+
+                <div className="admin-modal-section">
+                  <h4>What This Feature Does</h4>
+                  <p>{info.summary}</p>
+                </div>
+
+                <div className="admin-modal-section">
+                  <h4>Input Files</h4>
+                  <ul className="admin-modal-file-list">
+                    {info.inputs.map((item, idx) => (
+                      <li key={idx}>
+                        <strong>{item.name}</strong>
+                        <span className="admin-modal-file-loc">{item.location}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="admin-modal-section">
+                  <h4>Output Files</h4>
+                  <ul className="admin-modal-file-list">
+                    {info.outputs.map((item, idx) => (
+                      <li key={idx}>
+                        <strong>{item.name}</strong>
+                        <span className="admin-modal-file-loc">{item.location}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="admin-modal-actions">
+                  <button
+                    type="button"
+                    className="btn secondary-btn"
+                    style={{ width: 'auto' }}
+                    onClick={() => setPendingAction(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn primary-btn"
+                    style={{ width: 'auto' }}
+                    onClick={handleConfirm}
+                  >
+                    {info.confirmLabel}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
