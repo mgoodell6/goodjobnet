@@ -2629,6 +2629,7 @@ def assigned_seekers():
     try:
         seekers_records = get_seekers_records()
         all_jobs = get_master_jobs_records()
+        three_weeks_ago = datetime.datetime.now().date() - datetime.timedelta(days=21)
         assigned = []
         
         for idx, seeker in enumerate(seekers_records):
@@ -2653,10 +2654,18 @@ def assigned_seekers():
                 email = str(seeker.get("email") or seeker.get("Email") or seeker.get("Email Address", "")).strip()
                 seeker_job_types = str(seeker.get("Desired Job Types", seeker.get("Type of Job Needed", seeker.get("Desired Types", "")))).strip()
                 
-                # Count matching jobs
+                # Count matching jobs (only Currently Hiring Jobs, i.e., currently_hiring & verified within 21 days)
                 seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
                 match_count = 0
                 for row in all_jobs:
+                    is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
+                    if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
+                        continue
+                    date_verified_str = str(get_row_field(row, "date_verified")).strip()
+                    date_obj = parse_date_string(date_verified_str) if date_verified_str else None
+                    if not (date_obj is not None and date_obj.date() >= three_weeks_ago):
+                        continue
+
                     role = get_row_field(row, "available_jobs")
                     job_types_list = [t.strip() for t in str(role).split(",") if t.strip()]
                     match = False
