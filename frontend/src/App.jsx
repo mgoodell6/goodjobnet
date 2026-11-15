@@ -10,6 +10,7 @@ import InformationAndHelp from './pages/InformationAndHelp';
 import HotJobsReview from './pages/HotJobsReview';
 import JobSeekerDashboard from './pages/JobSeekerDashboard';
 import AssignedJobSeekersList from './pages/AssignedJobSeekersList';
+import AssignedSeekersJobsList from './pages/AssignedSeekersJobsList';
 import AdminPage from './pages/AdminPage';
 
 // Manual Version Configuration - Update this string to change the application version displayed in the header
@@ -46,6 +47,7 @@ function TopBar({ user, handleLogout }) {
       <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
         <Link to="/assigned-job-seekers" className="btn primary-btn" style={{ background: '#8e44ad', padding: '0.4rem 1rem', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>Show my assigned Job Seekers list</Link>
         <Link to="/hot-jobs-review?category=my_assigned_seekers" className="btn secondary-btn" style={{ padding: '0.4rem 1rem', fontSize: '0.9rem', whiteSpace: 'nowrap', borderColor: '#8e44ad', color: '#8e44ad' }} onClick={() => trackClick('verify_assigned_seekers_jobs', 'employment_center_dashboard', user?.username || null)}>Verify Jobs for My Assigned Seekers</Link>
+        <Link to="/assigned-seekers-jobs" className="btn secondary-btn" style={{ padding: '0.4rem 1rem', fontSize: '0.9rem', whiteSpace: 'nowrap', borderColor: '#8e44ad', color: '#8e44ad' }}>List Jobs for My Seekers</Link>
       </div>
       <div className="user-controls">
         <Link to="/help" className="help-link-btn" style={{ marginRight: '15px' }}>Information and help</Link>
@@ -100,6 +102,7 @@ function App() {
             <Route path="/hot-jobs-5review" element={<HotJobsReview user={user} />} />
             <Route path="/admin-page" element={<AdminPage user={user} />} />
             <Route path="/assigned-job-seekers" element={<AssignedJobSeekersList user={user} />} />
+            <Route path="/assigned-seekers-jobs" element={<AssignedSeekersJobsList user={user} />} />
             <Route path="/job-seeker-search" element={<JobSeekerSearch user={user} />} />
             <Route path="*" element={<Navigate to="/employment-dashboard" replace />} />
           </>

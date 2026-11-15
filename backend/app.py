@@ -2825,6 +2825,114 @@ def seeker_matching_jobs():
         garbage_collector.collect()
 
 
+@app.route('/api/assigned-seekers-matching-jobs', methods=['GET'])
+def assigned_seekers_matching_jobs():
+    coach = request.args.get("coach", "").strip()
+    if not coach:
+        return jsonify({"success": False, "error": "Coach name is required"}), 400
+
+    try:
+        seekers_records = get_seekers_records()
+        all_jobs = get_master_jobs_records()
+        three_weeks_ago = datetime.datetime.now().date() - datetime.timedelta(days=21)
+
+        # Pre-filter to only Currently Hiring Jobs (currently_hiring & verified within 21 days)
+        hiring_jobs = []
+        for row in all_jobs:
+            is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
+            if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
+                continue
+            date_verified_str = str(get_row_field(row, "date_verified")).strip()
+            date_obj = parse_date_string(date_verified_str) if date_verified_str else None
+            if not (date_obj is not None and date_obj.date() >= three_weeks_ago):
+                continue
+
+            company = get_row_field(row, "company_name") or "Unknown"
+            role = get_row_field(row, "available_jobs") or "Various"
+            address_val = get_row_field(row, "company_street")
+            city_val = get_row_field(row, "company_city")
+            state_val = get_row_field(row, "company_state", "FL")
+            job_zip_val = str(get_row_field(row, "company_zip")).strip()
+            if job_zip_val.endswith('.0'):
+                job_zip_val = job_zip_val[:-2]
+            addr_parts = [part for part in [address_val, city_val, f"{state_val} {job_zip_val}".strip()] if part]
+            address = ", ".join(addr_parts)
+
+            hiring_jobs.append({
+                "company": company,
+                "address": address,
+                "available_jobs": role,
+                "career_website": get_row_field(row, "career_website"),
+                "job_types_list": [t.strip() for t in str(role).split(",") if t.strip()],
+                "job_zip_5": resolve_zip(job_zip_val, city_val),
+            })
+
+        grouped = []
+        for seeker in seekers_records:
+            coach_val = str(seeker.get("Employment Advisor", seeker.get("Employment Coach", ""))).strip()
+            if not coach_val or not matches_coach_loose(coach_val, coach):
+                continue
+
+            name = seeker.get("Full Name", seeker.get(" Name", seeker.get("Name", "Unknown"))).strip()
+            seeker_job_types = str(seeker.get("Desired Job Types", seeker.get("Type of Job Needed", seeker.get("Desired Types", "")))).strip()
+            seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
+            seeker_zip_5 = resolve_zip(
+                str(seeker.get("ZipCode", seeker.get("Zip", seeker.get("Zipcode", "")))),
+                seeker.get("City", "")
+            )
+
+            matched_jobs = []
+            for job in hiring_jobs:
+                match = False
+                for s_job in seeker_types_list:
+                    for jb_job in job["job_types_list"]:
+                        if is_loose_match(s_job, jb_job):
+                            match = True
+                            break
+                    if match:
+                        break
+                if not match:
+                    continue
+
+                dist_miles = float('inf')
+                if seeker_zip_5 and job["job_zip_5"]:
+                    if seeker_zip_5 == job["job_zip_5"]:
+                        dist_miles = 0.0
+                    else:
+                        try:
+                            coords1 = get_zip_coordinates(seeker_zip_5)
+                            coords2 = get_zip_coordinates(job["job_zip_5"])
+                            if coords1 and coords2:
+                                dist_miles = calculate_distance(coords1[0], coords1[1], coords2[0], coords2[1])
+                        except Exception:
+                            pass
+
+                matched_jobs.append({
+                    "company": job["company"],
+                    "address": job["address"],
+                    "available_jobs": job["available_jobs"],
+                    "career_website": job["career_website"],
+                    "_dist": dist_miles,
+                })
+
+            matched_jobs.sort(key=lambda x: x["_dist"])
+            for j in matched_jobs:
+                del j["_dist"]
+
+            grouped.append({
+                "name": name,
+                "job_types": seeker_job_types,
+                "jobs": matched_jobs,
+            })
+
+        return jsonify({"success": True, "results": grouped})
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
+
 @app.route('/api/import-jobseekers', methods=['POST'])
 def import_jobseekers():
     import zipfile
