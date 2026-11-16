@@ -1164,6 +1164,21 @@ def hot_jobs_review():
 
         if category in ["jobseekers", "job_seekers", "seekers", "5days", "unverified_jobseekers"]:
             all_records = get_master_jobs_records()
+            seekers_records = get_seekers_records()
+            parsed_seekers_geo = []
+            for seeker in seekers_records:
+                seeker_job_types = str(seeker.get("Desired Job Types", seeker.get("Type of Job Needed", seeker.get("Desired Types", "")))).strip()
+                s_types = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
+                if not s_types:
+                    continue
+                seeker_zip = str(seeker.get("ZipCode", seeker.get("Zip", seeker.get("Zipcode", "")))).strip()
+                if seeker_zip.endswith('.0'):
+                    seeker_zip = seeker_zip[:-2]
+                s_city = str(seeker.get("City", "")).strip()
+                s_zip_5 = resolve_zip(seeker_zip, s_city)
+                s_coords = get_zip_coordinates(s_zip_5) if s_zip_5 else None
+                parsed_seekers_geo.append((s_types, s_zip_5, s_coords))
+
             source = "jobbank"
 
             for idx, row in enumerate(all_records):
@@ -1192,7 +1207,29 @@ def hot_jobs_review():
                 if 0 <= age_days <= 21:
                     continue
 
-                seekers_display = str(int(seekers_count)) if seekers_count == int(seekers_count) else str(seekers_count)
+                job_city_val = get_row_field(row, "company_city")
+                job_zip_raw = str(get_row_field(row, "company_zip")).strip()
+                if job_zip_raw.endswith('.0'):
+                    job_zip_raw = job_zip_raw[:-2]
+                job_zip_5 = resolve_zip(job_zip_raw, job_city_val)
+                job_coords = get_zip_coordinates(job_zip_5) if job_zip_5 else None
+
+                available_jobs_val = get_row_field(row, "available_jobs")
+                row_types = [t.strip() for t in str(available_jobs_val).split(",") if t.strip()]
+
+                nearby_seekers_count = 0
+                if job_zip_5 and row_types:
+                    for s_types, s_zip_5, s_coords in parsed_seekers_geo:
+                        if not s_zip_5:
+                            continue
+                        if s_zip_5 == job_zip_5:
+                            dist_miles = 0.0
+                        elif job_coords and s_coords:
+                            dist_miles = calculate_distance(job_coords[0], job_coords[1], s_coords[0], s_coords[1])
+                        else:
+                            continue
+                        if dist_miles <= 20.0 and any(is_loose_match(st, rt) for st in s_types for rt in row_types):
+                            nearby_seekers_count += 1
 
                 job = {
                     "row_index": idx + 2,
@@ -1200,7 +1237,7 @@ def hot_jobs_review():
                     "company_name": company_name_val,
                     "company_type": row.get("Company Type") or row.get("Company Type / Industry") or "",
                     "company_street": get_row_field(row, "company_street"),
-                    "company_city": get_row_field(row, "company_city"),
+                    "company_city": job_city_val,
                     "company_state": get_row_field(row, "company_state", "FL"),
                     "company_zip": get_row_field(row, "company_zip"),
                     "career_website": career_page,
@@ -1208,13 +1245,13 @@ def hot_jobs_review():
                     "contact_phone": str(get_row_field(row, "contact_phone")),
                     "contact_email": get_row_field(row, "contact_email"),
                     "currently_hiring": "Yes" if is_hiring_val in ["TRUE", "YES", "1", "Y"] else "No",
-                    "available_jobs": get_row_field(row, "available_jobs"),
+                    "available_jobs": available_jobs_val,
                     "special_considerations": get_row_field(row, "special_considerations"),
                     "notes": get_row_field(row, "notes"),
                     "date_last_verified": date_str,
                     "age_days": age_days,
-                    "seekers_looking": seekers_display,
-                    "_seekers_sort": seekers_count
+                    "seekers_looking": str(nearby_seekers_count),
+                    "_seekers_sort": nearby_seekers_count
                 }
                 jobs_to_review.append(job)
 
@@ -2629,6 +2666,7 @@ def assigned_seekers():
     try:
         seekers_records = get_seekers_records()
         all_jobs = get_master_jobs_records()
+        three_weeks_ago = datetime.datetime.now().date() - datetime.timedelta(days=21)
         assigned = []
         
         for idx, seeker in enumerate(seekers_records):
@@ -2653,10 +2691,18 @@ def assigned_seekers():
                 email = str(seeker.get("email") or seeker.get("Email") or seeker.get("Email Address", "")).strip()
                 seeker_job_types = str(seeker.get("Desired Job Types", seeker.get("Type of Job Needed", seeker.get("Desired Types", "")))).strip()
                 
-                # Count matching jobs
+                # Count matching jobs (only Currently Hiring Jobs, i.e., currently_hiring & verified within 21 days)
                 seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
                 match_count = 0
                 for row in all_jobs:
+                    is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
+                    if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
+                        continue
+                    date_verified_str = str(get_row_field(row, "date_verified")).strip()
+                    date_obj = parse_date_string(date_verified_str) if date_verified_str else None
+                    if not (date_obj is not None and date_obj.date() >= three_weeks_ago):
+                        continue
+
                     role = get_row_field(row, "available_jobs")
                     job_types_list = [t.strip() for t in str(role).split(",") if t.strip()]
                     match = False
@@ -2809,6 +2855,114 @@ def seeker_matching_jobs():
                 "older": older
             }
         })
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500
+    finally:
+        garbage_collector.collect()
+
+
+@app.route('/api/assigned-seekers-matching-jobs', methods=['GET'])
+def assigned_seekers_matching_jobs():
+    coach = request.args.get("coach", "").strip()
+    if not coach:
+        return jsonify({"success": False, "error": "Coach name is required"}), 400
+
+    try:
+        seekers_records = get_seekers_records()
+        all_jobs = get_master_jobs_records()
+        three_weeks_ago = datetime.datetime.now().date() - datetime.timedelta(days=21)
+
+        # Pre-filter to only Currently Hiring Jobs (currently_hiring & verified within 21 days)
+        hiring_jobs = []
+        for row in all_jobs:
+            is_hiring_val = str(get_row_field(row, "currently_hiring", "TRUE")).strip().upper()
+            if is_hiring_val not in ["TRUE", "YES", "1", "Y"]:
+                continue
+            date_verified_str = str(get_row_field(row, "date_verified")).strip()
+            date_obj = parse_date_string(date_verified_str) if date_verified_str else None
+            if not (date_obj is not None and date_obj.date() >= three_weeks_ago):
+                continue
+
+            company = get_row_field(row, "company_name") or "Unknown"
+            role = get_row_field(row, "available_jobs") or "Various"
+            address_val = get_row_field(row, "company_street")
+            city_val = get_row_field(row, "company_city")
+            state_val = get_row_field(row, "company_state", "FL")
+            job_zip_val = str(get_row_field(row, "company_zip")).strip()
+            if job_zip_val.endswith('.0'):
+                job_zip_val = job_zip_val[:-2]
+            addr_parts = [part for part in [address_val, city_val, f"{state_val} {job_zip_val}".strip()] if part]
+            address = ", ".join(addr_parts)
+
+            hiring_jobs.append({
+                "company": company,
+                "address": address,
+                "available_jobs": role,
+                "career_website": get_row_field(row, "career_website"),
+                "job_types_list": [t.strip() for t in str(role).split(",") if t.strip()],
+                "job_zip_5": resolve_zip(job_zip_val, city_val),
+            })
+
+        grouped = []
+        for seeker in seekers_records:
+            coach_val = str(seeker.get("Employment Advisor", seeker.get("Employment Coach", ""))).strip()
+            if not coach_val or not matches_coach_loose(coach_val, coach):
+                continue
+
+            name = seeker.get("Full Name", seeker.get(" Name", seeker.get("Name", "Unknown"))).strip()
+            seeker_job_types = str(seeker.get("Desired Job Types", seeker.get("Type of Job Needed", seeker.get("Desired Types", "")))).strip()
+            seeker_types_list = [t.strip() for t in seeker_job_types.split(",") if t.strip()]
+            seeker_zip_5 = resolve_zip(
+                str(seeker.get("ZipCode", seeker.get("Zip", seeker.get("Zipcode", "")))),
+                seeker.get("City", "")
+            )
+
+            matched_jobs = []
+            for job in hiring_jobs:
+                match = False
+                for s_job in seeker_types_list:
+                    for jb_job in job["job_types_list"]:
+                        if is_loose_match(s_job, jb_job):
+                            match = True
+                            break
+                    if match:
+                        break
+                if not match:
+                    continue
+
+                dist_miles = float('inf')
+                if seeker_zip_5 and job["job_zip_5"]:
+                    if seeker_zip_5 == job["job_zip_5"]:
+                        dist_miles = 0.0
+                    else:
+                        try:
+                            coords1 = get_zip_coordinates(seeker_zip_5)
+                            coords2 = get_zip_coordinates(job["job_zip_5"])
+                            if coords1 and coords2:
+                                dist_miles = calculate_distance(coords1[0], coords1[1], coords2[0], coords2[1])
+                        except Exception:
+                            pass
+
+                matched_jobs.append({
+                    "company": job["company"],
+                    "address": job["address"],
+                    "available_jobs": job["available_jobs"],
+                    "career_website": job["career_website"],
+                    "_dist": dist_miles,
+                })
+
+            matched_jobs.sort(key=lambda x: x["_dist"])
+            for j in matched_jobs:
+                del j["_dist"]
+
+            grouped.append({
+                "name": name,
+                "job_types": seeker_job_types,
+                "jobs": matched_jobs,
+            })
+
+        return jsonify({"success": True, "results": grouped})
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "error": "Server Error", "details": str(e)}), 500

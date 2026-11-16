@@ -1,11 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import MatchingJobsSection from '../components/MatchingJobsSection';
 
 function AssignedJobSeekersList({ user }) {
   const [loading, setLoading] = useState(true);
   const [seekers, setSeekers] = useState([]);
   const [error, setError] = useState('');
+  const [selectedSeeker, setSelectedSeeker] = useState(null);
+  const [matchingJobs, setMatchingJobs] = useState({ recent: [], older: [] });
+  const [matchingJobsLoading, setMatchingJobsLoading] = useState(false);
   const navigate = useNavigate();
+
+  const loadMatchingJobs = useCallback(async (seeker) => {
+    setSelectedSeeker(seeker);
+    setMatchingJobsLoading(true);
+    try {
+      const response = await fetch(
+        `/api/seeker-matching-jobs?row_index=${seeker.row_index}&job_types=${encodeURIComponent(seeker.job_types || seeker.desired_job_types || '')}&zipcode=${encodeURIComponent(seeker.zipcode || '')}`
+      );
+      const data = await response.json();
+      if (data.success) {
+        setMatchingJobs(data.results);
+      } else {
+        alert('Failed to load matching jobs: ' + (data.error || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error while fetching matching jobs.');
+    } finally {
+      setMatchingJobsLoading(false);
+      setTimeout(() => {
+        document.getElementById('matching-jobs-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchAssignedSeekers = async () => {
@@ -72,16 +100,34 @@ function AssignedJobSeekersList({ user }) {
                       {seeker.name}
                     </td>
                     <td>{seeker.address || 'N/A'}</td>
-                    <td>{seeker.phone ? <a href={`tel:${seeker.phone}`}>{seeker.phone}</a> : 'N/A'}</td>
+                    <td>{seeker.phone || 'N/A'}</td>
                     <td>{seeker.email ? <a href={`mailto:${seeker.email}`}>{seeker.email}</a> : 'N/A'}</td>
                     <td>{seeker.job_types || 'N/A'}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{seeker.matching_jobs_count ?? 0}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>
+                      <a
+                        href="#matching-jobs-section"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          loadMatchingJobs(seeker);
+                        }}
+                        style={{ color: 'var(--primary-color)', textDecoration: 'underline', cursor: 'pointer' }}
+                        title="View matching jobs for this job seeker"
+                      >
+                        {seeker.matching_jobs_count ?? 0}
+                      </a>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+
+        <MatchingJobsSection
+          selectedSeeker={selectedSeeker}
+          matchingJobs={matchingJobs}
+          matchingJobsLoading={matchingJobsLoading}
+        />
 
         <div className="actions mt-2 text-center">
           <button 
